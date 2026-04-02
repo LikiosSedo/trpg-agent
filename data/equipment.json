@@ -1,0 +1,68 @@
+[
+  {
+    "name": "Shortsword",
+    "type": "weapon",
+    "description": "A light, finesse blade favored by rogues. Deals 1d6 piercing damage.",
+    "bonus": 0
+  },
+  {
+    "name": "Longsword",
+    "type": "weapon",
+    "description": "A versatile martial weapon. Deals 1d8 slashing damage.",
+    "bonus": 0
+  },
+  {
+    "name": "Shortbow",
+    "type": "weapon",
+    "description": "A simple ranged weapon with 80ft range. Deals 1d6 piercing damage.",
+    "bonus": 0
+  },
+  {
+    "name": "Leather Armor",
+    "type": "armor",
+    "description": "Light armor made of cured leather. AC 11 + DEX modifier.",
+    "bonus": 1
+  },
+  {
+    "name": "Chain Shirt",
+    "type": "armor",
+    "description": "Medium armor of interlocking metal rings. AC 13 + DEX modifier (max 2).",
+    "bonus": 3
+  },
+  {
+    "name": "Healing Potion",
+    "type": "potion",
+    "description": "A vial of glowing red liquid. Restores 2d4+2 HP when consumed.",
+    "bonus": 2
+  },
+  {
+    "name": "Antidote",
+    "type": "potion",
+    "description": "A bitter herbal remedy that cures poison and grants poison resistance for 1 hour."
+  },
+  {
+    "name": "Shadow Ward Potion",
+    "type": "potion",
+    "description": "A shimmering silver liquid brewed by Greenleaf. Grants resistance to necrotic damage for 10 minutes."
+  },
+  {
+    "name": "Mine Key",
+    "type": "quest",
+    "description": "A heavy iron key that opens the sealed gate to the mid-level Greyspine Mines."
+  },
+  {
+    "name": "Darian's Journal",
+    "type": "quest",
+    "description": "The last pages of a dead mercenary's journal, containing sketches of strange symbols found deep in the mines."
+  },
+  {
+    "name": "Hempen Rope",
+    "type": "misc",
+    "description": "50 feet of sturdy rope. Useful for climbing, binding, or improvised traps."
+  },
+  {
+    "name": "Torch",
+    "type": "misc",
+    "description": "A simple torch that burns for 1 hour, providing bright light in a 20ft radius."
+  }
+]

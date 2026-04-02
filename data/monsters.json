@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Goblin",
+    "hp": 7,
+    "dc": 12,
+    "damageDice": "1d6+2",
+    "specialAbility": "Nimble Escape: can Disengage or Hide as a bonus action",
+    "description": "A small, cunning humanoid that fights dirty and flees when outmatched.",
+    "loot": ["Rusty Dagger", "3 gold"]
+  },
+  {
+    "name": "Skeleton",
+    "hp": 13,
+    "dc": 13,
+    "damageDice": "1d6+2",
+    "specialAbility": "Undead Fortitude: drops to 1 HP instead of 0 once",
+    "description": "An animated pile of bones held together by dark magic, armed with a rusty shortsword.",
+    "loot": ["Bone Fragment", "5 gold"]
+  },
+  {
+    "name": "Giant Spider",
+    "hp": 26,
+    "dc": 14,
+    "damageDice": "1d8+3",
+    "specialAbility": "Web: target must pass DC 12 STR check or be restrained",
+    "description": "A horse-sized spider lurking in dark corners, spinning webs to trap prey.",
+    "loot": ["Spider Silk", "Venom Sac"]
+  },
+  {
+    "name": "Shadow",
+    "hp": 16,
+    "dc": 12,
+    "damageDice": "2d6+2",
+    "specialAbility": "Strength Drain: on hit, target's STR is reduced by 1d4 until rest",
+    "description": "A wraith of living darkness that drains the life force of the living.",
+    "loot": ["Shadow Essence"]
+  },
+  {
+    "name": "Ghoul",
+    "hp": 22,
+    "dc": 13,
+    "damageDice": "2d6+2",
+    "specialAbility": "Paralyzing Touch: target must pass DC 10 CON save or be paralyzed for 1 turn",
+    "description": "An undead creature that feeds on corpses, its claws carry a paralyzing toxin.",
+    "loot": ["Ghoul Claw", "8 gold"]
+  },
+  {
+    "name": "Orc Warrior",
+    "hp": 15,
+    "dc": 13,
+    "damageDice": "1d12+3",
+    "specialAbility": "Aggressive: can move its full speed toward a hostile target as a bonus action",
+    "description": "A brutal fighter from the Shatterstone Wastes, wielding a massive greataxe.",
+    "loot": ["Crude Greataxe", "6 gold"]
+  },
+  {
+    "name": "Mimic",
+    "hp": 30,
+    "dc": 14,
+    "damageDice": "1d8+3",
+    "specialAbility": "Shapechanger: disguised as a treasure chest; first attack has advantage",
+    "description": "A creature that perfectly imitates a mining crate, striking when someone reaches inside.",
+    "loot": ["Mimic Adhesive", "15 gold"]
+  },
+  {
+    "name": "Eclipsed Beast",
+    "hp": 45,
+    "dc": 16,
+    "damageDice": "2d8+4",
+    "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage",
+    "description": "A monstrous entity of pure shadow, herald of the Eclipsed Eye. The final threat in the Greyspine depths.",
+    "loot": ["Void Shard", "Shadow Crystal", "50 gold"]
+  }
+]

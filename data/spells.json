@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Fire Bolt",
+    "description": "Hurl a mote of fire at a creature within 120 feet.",
+    "effect": "Deal 1d10 fire damage on a ranged spell attack hit.",
+    "usesPerRest": 0,
+    "remaining": 0
+  },
+  {
+    "name": "Magic Missile",
+    "description": "Three glowing darts of magical force strike targets of your choice.",
+    "effect": "Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.",
+    "usesPerRest": 3,
+    "remaining": 3
+  },
+  {
+    "name": "Cure Wounds",
+    "description": "Touch a creature and channel positive energy to heal its wounds.",
+    "effect": "Restore 1d8+INT modifier HP to a creature you touch.",
+    "usesPerRest": 3,
+    "remaining": 3
+  },
+  {
+    "name": "Shield",
+    "description": "An invisible barrier of magical force appears to protect you.",
+    "effect": "Reaction: +5 AC until the start of your next turn.",
+    "usesPerRest": 3,
+    "remaining": 3
+  },
+  {
+    "name": "Sleep",
+    "description": "Send creatures into a magical slumber with a wave of drowsiness.",
+    "effect": "Roll 5d8; creatures with HP equal or below the total fall unconscious for 1 minute.",
+    "usesPerRest": 3,
+    "remaining": 3
+  },
+  {
+    "name": "Detect Magic",
+    "description": "Sense the presence of magic within 30 feet for up to 10 minutes.",
+    "effect": "Reveal magical auras and identify the school of magic. Can see through thin walls.",
+    "usesPerRest": 3,
+    "remaining": 3
+  }
+]
