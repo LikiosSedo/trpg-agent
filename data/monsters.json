@@ -79,5 +79,14 @@
     "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage",
     "description": "A monstrous entity of pure shadow, herald of the Eclipsed Eye. The final threat in the Greyspine depths.",
     "loot": ["Void Shard", "Shadow Crystal", "50 gold"]
+  },
+  {
+    "name": "Cockatrice",
+    "hp": 27,
+    "dc": 13,
+    "damageDice": "1d6+1",
+    "specialAbility": "Petrifying Bite: target must pass DC 11 CON save or be restrained for 1 turn (petrifying)",
+    "description": "A bizarre creature with the body of a rooster and the tail of a lizard. Its bite can turn flesh to stone.",
+    "loot": ["Cockatrice Feather", "7 gold"]
   }
 ]
