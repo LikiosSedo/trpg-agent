@@ -13,6 +13,7 @@ import { initGameState, getSession, getFacts } from './game-state.js'
 import { GameFactStore } from './game-facts.js'
 import { checkSafety } from './safety.js'
 import { DossierManager } from './dossier.js'
+import { renderPrologue, renderWorldGuide } from './world-guide.js'
 
 // ─── Dossier (全局) ─────────────────────────
 let dossier = new DossierManager()
@@ -234,12 +235,17 @@ function handleSlashCommand(cmd: string): boolean {
       console.log(dossier.renderList())
       return true
     }
+    case '/world': {
+      console.log(renderWorldGuide())
+      return true
+    }
     case '/help': {
       console.log()
       console.log(chalk.dim('  /status    — 查看角色状态'))
       console.log(chalk.dim('  /inventory — 查看背包'))
       console.log(chalk.dim('  /npc       — 查看已知人物档案'))
       console.log(chalk.dim('  /npc <名>  — 查看角色详细档案'))
+      console.log(chalk.dim('  /world     — 查看世界指南'))
       console.log(chalk.dim('  /map       — 查看世界地图'))
       console.log(chalk.dim('  /save      — 手动存档'))
       console.log(chalk.dim('  /saves     — 列出所有存档'))
@@ -305,8 +311,10 @@ async function gameLoop(rl: readline.Interface, classId: string) {
   const facts = getFacts()
   const classZh = CLASS_TEMPLATES[classId]?.nameZh ?? '冒险者'
 
+  // ── 说书人开场 ──
+  console.log(renderPrologue())
+
   // ── Opening scene ──
-  console.log()
   console.log(chalk.dim('  ─── 游戏开始 ───'))
   console.log()
 
