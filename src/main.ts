@@ -12,6 +12,10 @@ import type { PlayerCharacter, GameSession, NPC, Spell, AbilityScores } from './
 import { initGameState, getSession, getFacts } from './game-state.js'
 import { GameFactStore } from './game-facts.js'
 import { checkSafety } from './safety.js'
+import { DossierManager } from './dossier.js'
+
+// ─── Dossier (全局) ─────────────────────────
+let dossier = new DossierManager()
 
 import { initDMAgent, dmRespond } from './dm-agent.js'
 import { WORLD_OVERVIEW } from './data/maps.js'
@@ -225,10 +229,17 @@ function handleSlashCommand(cmd: string): boolean {
       }
       return true
     }
+    case '/npc':
+    case '/npc ': {
+      console.log(dossier.renderList())
+      return true
+    }
     case '/help': {
       console.log()
       console.log(chalk.dim('  /status    — 查看角色状态'))
       console.log(chalk.dim('  /inventory — 查看背包'))
+      console.log(chalk.dim('  /npc       — 查看已知人物档案'))
+      console.log(chalk.dim('  /npc <名>  — 查看角色详细档案'))
       console.log(chalk.dim('  /map       — 查看世界地图'))
       console.log(chalk.dim('  /save      — 手动存档'))
       console.log(chalk.dim('  /saves     — 列出所有存档'))
@@ -316,6 +327,10 @@ async function gameLoop(rl: readline.Interface, classId: string) {
 
   await sendToDM(openingPrompt)
 
+  // 开场自动解锁格雷格（第一个遇到的 NPC）
+  const gregNotice = dossier.unlock('格雷格', 0)
+  if (gregNotice) console.log(gregNotice)
+
   // ── Main loop ──
   let turnsSinceLastSave = 0
 
@@ -357,6 +372,11 @@ async function gameLoop(rl: readline.Interface, classId: string) {
       continue
     }
 
+    if (input.startsWith('/npc ') && input.length > 5) {
+      const npcName = input.slice(5).trim()
+      console.log(dossier.renderProfile(npcName))
+      continue
+    }
     if (input.startsWith('/')) {
       if (!handleSlashCommand(input)) {
         console.log(chalk.red(`  未知命令: ${input}。输入 /help 查看帮助。`))
@@ -379,6 +399,19 @@ async function gameLoop(rl: readline.Interface, classId: string) {
       ? `[DM安全指令: ${safety.dmInstruction}]\n\n${input}`
       : input
     await sendToDM(dmInput)
+
+    // NPC 档案更新 — 检测 DM 回复中提到的 NPC
+    for (const npc of session.npcs) {
+      if (input.includes(npc.name) || dmInput.includes(npc.name)) {
+        // 首次遇见 → 解锁档案
+        const unlockNotice = dossier.unlock(npc.name, session.turnCount)
+        if (unlockNotice) console.log(unlockNotice)
+
+        // 根据信任度揭示新信息
+        const updateNotice = dossier.onInteraction(npc.name, npc.trust, session.turnCount)
+        if (updateNotice) console.log(updateNotice)
+      }
+    }
 
     // Auto-save every 5 turns
     turnsSinceLastSave++
