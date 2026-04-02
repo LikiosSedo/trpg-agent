@@ -40,6 +40,19 @@ export const AttackTool: Tool = {
     const session = getSession()
     const { targetId, method, spellId, encounterMonsters } = input
 
+    // 位置检查：战斗只能在当前位置发生
+    const locationMonsters: Record<string, string[]> = {
+      'twilight-woods': ['Wolf', 'Giant Spider', 'Goblin', 'Cockatrice'],
+      'greyspine-mines': ['Skeleton', 'Shadow', 'Ghoul', 'Mimic'],
+      'shatterstone-wastes': ['Orc Warrior', 'Ghoul', 'Eclipsed Beast'],
+      'dawnbreak-town': [],  // 镇上一般不战斗
+    }
+    const allowedHere = locationMonsters[session.worldState.currentLocation] ?? []
+    const targetName = targetId.toLowerCase()
+    if (!session.combat?.active && !allowedHere.some(m => m.toLowerCase().includes(targetName))) {
+      return { output: `这里没有${targetId}。当前位置不太可能遇到这种敌人。`, isError: true }
+    }
+
     // 加载怪物数据库
     const monstersJson = await import('../../data/monsters.json', { with: { type: 'json' } })
     const monstersDb: Monster[] = monstersJson.default

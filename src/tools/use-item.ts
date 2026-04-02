@@ -96,6 +96,9 @@ export const UseItemTool: Tool = {
         if (!targetId) return { output: 'give操作需指定targetId。', isError: true }
         const npc = session.npcs.find(n => n.name === targetId)
         if (!npc) return { output: `NPC"${targetId}"不存在。`, isError: true }
+        if (npc.location !== session.worldState.currentLocation) {
+          return { output: `${npc.name}不在这里，无法给予物品。`, isError: true }
+        }
         player.inventory.splice(itemIdx, 1)
         facts.addEvent(`将${item!.name}交给${npc.name}`)
         return { output: `将${item!.name}交给${npc.name}。` }

@@ -80,9 +80,9 @@ export function calculatePlayerAC(player: PlayerCharacter): number {
   return 10 + dexMod + armorBonus
 }
 
-/** 从伤害骰表达式中提取能力修正值，如 "1d6+2" → 2，"2d8" → 0 */
+/** 从伤害骰表达式中提取能力修正值，如 "1d6+2" → 2，"2d8-1" → -1，"2d8" → 0 */
 export function parseAttackMod(damageDice: string): number {
-  const m = damageDice.match(/[+-](\d+)$/)
+  const m = damageDice.match(/([+-]\d+)$/)
   return m ? Number(m[1]) : 0
 }
 
