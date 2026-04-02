@@ -67,6 +67,27 @@ export function castSpell(
   return { success: true }
 }
 
+// ─── 战斗相关 ──────────────────────────────────
+
+export function rollInitiative(dexMod: number): { roll: number; total: number } {
+  const roll = rollD20()
+  return { roll, total: roll + dexMod }
+}
+
+export function calculatePlayerAC(player: PlayerCharacter): number {
+  const dexMod = player.abilityModifiers.DEX
+  const armorBonus = player.equipped.armor?.bonus ?? 0
+  return 10 + dexMod + armorBonus
+}
+
+/** 从伤害骰表达式中提取能力修正值，如 "1d6+2" → 2，"2d8" → 0 */
+export function parseAttackMod(damageDice: string): number {
+  const m = damageDice.match(/[+-](\d+)$/)
+  return m ? Number(m[1]) : 0
+}
+
+// ─── 休息 ───────────────────────────────────────
+
 export function shortRest(player: PlayerCharacter): void {
   // Restore HP: roll 1d8 + CON mod
   const heal = rollDice('1d8').total + player.abilityModifiers.CON

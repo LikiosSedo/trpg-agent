@@ -20,6 +20,8 @@ let dossier = new DossierManager()
 
 import { initDMAgent, dmRespond } from './dm-agent.js'
 import { WORLD_OVERVIEW } from './data/maps.js'
+import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
+import { QuestManager } from './quest-manager.js'
 
 // ─── Character Class Templates ───────────────
 
@@ -126,6 +128,38 @@ function createInitialNPCs(): NPC[] {
       location: 'dawnbreak-town',
       mood: '从容',
     },
+    {
+      name: '陈妈',
+      trust: 0,
+      knownFacts: ['镇上来往旅客的动向', '最近有陌生人频繁出入镇外', '卡恩深夜独自外出'],
+      playerPromises: [],
+      location: 'dawnbreak-town',
+      mood: '热情',
+    },
+    {
+      name: '格罗姆',
+      trust: 0,
+      knownFacts: ['矿石品质近期下降', '矿石中出现不明黑色晶体', '保留了黑色晶体样本'],
+      playerPromises: [],
+      location: 'dawnbreak-town',
+      mood: '暴躁',
+    },
+    {
+      name: '叶绿',
+      trust: 0,
+      knownFacts: ['助手近期行为古怪常深夜外出', '助手抽屉里有画着奇怪符号的纸', '怀疑助手加入了秘密组织'],
+      playerPromises: [],
+      location: 'dawnbreak-town',
+      mood: '温和',
+    },
+    {
+      name: '韩猛',
+      trust: 0,
+      knownFacts: ['派出调查矿道的小队接连失联', '失联小队最后报告中有暗影教团痕迹', '公会地下室囤积了应急武器'],
+      playerPromises: [],
+      location: 'dawnbreak-town',
+      mood: '焦虑',
+    },
   ]
 }
 
@@ -143,6 +177,7 @@ function createGameSession(name: string, classId: string): GameSession {
     skills: [...template.skills],
     hp: template.maxHp,
     maxHp: template.maxHp,
+    xp: 0,
     gold: 0,
     inventory: [],
     spells: template.spells.map(s => ({ ...s })),
@@ -163,6 +198,7 @@ function createGameSession(name: string, classId: string): GameSession {
     },
     events: [],
     turnCount: 0,
+    combat: null,
   }
 }
 
@@ -235,6 +271,32 @@ function handleSlashCommand(cmd: string): boolean {
       console.log(dossier.renderList())
       return true
     }
+    case '/quest': {
+      const qm = new QuestManager(session)
+      const active = qm.getActiveQuests()
+      console.log()
+      console.log(chalk.cyan('── 任务日志 ──'))
+      if (active.length === 0) {
+        console.log(chalk.dim('  暂无进行中的任务。'))
+      } else {
+        for (const q of active) {
+          console.log(chalk.bold(`  ${q.name}`))
+          console.log(chalk.dim(`    ${q.description}`))
+          for (let i = 0; i < q.objectives.length; i++) {
+            const done = q.objectivesCompleted[i]
+            console.log(`    ${done ? chalk.green('[x]') : chalk.dim('[ ]')} ${q.objectives[i]}`)
+          }
+          console.log(chalk.yellow(`    奖励: ${q.reward.gold}金 + ${q.reward.xp}XP`))
+        }
+      }
+      const completed = session.quests.filter(q => q.status === 'completed')
+      if (completed.length > 0) {
+        console.log(chalk.dim(`  已完成: ${completed.map(q => q.name).join(', ')}`))
+      }
+      console.log(chalk.dim(`  经验值: ${session.player.xp} XP (Lv${session.player.level})`))
+      console.log()
+      return true
+    }
     case '/world': {
       console.log(renderWorldGuide())
       return true
@@ -242,6 +304,7 @@ function handleSlashCommand(cmd: string): boolean {
     case '/help': {
       console.log()
       console.log(chalk.dim('  /status    — 查看角色状态'))
+      console.log(chalk.dim('  /quest     — 查看任务日志'))
       console.log(chalk.dim('  /inventory — 查看背包'))
       console.log(chalk.dim('  /npc       — 查看已知人物档案'))
       console.log(chalk.dim('  /npc <名>  — 查看角色详细档案'))
@@ -372,6 +435,7 @@ async function gameLoop(rl: readline.Interface, classId: string) {
           const loaded = GameFactStore.load(slotName)
           initGameState(loaded['session'])
           initDMAgent()
+          resetIdleTracking()
           console.log(chalk.green(`\n  存档已加载: ${slotName}\n`))
         } catch (err) {
           console.log(chalk.red(`\n  加载失败: ${(err as Error).message}\n`))
@@ -403,10 +467,34 @@ async function gameLoop(rl: readline.Interface, classId: string) {
     }
 
     session.turnCount++
-    const dmInput = safety.level === 'warn'
-      ? `[DM安全指令: ${safety.dmInstruction}]\n\n${input}`
-      : input
+
+    // ── 构建 DM 输入：安全指令 + 早期引导 + 防卡事件 ──
+    const parts: string[] = []
+
+    if (safety.level === 'warn') {
+      parts.push(`[DM安全指令: ${safety.dmInstruction}]`)
+    }
+
+    const guidance = getEarlyGuidance(session.turnCount)
+    if (guidance) {
+      parts.push(guidance)
+    }
+
+    const idleEvent = checkIdleEvent(input)
+    if (idleEvent) {
+      parts.push(idleEvent)
+    }
+
+    parts.push(input)
+    const dmInput = parts.join('\n\n')
     await sendToDM(dmInput)
+
+    // ── 战斗胜利后检查任务目标 ──
+    const qm = new QuestManager(session)
+    const objResult = qm.checkCombatObjectives()
+    if (objResult) {
+      console.log(chalk.green(`\n  [任务进度] ${objResult.questName}：完成 "${objResult.text}"`))
+    }
 
     // NPC 档案更新 — 检测 DM 回复中提到的 NPC
     for (const npc of session.npcs) {

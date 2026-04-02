@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import type { GameSession, GameEvent, NPC } from './types.js'
+import { getCombatSummary } from './combat-manager.js'
 
 export class GameFactStore {
   constructor(private session: GameSession) {}
@@ -35,7 +36,10 @@ export class GameFactStore {
       .map(e => `[Turn ${e.turn}] ${e.fact}`)
     const activeQuests = quests
       .filter(q => q.status === 'active')
-      .map(q => `- ${q.name}: ${q.objectives.join(', ')}`)
+      .map(q => {
+        const objs = q.objectives.map((o, i) => `${q.objectivesCompleted[i] ? '[x]' : '[ ]'} ${o}`).join(', ')
+        return `- ${q.name}: ${objs}`
+      })
 
     const locationNames: Record<string, string> = {
       'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
@@ -59,6 +63,7 @@ export class GameFactStore {
       criticalEvents.length ? `关键事件:\n${criticalEvents.join('\n')}` : '',
       recentEvents.length ? `最近发生:\n${recentEvents.join('\n')}` : '',
       npcs.length ? `NPC状态:\n${npcs.map(n => `- ${n.name}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}）`).join('\n')}` : '',
+      getCombatSummary(this.session) ?? '',
     ].filter(Boolean).join('\n')
   }
 
@@ -75,6 +80,7 @@ export class GameFactStore {
       (equip ? `Equipped: ${equip}. ` : '') +
       `Skills: ${player.skills.join(', ')}. ` +
       (spellsLeft.length ? `Available spells: ${spellsLeft.join(', ')}. ` : '') +
+      `XP: ${player.xp}. ` +
       `Carrying ${player.inventory.length} items, knows ${player.clues.length} clues.`
     )
   }

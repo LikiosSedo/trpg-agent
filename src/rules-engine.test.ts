@@ -66,6 +66,7 @@ function makeTestSession(): GameSession {
     },
     events: [],
     turnCount: 1,
+    combat: null,
   }
 }
 

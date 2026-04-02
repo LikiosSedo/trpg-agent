@@ -69,6 +69,50 @@ const PORTRAITS: Record<string, string[]> = {
     '     │  ♩    │     ',
     '     ╰───────╯     ',
   ],
+  '陈妈': [
+    '      ╭━━━━━╮      ',
+    '      ┃ ◠ ◠ ┃      ',
+    '      ┃  ─  ┃      ',
+    '      ╰┬───┬╯      ',
+    '     ╭─┴───┴─╮     ',
+    '     │ ┃   ┃ │     ',
+    '     │ 旅 店  │     ',
+    '     │  ☕   │     ',
+    '     ╰───────╯     ',
+  ],
+  '格罗姆': [
+    '      ╭━━━━━╮      ',
+    '     ╭┃ ▪ ▪ ┃╮     ',
+    '     ┃┃ ═══ ┃┃     ',
+    '     ╰┃  ▬  ┃╯     ',
+    '      ╰━┥█┝━╯      ',
+    '    ╭───┴─┴───╮    ',
+    '    │ ▓▓▓▓▓▓▓ │    ',
+    '    │  铁 匠   │    ',
+    '    ╰─────────╯    ',
+  ],
+  '叶绿': [
+    '     ⋮╭━━━━━╮      ',
+    '      ┃ ◡ ◡ ┃      ',
+    '      ┃  ◡  ┃      ',
+    '      ╰┬───┬╯⋎    ',
+    '     ╭──┴─┴──╮     ',
+    '     │ ░ ░ ░ │     ',
+    '     │ 药 师  │     ',
+    '     │  ❀    │     ',
+    '     ╰───────╯     ',
+  ],
+  '韩猛': [
+    '      ╭━━━━━╮      ',
+    '      ┃ ◣ ◢ ┃      ',
+    '      ┃  ▬  ┃      ',
+    '      ╰┬───┬╯      ',
+    '     ╭─┴───┴─╮     ',
+    '     │ ┃     │     ',
+    '     │ 独 臂  │     ',
+    '     │  ⚔    │     ',
+    '     ╰───────╯     ',
+  ],
 }
 
 // ─── 信息揭示层（每个 NPC 预定义） ──────────
@@ -131,6 +175,38 @@ const REVELATION_LAYERS: Record<string, RevelationLayer[]> = {
     { trustRequired: 4, fact: '琴箱有隐藏夹层，里面的东西散发微弱暗影能量', category: '秘密' },
     { trustRequired: 5, fact: '暗影教团高阶执行者，计划在仪式中篡夺虚空棱镜的力量', category: '秘密' },
   ],
+  '陈妈': [
+    { trustRequired: 0, fact: '说话爽利，手脚麻利，对旅客既热情又精明', category: '性格' },
+    { trustRequired: 0, fact: '破晓旅店老板娘，经营二十余年', category: '背景' },
+    { trustRequired: 1, fact: '消息灵通，镇上大小事都瞒不过她', category: '背景' },
+    { trustRequired: 2, fact: '年轻时丈夫死于矿难，独自拉扯旅店和两个孩子', category: '背景' },
+    { trustRequired: 3, fact: '最近注意到有些"陌生面孔"频繁出入镇外', category: '线索' },
+    { trustRequired: 4, fact: '曾在夜里看到卡恩独自往暮色森林方向走', category: '线索' },
+  ],
+  '格罗姆': [
+    { trustRequired: 0, fact: '矮人铁匠，锤子比他脑袋还大', category: '背景' },
+    { trustRequired: 0, fact: '说话直来直去，不喜欢拐弯抹角', category: '性格' },
+    { trustRequired: 1, fact: '从北方矮人堡垒迁来，据说是为了追随某条矿脉', category: '背景' },
+    { trustRequired: 2, fact: '对矿石品质极为敏感，最近发现矿道出产的矿石"味道不对"', category: '线索' },
+    { trustRequired: 3, fact: '矿石中夹杂着一种他从未见过的黑色晶体碎片', category: '线索' },
+    { trustRequired: 4, fact: '悄悄保留了几块黑色晶体样本，怀疑跟矿道深处的异变有关', category: '秘密' },
+  ],
+  '叶绿': [
+    { trustRequired: 0, fact: '半精灵药剂师，总是带着草药的清香', category: '背景' },
+    { trustRequired: 0, fact: '温柔耐心，对每位病人都仔细问诊', category: '性格' },
+    { trustRequired: 1, fact: '草药堂传承三代，她是最年轻的堂主', category: '背景' },
+    { trustRequired: 2, fact: '最近她的助手行为越来越古怪，常常深夜外出', category: '线索' },
+    { trustRequired: 3, fact: '在助手的抽屉里发现过一张画着奇怪符号的纸', category: '线索' },
+    { trustRequired: 4, fact: '怀疑助手加入了某种秘密组织，但不敢声张', category: '秘密' },
+  ],
+  '韩猛': [
+    { trustRequired: 0, fact: '退役战士，右臂在一次讨伐中失去', category: '背景' },
+    { trustRequired: 0, fact: '嗓门大，脾气火爆，但对新手冒险者格外照顾', category: '性格' },
+    { trustRequired: 1, fact: '艾琳娜的老部下，是她推荐他来管理公会分部的', category: '关系' },
+    { trustRequired: 2, fact: '最近派出去调查矿道的小队接连失联，他很焦虑', category: '线索' },
+    { trustRequired: 3, fact: '偷偷在公会地下室囤积了一批武器，以防"最坏的情况"', category: '秘密' },
+    { trustRequired: 4, fact: '从失联小队最后的报告中发现了暗影教团的蛛丝马迹', category: '秘密' },
+  ],
 }
 
 // ─── 档案条目 ─────────────────────────────────
@@ -150,6 +226,10 @@ const BASE_INFO: Record<string, { name: string; title: string; appearance: strin
   '艾琳娜': { name: '艾琳娜·银叶', title: '冒险者公会会长', appearance: '银白长发侧辫，琥珀色瞳，墨绿皮甲灰色斗篷。' },
   '维克多': { name: '维克多·黑石', title: '破晓镇镇长', appearance: '50岁灰发绅士，深色礼服，浓重黑眼圈。' },
   '卡恩': { name: '「旅者」卡恩', title: '游吟诗人', appearance: '年轻俊朗，衣着考究，指甲异常整齐。' },
+  '陈妈': { name: '陈妈', title: '破晓旅店老板娘', appearance: '四十多岁，圆脸利落短发，围着花围裙，笑起来很爽朗。' },
+  '格罗姆': { name: '格罗姆·铁砧', title: '铁砧铺矮人铁匠', appearance: '矮壮结实，络腮胡编成两条辫子，手臂粗如小腿。' },
+  '叶绿': { name: '叶绿', title: '草药堂药剂师', appearance: '半精灵，浅绿色眼瞳，总带着淡淡的草药香气。' },
+  '韩猛': { name: '「独臂」韩猛', title: '冒险者公会分部管理员', appearance: '魁梧的独臂战士，右袖空荡，但左手足以掰断桌腿。' },
 }
 
 // ─── 档案管理器 ───────────────────────────────

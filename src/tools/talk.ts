@@ -8,6 +8,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
+import { QuestManager } from '../quest-manager.js'
 
 export const TalkTool: Tool = {
   name: 'Talk',
@@ -30,6 +31,16 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
     const npc = session.npcs.find(n => n.name === npcId)
     if (!npc) return { output: `NPC"${npcId}"不存在。`, isError: true }
 
+    // 位置检查：玩家必须和 NPC 在同一地点
+    if (npc.location !== session.worldState.currentLocation) {
+      const locationNames: Record<string, string> = {
+        'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
+        'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
+      }
+      const npcLoc = locationNames[npc.location] ?? npc.location
+      return { output: `${npc.name}不在这里。上次见到${npc.name}是在${npcLoc}。`, isError: true }
+    }
+
     const npcContext = facts.getNPCContext(npcId)
 
     // Social skill check if non-normal approach
@@ -43,18 +54,64 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const dc = 10 + Math.max(0, -npc.trust) // Higher DC if NPC distrusts player
       const result = skillCheck(totalMod, dc)
 
+      // Trust changes based on check result
+      if (result.success) {
+        npc.trust = Math.min(10, npc.trust + 1)
+      } else {
+        npc.trust = Math.max(-10, npc.trust - 1)
+      }
+
       const approachZh = { persuade: '说服', deceive: '欺骗', intimidate: '威吓' }
       return {
         output: [
           `对话(${approachZh[approach as keyof typeof approachZh]})：玩家对${npc.name}说"${message}"。`,
           `${approachZh[approach as keyof typeof approachZh]}检定：d20=${result.roll}, 修正+${totalMod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`,
+          `信任度变化: ${npc.trust + (result.success ? -1 : 1)} → ${npc.trust}`,
           `NPC上下文：${npcContext}`,
         ].join('\n'),
       }
     }
 
+    // ── 任务自动分配 ──
+    const questInfo = tryAssignQuest(session, npc.name)
+
     return {
-      output: `对话：玩家对${npc.name}说"${message}"。\nNPC上下文：${npcContext}`,
+      output: [
+        `对话：玩家对${npc.name}说"${message}"。`,
+        `NPC上下文：${npcContext}`,
+        questInfo ?? '',
+      ].filter(Boolean).join('\n'),
     }
   },
+}
+
+/** 与公会相关 NPC 对话时自动分配任务 */
+function tryAssignQuest(session: import('../types.js').GameSession, npcName: string): string | null {
+  if (npcName !== '艾琳娜' && npcName !== '韩猛') return null
+
+  const qm = new QuestManager(session)
+  const active = qm.getActiveQuests()
+
+  // 没有活跃任务 → 分配"森林试炼"
+  if (active.length === 0) {
+    const completed = session.quests.find(q => q.name === '森林试炼' && q.status === 'completed')
+    if (!completed) {
+      const quest = qm.createQuest('森林试炼')
+      if (quest) {
+        return `[系统：${npcName}分配了新任务"${quest.name}"——${quest.description}]`
+      }
+    }
+  }
+
+  // 完成"森林试炼"后回来报告 → 分配"矿道调查"
+  const forestDone = session.quests.find(q => q.name === '森林试炼' && q.status === 'completed')
+  const mineDone = session.quests.find(q => q.name === '矿道调查')
+  if (forestDone && !mineDone) {
+    const quest = qm.createQuest('矿道调查')
+    if (quest) {
+      return `[系统：${npcName}分配了新任务"${quest.name}"——${quest.description}]`
+    }
+  }
+
+  return null
 }

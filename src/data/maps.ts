@@ -111,7 +111,7 @@ export const dawnbreakTown: Location = {
       id: 'mayor-office',
       name: "Mayor's Office",
       nameZh: '镇长府',
-      description: '镇长赵文远的办公室，暗中收受商会贿赂。',
+      description: '镇长维克多·黑石的办公室，暗中收受商会贿赂。',
       position: { x: 3, y: 11 },
       discovered: true,
     },

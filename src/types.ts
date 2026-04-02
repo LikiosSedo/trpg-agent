@@ -43,11 +43,44 @@ export interface Spell {
 export interface Monster {
   name: string
   hp: number
-  dc: number // 命中/闪避难度
+  dc: number // 命中/闪避难度 (用作 AC)
   damageDice: string // "1d6+2"
   specialAbility: string
   description: string
   loot: string[]
+}
+
+// ─── 战斗状态 ─────────────────────────────────
+
+/** 战斗中的怪物运行时实例 */
+export interface MonsterInstance {
+  id: string            // 唯一 id，如 "Goblin" 或 "Goblin_2"
+  name: string          // 怪物模板名
+  hp: number
+  maxHp: number
+  ac: number            // 来自 Monster.dc
+  attackMod: number     // 能力修正 + 熟练(+2)
+  damageDice: string
+  specialAbility: string
+  loot: string[]
+  conditions: string[]  // 状态效果，如 'paralyzed'
+}
+
+/** 先攻序列中的一个条目 */
+export interface InitiativeEntry {
+  id: string
+  name: string
+  initiative: number
+  isPlayer: boolean
+}
+
+/** 当前战斗的完整状态 */
+export interface CombatState {
+  active: boolean
+  round: number
+  initiativeOrder: InitiativeEntry[]
+  monsters: MonsterInstance[]
+  log: string[]         // 当前回合的战斗日志
 }
 
 // ─── NPC ──────────────────────────────────────
@@ -70,6 +103,8 @@ export interface Quest {
   description: string
   status: QuestStatus
   objectives: string[]
+  objectivesCompleted: boolean[]
+  reward: { gold: number; xp: number }
 }
 
 // ─── 玩家角色 ─────────────────────────────────
@@ -82,6 +117,7 @@ export interface PlayerCharacter {
   skills: Skill[] // 熟练技能，最多5个
   hp: number
   maxHp: number
+  xp: number
   gold: number
   inventory: Item[]
   spells: Spell[]
@@ -105,7 +141,7 @@ export interface GameEvent {
 export interface WorldState {
   currentLocation: string
   timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night'
-  flags: Record<string, boolean> // 剧情标记，如 "mine_collapse_investigated"
+  flags: Record<string, string | number | boolean> // 剧情标记 + 运行时数值
 }
 
 // ─── 游戏会话 ──────────────────────────────────
@@ -117,4 +153,5 @@ export interface GameSession {
   worldState: WorldState
   events: GameEvent[]
   turnCount: number
+  combat: CombatState | null
 }
