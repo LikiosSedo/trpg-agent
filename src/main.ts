@@ -487,12 +487,13 @@ async function gameLoop(rl: readline.Interface, classId: string) {
 
     parts.push(input)
     const dmInput = parts.join('\n\n')
-    await sendToDM(dmInput)
+    const dmResponse = await sendToDM(dmInput)
+    parseTrustChanges(dmResponse, session.npcs)
 
     // ── 战斗胜利后检查任务目标 ──
     const qm = new QuestManager(session)
-    const objResult = qm.checkCombatObjectives()
-    if (objResult) {
+    const objResults = qm.checkCombatObjectives()
+    for (const objResult of objResults) {
       console.log(chalk.green(`\n  [任务进度] ${objResult.questName}：完成 "${objResult.text}"`))
     }
 
@@ -537,16 +538,35 @@ async function gameLoop(rl: readline.Interface, classId: string) {
  * Tool outputs are printed by the tools themselves (console.log in execute).
  * Text responses from the DM are printed here.
  */
-async function sendToDM(input: string) {
+async function sendToDM(input: string): Promise<string> {
+  let fullText = ''
   try {
     for await (const event of dmRespond(input)) {
       if (event.type === 'text_delta') {
-        process.stdout.write(event.text ?? '')
+        const text = event.text ?? ''
+        process.stdout.write(text)
+        fullText += text
       }
     }
     console.log()
   } catch (err) {
     console.log(chalk.red(`\n  [错误: ${(err as Error).message.slice(0, 80)}]`))
+  }
+  return fullText
+}
+
+/** Parse [信任变化:NPC名:+N:原因] annotations from DM output and update NPC trust */
+function parseTrustChanges(text: string, npcs: NPC[]): void {
+  const pattern = /\[信任变化:(.+?):([+-]\d+):(.+?)\]/g
+  let match
+  while ((match = pattern.exec(text)) !== null) {
+    const [, npcName, deltaStr, reason] = match
+    const delta = parseInt(deltaStr, 10)
+    const npc = npcs.find(n => n.name === npcName)
+    if (npc) {
+      npc.trust += delta
+      console.log(chalk.dim(`  [${npcName} 信任度 ${delta > 0 ? '+' : ''}${delta} → ${npc.trust}：${reason}]`))
+    }
   }
 }
 

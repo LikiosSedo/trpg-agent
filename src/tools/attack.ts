@@ -9,7 +9,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import type { Monster } from '../types.js'
 import { getSession } from '../game-state.js'
-import { startCombat, executeFullRound, getCombatSummary } from '../combat-manager.js'
+import { startCombat, executeFullRound, getCombatSummary, attemptFlee } from '../combat-manager.js'
 
 export const AttackTool: Tool = {
   name: 'Attack',
@@ -28,7 +28,7 @@ export const AttackTool: Tool = {
 后续回合只需指定 targetId 和 method。`,
   inputSchema: z.object({
     targetId: z.string().describe('攻击目标的名称或ID'),
-    method: z.enum(['weapon', 'spell']).describe('"weapon" 使用装备武器, "spell" 使用法术'),
+    method: z.enum(['weapon', 'spell', 'flee']).describe('"weapon" 使用装备武器, "spell" 使用法术, "flee" 尝试逃跑'),
     spellId: z.string().optional().describe('使用的法术名 (method 为 "spell" 时必填)'),
     encounterMonsters: z.array(z.string()).optional().describe(
       '首次攻击时，参战的所有怪物名称列表（如 ["Goblin", "Goblin"]）。不提供则默认只有 targetId 对应的怪物。',
@@ -39,6 +39,26 @@ export const AttackTool: Tool = {
   async execute(input: any) {
     const session = getSession()
     const { targetId, method, spellId, encounterMonsters } = input
+
+    // 逃跑处理
+    if (method === 'flee') {
+      if (!session.combat?.active) {
+        return { output: '当前没有进行中的战斗，无需逃跑。', isError: true }
+      }
+      try {
+        const fleeResult = attemptFlee(session)
+        const combatStatus = !fleeResult.ended ? getCombatSummary(session) : null
+        return {
+          output: [
+            ...fleeResult.log,
+            '',
+            combatStatus ?? '',
+          ].filter(Boolean).join('\n'),
+        }
+      } catch (e: any) {
+        return { output: e.message, isError: true }
+      }
+    }
 
     // 位置检查：战斗只能在当前位置发生
     const locationMonsters: Record<string, string[]> = {

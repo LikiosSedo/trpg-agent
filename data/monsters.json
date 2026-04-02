@@ -1,5 +1,14 @@
 [
   {
+    "name": "Wolf",
+    "hp": 11,
+    "dc": 13,
+    "damageDice": "2d4+2",
+    "specialAbility": "Pack Tactics: advantage on attack if an ally is adjacent to the target",
+    "description": "A large grey wolf with gleaming yellow eyes, hunting in packs through the Twilight Woods.",
+    "loot": ["Wolf Pelt", "2 gold"]
+  },
+  {
     "name": "Goblin",
     "hp": 7,
     "dc": 12,

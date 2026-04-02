@@ -123,6 +123,14 @@ export const dawnbreakTown: Location = {
       position: { x: 8, y: 11 },
       discovered: true,
     },
+    {
+      id: 'shattered-shield-tavern',
+      name: 'The Shattered Shield Tavern',
+      nameZh: '碎盾亭酒馆',
+      description: '前佣兵格雷格·铁拳头经营的酒馆，冒险者聚集之处。帮工小莉拥有灵视能力。',
+      position: { x: 12, y: 7 },
+      discovered: true,
+    },
   ],
 };
 

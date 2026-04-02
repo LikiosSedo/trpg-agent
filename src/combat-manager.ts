@@ -154,6 +154,8 @@ export function executePlayerAttack(
     if (killed) {
       log.push(`☠ ${monster.id} 被击杀！`)
       getFacts().addEvent(`${monster.id}被击杀`, 'critical')
+      const killKey = `kills_${monster.name}`
+      session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
     }
     return { log, killed }
   }
@@ -186,6 +188,8 @@ export function executePlayerAttack(
   if (killed) {
     log.push(`☠ ${monster.id} 被击杀！`)
     getFacts().addEvent(`${monster.id}被击杀`, 'critical')
+    const killKey = `kills_${monster.name}`
+    session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
   }
   return { log, killed }
 }
@@ -236,6 +240,49 @@ export function executeMonsterTurns(session: GameSession): string[] {
   }
 
   return log
+}
+
+// ─── 逃跑 ─────────────────────────────────────────
+
+export function attemptFlee(session: GameSession): {
+  success: boolean
+  log: string[]
+  ended: boolean
+  result: CombatResult
+} {
+  const combat = session.combat
+  if (!combat?.active) throw new Error('当前没有进行中的战斗')
+
+  const player = session.player
+  const log: string[] = []
+
+  // DEX check: DC 10 + alive monster count
+  const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+  const dc = 10 + aliveMonsters.length
+  const roll = rollDice('1d20').total
+  const total = roll + player.abilityModifiers.DEX
+  const success = total >= dc
+
+  log.push(`逃跑检定：d20(${roll})+${player.abilityModifiers.DEX}=${total} vs DC${dc}`)
+
+  if (success) {
+    log.push('逃跑成功！脱离了战斗。')
+    getFacts().addEvent('逃跑成功，脱离战斗', 'normal')
+    endCombat(session)
+    return { success, log, ended: true, result: 'ongoing' }
+  }
+
+  log.push('逃跑失败！怪物趁机攻击！')
+  const monsterLog = executeMonsterTurns(session)
+  log.push(...monsterLog)
+
+  const check = checkCombatEnd(session)
+  if (check.ended && check.result === 'defeat') {
+    log.push('\n=== 战斗失败 ===')
+    endCombat(session)
+  }
+
+  return { success, log, ended: check.ended, result: check.result }
 }
 
 // ─── 战斗结束检查 ────────────────────────────────

@@ -72,17 +72,41 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       }
     }
 
-    // ── 任务自动分配 ──
+    // ── 任务自动完成 + 分配 ──
+    const completionInfo = tryAutoComplete(session, npc.name)
     const questInfo = tryAssignQuest(session, npc.name)
 
     return {
       output: [
         `对话：玩家对${npc.name}说"${message}"。`,
         `NPC上下文：${npcContext}`,
+        completionInfo ?? '',
         questInfo ?? '',
       ].filter(Boolean).join('\n'),
     }
   },
+}
+
+/** 与公会 NPC 对话时，自动完成已达成全部目标的任务 */
+function tryAutoComplete(session: import('../types.js').GameSession, npcName: string): string | null {
+  if (npcName !== '艾琳娜' && npcName !== '韩猛') return null
+
+  const qm = new QuestManager(session)
+  const active = qm.getActiveQuests()
+  const results: string[] = []
+
+  for (const quest of active) {
+    if (quest.objectivesCompleted.every(Boolean)) {
+      const reward = qm.completeQuest(quest.name)
+      if (reward) {
+        let msg = `[系统：任务"${quest.name}"完成！奖励：${reward.gold}金币, ${reward.xp}XP]`
+        if (reward.levelUp) msg += ` [升级！达到 Lv${reward.levelUp}]`
+        results.push(msg)
+      }
+    }
+  }
+
+  return results.length > 0 ? results.join('\n') : null
 }
 
 /** 与公会相关 NPC 对话时自动分配任务 */
@@ -105,9 +129,19 @@ function tryAssignQuest(session: import('../types.js').GameSession, npcName: str
 
   // 完成"森林试炼"后回来报告 → 分配"矿道调查"
   const forestDone = session.quests.find(q => q.name === '森林试炼' && q.status === 'completed')
-  const mineDone = session.quests.find(q => q.name === '矿道调查')
-  if (forestDone && !mineDone) {
+  const mineExists = session.quests.find(q => q.name === '矿道调查')
+  if (forestDone && !mineExists) {
     const quest = qm.createQuest('矿道调查')
+    if (quest) {
+      return `[系统：${npcName}分配了新任务"${quest.name}"——${quest.description}]`
+    }
+  }
+
+  // 完成"矿道调查"后 → 分配"荒原侦察"
+  const mineDone = session.quests.find(q => q.name === '矿道调查' && q.status === 'completed')
+  const wastelandExists = session.quests.find(q => q.name === '荒原侦察')
+  if (mineDone && !wastelandExists) {
+    const quest = qm.createQuest('荒原侦察')
     if (quest) {
       return `[系统：${npcName}分配了新任务"${quest.name}"——${quest.description}]`
     }

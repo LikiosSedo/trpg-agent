@@ -99,7 +99,7 @@ export function buildDMPrompt(): string {
 | Move | 玩家说要去某个地方时。mode:"explore" |
 | Look | 玩家观察环境或检查目标时 |
 | Talk | 玩家与NPC对话时（特别是说服/欺骗/威吓需要检定时） |
-| Attack | 战斗中攻击。需指定目标和方式(weapon/spell) |
+| Attack | 首次遇敌时用 encounterMonsters 列出所有参战怪物，后续回合只需 targetId + method(weapon/spell)。系统自动计算掷骰、伤害、怪物反击并返回结果代码，你只负责将结果编织成叙事 |
 | UseItem | 使用/装备/卸下/给予/丢弃物品 |
 | Search | 搜索区域(area)/尸体(body)/容器(container)/线索(clue) |
 | Rest | 短休息或长休息。你决定当前位置是否安全 |
@@ -150,5 +150,14 @@ export function buildDMPrompt(): string {
 - 每次回应3-5段，不要太长
 - 不要使用emoji
 - 重要提示或选择用明确的方式呈现
+
+## 信任度标注
+当NPC对玩家的态度因互动而明显变化时，在回复末尾标注：
+[信任变化:NPC名:+1:简短原因]
+
+- 正数(+1/+2)：玩家帮助、兑现承诺、表现真诚
+- 负数(-1/-2)：食言、威胁、伤害NPC关心的人
+- 不是每次对话都需要标注，只在态度明显变化时使用
+- 一次回复中可以标注多个NPC的变化
 `
 }

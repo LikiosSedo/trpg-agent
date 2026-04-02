@@ -25,6 +25,11 @@ export const RestTool: Tool = {
     const session = getSession()
     const facts = getFacts()
     const player = session.player
+
+    if (session.combat?.active) {
+      return { output: '战斗中无法休息！请先结束战斗（击败敌人或逃跑）。', isError: true }
+    }
+
     const oldHp = player.hp
 
     if (input.type === 'short') {

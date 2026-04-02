@@ -7,6 +7,20 @@
 import type { GameSession, Quest, PlayerCharacter } from './types.js'
 import { getFacts } from './game-state.js'
 
+// ─── 怪物中英名映射（用于击杀目标匹配）──────────
+
+const MONSTER_NAME_ZH: Record<string, string> = {
+  '狼': 'Wolf',
+  '哥布林': 'Goblin',
+  '骷髅': 'Skeleton',
+  '巨型蜘蛛': 'Giant Spider',
+  '暗影': 'Shadow',
+  '食尸鬼': 'Ghoul',
+  '兽人战士': 'Orc Warrior',
+  '拟态怪': 'Mimic',
+  '蚀日兽': 'Eclipsed Beast',
+}
+
 // ─── 预定义任务 ────────────────────────────────
 
 export interface QuestTemplate {
@@ -134,16 +148,31 @@ export class QuestManager {
     return null
   }
 
-  /** 根据战斗击杀数检查 "森林试炼" 的击杀目标 */
-  checkCombatObjectives(): { questName: string; objectiveIndex: number; text: string } | null {
-    const quest = this.session.quests.find(q => q.name === '森林试炼' && q.status === 'active')
-    if (!quest || quest.objectivesCompleted[0]) return null
+  /** 根据击杀数按怪物名检查所有活跃任务的击杀目标 */
+  checkCombatObjectives(): { questName: string; objectiveIndex: number; text: string }[] {
+    const results: { questName: string; objectiveIndex: number; text: string }[] = []
 
-    const victories = Number(this.session.worldState.flags['combat_victories'] ?? 0)
-    if (victories >= 3) {
-      this.completeObjective('森林试炼', 0)
-      return { questName: '森林试炼', objectiveIndex: 0, text: quest.objectives[0] }
+    for (const quest of this.session.quests.filter(q => q.status === 'active')) {
+      for (let i = 0; i < quest.objectives.length; i++) {
+        if (quest.objectivesCompleted[i]) continue
+
+        // Parse kill objectives like "击杀3只狼"
+        const killMatch = quest.objectives[i].match(/击杀(\d+)只(.+)/)
+        if (!killMatch) continue
+
+        const required = Number(killMatch[1])
+        const targetZh = killMatch[2]
+        const monsterName = MONSTER_NAME_ZH[targetZh]
+        if (!monsterName) continue
+
+        const kills = Number(this.session.worldState.flags[`kills_${monsterName}`] ?? 0)
+        if (kills >= required) {
+          this.completeObjective(quest.name, i)
+          results.push({ questName: quest.name, objectiveIndex: i, text: quest.objectives[i] })
+        }
+      }
     }
-    return null
+
+    return results
   }
 }

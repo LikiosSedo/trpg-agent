@@ -8,6 +8,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import { getSession, getFacts } from '../game-state.js'
 import { rollDice } from '../rules-engine.js'
+import { executeMonsterTurns, checkCombatEnd, endCombat, getCombatSummary } from '../combat-manager.js'
 
 export const UseItemTool: Tool = {
   name: 'UseItem',
@@ -37,6 +38,8 @@ export const UseItemTool: Tool = {
 
     const item = action === 'unequip' ? undefined : player.inventory[itemIdx]
 
+    let result: { output: string; isError?: boolean }
+
     switch (action) {
       case 'use': {
         if (item!.type === 'potion') {
@@ -49,46 +52,55 @@ export const UseItemTool: Tool = {
             player.hp = Math.min(player.maxHp, player.hp + healAmount)
             player.inventory.splice(itemIdx, 1)
             facts.addEvent(`使用${item!.name}，恢复${player.hp - oldHp}HP`)
-            return { output: `使用${item!.name}：恢复${player.hp - oldHp}HP(${oldHp}→${player.hp}/${player.maxHp})。物品已消耗。` }
+            result = { output: `使用${item!.name}：恢复${player.hp - oldHp}HP(${oldHp}→${player.hp}/${player.maxHp})。物品已消耗。` }
+            break
           }
           // Non-healing potion (antidote, shadow ward, etc.)
           player.inventory.splice(itemIdx, 1)
           facts.addEvent(`使用${item!.name}`)
-          return { output: `使用${item!.name}：${item!.description}。物品已消耗。` }
+          result = { output: `使用${item!.name}：${item!.description}。物品已消耗。` }
+          break
         }
         if (item!.type === 'quest') {
           facts.addEvent(`使用任务物品${item!.name}`, 'critical')
-          return { output: `使用任务物品${item!.name}：${item!.description}。` }
+          result = { output: `使用任务物品${item!.name}：${item!.description}。` }
+          break
         }
-        return { output: `${item!.name}(${item!.type})无法直接使用。` }
+        result = { output: `${item!.name}(${item!.type})无法直接使用。` }
+        break
       }
       case 'equip': {
         if (item!.type === 'weapon') {
           if (player.equipped.weapon) player.inventory.push(player.equipped.weapon)
           player.equipped.weapon = item!
           player.inventory.splice(itemIdx, 1)
-          return { output: `装备武器：${item!.name}。${item!.description}` }
+          result = { output: `装备武器：${item!.name}。${item!.description}` }
+          break
         }
         if (item!.type === 'armor') {
           if (player.equipped.armor) player.inventory.push(player.equipped.armor)
           player.equipped.armor = item!
           player.inventory.splice(itemIdx, 1)
-          return { output: `装备护甲：${item!.name}。${item!.description}` }
+          result = { output: `装备护甲：${item!.name}。${item!.description}` }
+          break
         }
-        return { output: `${item!.name}(${item!.type})无法装备。` }
+        result = { output: `${item!.name}(${item!.type})无法装备。` }
+        break
       }
       case 'unequip': {
         if (itemId === player.equipped.weapon?.name) {
           player.inventory.push(player.equipped.weapon)
           const name = player.equipped.weapon.name
           player.equipped.weapon = undefined
-          return { output: `卸下武器${name}，放入背包。` }
+          result = { output: `卸下武器${name}，放入背包。` }
+          break
         }
         if (itemId === player.equipped.armor?.name) {
           player.inventory.push(player.equipped.armor)
           const name = player.equipped.armor.name
           player.equipped.armor = undefined
-          return { output: `卸下护甲${name}，放入背包。` }
+          result = { output: `卸下护甲${name}，放入背包。` }
+          break
         }
         return { output: `${itemId}未被装备。`, isError: true }
       }
@@ -101,12 +113,33 @@ export const UseItemTool: Tool = {
         }
         player.inventory.splice(itemIdx, 1)
         facts.addEvent(`将${item!.name}交给${npc.name}`)
-        return { output: `将${item!.name}交给${npc.name}。` }
+        result = { output: `将${item!.name}交给${npc.name}。` }
+        break
       }
       case 'drop': {
         player.inventory.splice(itemIdx, 1)
-        return { output: `丢弃${item!.name}。` }
+        result = { output: `丢弃${item!.name}。` }
+        break
+      }
+      default:
+        return { output: `未知操作: ${action}`, isError: true }
+    }
+
+    // 战斗中使用物品后，怪物获得反击回合
+    if (session.combat?.active && !result!.isError) {
+      const monsterLog = executeMonsterTurns(session)
+      if (monsterLog.length > 0) {
+        result!.output += '\n\n[怪物回合]\n' + monsterLog.join('\n')
+      }
+      const check = checkCombatEnd(session)
+      if (check.ended && check.result === 'defeat') {
+        result!.output += '\n\n=== 战斗失败 ==='
+        endCombat(session)
+      } else if (session.combat?.active) {
+        result!.output += '\n\n' + (getCombatSummary(session) ?? '')
       }
     }
+
+    return result!
   },
 }
