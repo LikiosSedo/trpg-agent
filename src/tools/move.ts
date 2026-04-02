@@ -57,8 +57,18 @@ export const MoveTool: Tool = {
     session.worldState.currentLocation = destination
     facts.addEvent(`移动至${dest.nameZh}(${dest.id})`)
 
+    // 到达后自动描述新地点（减少玩家操作摩擦）
+    const npcsHere = session.npcs.filter(n => n.location === destination).map(n => n.name)
+    const poiList = dest.pointsOfInterest?.map((p: any) => p.nameZh ?? p.name) ?? []
+
     return {
-      output: `移动：${locations[current]?.nameZh ?? current} → ${dest.nameZh}。${conn.description} 旅行时间${conn.travelTime}分钟。危险等级：${dest.dangerLevel}。`,
+      output: [
+        `移动：${locations[current]?.nameZh ?? current} → ${dest.nameZh}。${conn.description}`,
+        `你来到了${dest.nameZh}。${dest.description}`,
+        npcsHere.length ? `你看到了：${npcsHere.join('、')}。` : '',
+        poiList.length ? `附近有：${poiList.join('、')}。` : '',
+        `（可以 Talk 对话、Look 仔细观察、Search 搜索、或继续移动）`,
+      ].filter(Boolean).join('\n'),
     }
   },
 }

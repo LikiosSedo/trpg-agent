@@ -407,11 +407,15 @@ async function gameLoop(rl: readline.Interface, classId: string) {
     '- 第一次输出不要太长，3-4段即可',
   ].join('\n')
 
-  await sendToDM(openingPrompt)
+  const openingResponse = await sendToDM(openingPrompt)
 
-  // 开场自动解锁格雷格（第一个遇到的 NPC）
-  const gregNotice = dossier.unlock('格雷格', 0)
-  if (gregNotice) console.log(gregNotice)
+  // 开场 DM 回复中提到的 NPC 自动解锁档案（如格雷格）
+  for (const npc of session.npcs) {
+    if (openingResponse.includes(npc.name)) {
+      const notice = dossier.unlock(npc.name, 0)
+      if (notice) console.log(notice)
+    }
+  }
 
   // ── Main loop ──
   let turnsSinceLastSave = 0
@@ -508,9 +512,9 @@ async function gameLoop(rl: readline.Interface, classId: string) {
       console.log(chalk.green(`\n  [任务进度] ${objResult.questName}：完成 "${objResult.text}"`))
     }
 
-    // NPC 档案更新 — 检测 DM 回复中提到的 NPC
+    // NPC 档案更新 — 检测玩家输入或 DM 回复中提到的 NPC
     for (const npc of session.npcs) {
-      if (input.includes(npc.name) || dmInput.includes(npc.name)) {
+      if (input.includes(npc.name) || dmInput.includes(npc.name) || dmResponse.includes(npc.name)) {
         // 首次遇见 → 解锁档案
         const unlockNotice = dossier.unlock(npc.name, session.turnCount)
         if (unlockNotice) console.log(unlockNotice)

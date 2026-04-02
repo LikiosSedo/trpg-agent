@@ -99,8 +99,8 @@ function tryAutoComplete(session: import('../types.js').GameSession, npcName: st
     if (quest.objectivesCompleted.every(Boolean)) {
       const reward = qm.completeQuest(quest.name)
       if (reward) {
-        let msg = `[系统：任务"${quest.name}"完成！奖励：${reward.gold}金币, ${reward.xp}XP]`
-        if (reward.levelUp) msg += ` [升级！达到 Lv${reward.levelUp}]`
+        let msg = `\n★ 任务"${quest.name}"完成！奖励：${reward.gold}金币, ${reward.xp}经验！`
+        if (reward.levelUp) msg += `\n\n★★★ 升级！你现在是 Lv${reward.levelUp} 了！HP+5, 新能力已解锁！ ★★★`
         results.push(msg)
       }
     }
