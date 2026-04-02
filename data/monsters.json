@@ -1,54 +1,63 @@
 [
   {
-    "name": "Wolf",
-    "hp": 11,
-    "dc": 13,
-    "damageDice": "2d4+2",
-    "specialAbility": "Pack Tactics: advantage on attack if an ally is adjacent to the target",
-    "description": "A large grey wolf with gleaming yellow eyes, hunting in packs through the Twilight Woods.",
-    "loot": ["Wolf Pelt", "2 gold"]
-  },
-  {
     "name": "Goblin",
     "hp": 7,
-    "dc": 12,
-    "damageDice": "1d6+2",
+    "dc": 11,
+    "damageDice": "1d6+1",
     "specialAbility": "Nimble Escape: can Disengage or Hide as a bonus action",
     "description": "A small, cunning humanoid that fights dirty and flees when outmatched.",
     "loot": ["Rusty Dagger", "3 gold"]
   },
   {
+    "name": "Wolf",
+    "hp": 11,
+    "dc": 12,
+    "damageDice": "1d6+2",
+    "specialAbility": "Pack Tactics: advantage on attack if an ally is adjacent to the target",
+    "description": "A large grey wolf with gleaming yellow eyes, hunting in packs through the Twilight Woods.",
+    "loot": ["Wolf Pelt", "2 gold"]
+  },
+  {
+    "name": "Cockatrice",
+    "hp": 18,
+    "dc": 12,
+    "damageDice": "1d6+1",
+    "specialAbility": "Petrifying Bite: target must pass DC 11 CON save or be restrained for 1 turn",
+    "description": "A bizarre creature with the body of a rooster and the tail of a lizard. Its bite can turn flesh to stone.",
+    "loot": ["Cockatrice Feather", "7 gold"]
+  },
+  {
     "name": "Skeleton",
     "hp": 13,
-    "dc": 13,
+    "dc": 12,
     "damageDice": "1d6+2",
     "specialAbility": "Undead Fortitude: drops to 1 HP instead of 0 once",
     "description": "An animated pile of bones held together by dark magic, armed with a rusty shortsword.",
     "loot": ["Bone Fragment", "5 gold"]
   },
   {
-    "name": "Giant Spider",
-    "hp": 26,
-    "dc": 14,
-    "damageDice": "1d8+3",
-    "specialAbility": "Web: target must pass DC 12 STR check or be restrained",
-    "description": "A horse-sized spider lurking in dark corners, spinning webs to trap prey.",
-    "loot": ["Spider Silk", "Venom Sac"]
-  },
-  {
     "name": "Shadow",
-    "hp": 16,
+    "hp": 13,
     "dc": 12,
-    "damageDice": "2d6+2",
-    "specialAbility": "Strength Drain: on hit, target's STR is reduced by 1d4 until rest",
+    "damageDice": "1d6+2",
+    "specialAbility": "Strength Drain: on hit, target's STR is reduced by 1 until rest",
     "description": "A wraith of living darkness that drains the life force of the living.",
     "loot": ["Shadow Essence"]
   },
   {
-    "name": "Ghoul",
-    "hp": 22,
+    "name": "Giant Spider",
+    "hp": 20,
     "dc": 13,
-    "damageDice": "2d6+2",
+    "damageDice": "1d8+2",
+    "specialAbility": "Web: target must pass DC 11 STR check or be restrained",
+    "description": "A horse-sized spider lurking in dark corners, spinning webs to trap prey.",
+    "loot": ["Spider Silk", "Venom Sac"]
+  },
+  {
+    "name": "Ghoul",
+    "hp": 19,
+    "dc": 12,
+    "damageDice": "1d8+2",
     "specialAbility": "Paralyzing Touch: target must pass DC 10 CON save or be paralyzed for 1 turn",
     "description": "An undead creature that feeds on corpses, its claws carry a paralyzing toxin.",
     "loot": ["Ghoul Claw", "8 gold"]
@@ -56,17 +65,17 @@
   {
     "name": "Orc Warrior",
     "hp": 15,
-    "dc": 13,
-    "damageDice": "1d12+3",
+    "dc": 12,
+    "damageDice": "1d8+2",
     "specialAbility": "Aggressive: can move its full speed toward a hostile target as a bonus action",
     "description": "A brutal fighter from the Shatterstone Wastes, wielding a massive greataxe.",
     "loot": ["Crude Greataxe", "6 gold"]
   },
   {
     "name": "Mimic",
-    "hp": 30,
-    "dc": 14,
-    "damageDice": "1d8+3",
+    "hp": 25,
+    "dc": 13,
+    "damageDice": "1d8+2",
     "specialAbility": "Shapechanger: disguised as a treasure chest; first attack has advantage",
     "description": "A creature that perfectly imitates a mining crate, striking when someone reaches inside.",
     "loot": ["Mimic Adhesive", "15 gold"]
@@ -79,14 +88,5 @@
     "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage",
     "description": "A monstrous entity of pure shadow, herald of the Eclipsed Eye. The final threat in the Greyspine depths.",
     "loot": ["Void Shard", "Shadow Crystal", "50 gold"]
-  },
-  {
-    "name": "Cockatrice",
-    "hp": 27,
-    "dc": 13,
-    "damageDice": "1d6+1",
-    "specialAbility": "Petrifying Bite: target must pass DC 11 CON save or be restrained for 1 turn (petrifying)",
-    "description": "A bizarre creature with the body of a rooster and the tail of a lizard. Its bite can turn flesh to stone.",
-    "loot": ["Cockatrice Feather", "7 gold"]
   }
 ]

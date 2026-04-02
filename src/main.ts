@@ -275,25 +275,36 @@ function handleSlashCommand(cmd: string): boolean {
       const qm = new QuestManager(session)
       const active = qm.getActiveQuests()
       console.log()
-      console.log(chalk.cyan('── 任务日志 ──'))
+      console.log(chalk.cyan('  ══════ 任 务 日 志 ══════'))
       if (active.length === 0) {
-        console.log(chalk.dim('  暂无进行中的任务。'))
+        console.log(chalk.dim('\n  暂无进行中的任务。'))
+        console.log(chalk.dim('  去找冒险者公会的艾琳娜或韩猛接任务。\n'))
       } else {
         for (const q of active) {
-          console.log(chalk.bold(`  ${q.name}`))
+          const doneCount = q.objectivesCompleted.filter(Boolean).length
+          console.log()
+          console.log(`  ${chalk.yellow.bold('⚔')} ${chalk.bold(q.name)} ${chalk.dim(`(${doneCount}/${q.objectives.length})`)}`)
           console.log(chalk.dim(`    ${q.description}`))
           for (let i = 0; i < q.objectives.length; i++) {
             const done = q.objectivesCompleted[i]
-            console.log(`    ${done ? chalk.green('[x]') : chalk.dim('[ ]')} ${q.objectives[i]}`)
+            console.log(`    ${done ? chalk.green('✓') : chalk.dim('○')} ${done ? chalk.green(q.objectives[i]) : q.objectives[i]}`)
           }
           console.log(chalk.yellow(`    奖励: ${q.reward.gold}金 + ${q.reward.xp}XP`))
         }
+        console.log()
       }
       const completed = session.quests.filter(q => q.status === 'completed')
       if (completed.length > 0) {
-        console.log(chalk.dim(`  已完成: ${completed.map(q => q.name).join(', ')}`))
+        console.log(chalk.dim(`  已完成: ${completed.map(q => '✓ ' + q.name).join('  ')}`))
       }
-      console.log(chalk.dim(`  经验值: ${session.player.xp} XP (Lv${session.player.level})`))
+      const nextLvl = session.player.level < 3 ? (session.player.level === 1 ? 100 : 300) : null
+      if (nextLvl) {
+        const pct = Math.min(100, Math.round((session.player.xp / nextLvl) * 100))
+        const bar = chalk.green('█'.repeat(Math.round(pct / 10))) + chalk.dim('░'.repeat(10 - Math.round(pct / 10)))
+        console.log(`  经验: ${bar} ${session.player.xp}/${nextLvl} XP (Lv${session.player.level})`)
+      } else {
+        console.log(chalk.dim(`  经验: ${session.player.xp} XP (Lv${session.player.level} MAX)`))
+      }
       console.log()
       return true
     }

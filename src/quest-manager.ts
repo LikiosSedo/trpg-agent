@@ -33,20 +33,20 @@ export interface QuestTemplate {
 export const QUEST_TEMPLATES: Record<string, QuestTemplate> = {
   '森林试炼': {
     name: '森林试炼',
-    description: '艾琳娜要求你证明自己的能力：清除暮色森林边缘骚扰伐木工的狼群，并带回猎人老林的近况报告。',
-    objectives: ['击杀3只狼', '找到猎人老林并交谈'],
+    description: '清除暮色森林边缘的狼群威胁，确认猎人老林的安全。',
+    objectives: ['击杀3只狼 [暮色森林]', '在猎人石屋找到老林并交谈 [暮色森林深处]'],
     reward: { gold: 50, xp: 100 },
   },
   '矿道调查': {
     name: '矿道调查',
-    description: '矿道中层两周前失踪了矿工和搜救队。公会需要有人深入调查异常情况。',
-    objectives: ['进入矿道中层', '找到失踪矿工的线索'],
+    description: '失踪矿工和搜救队两周未归。深入矿道中层，找到他们的下落。',
+    objectives: ['进入灰脊矿道中层 [从镇北矿道入口进入]', '在废弃矿工宿舍搜索失踪队伍痕迹 [矿道中层]'],
     reward: { gold: 100, xp: 200 },
   },
   '荒原侦察': {
     name: '荒原侦察',
-    description: '碎石荒原的兽人战团最近异常好斗，公会需要有人调查原因并搜集情报。',
-    objectives: ['调查兽人异常行为', '找到废弃瞭望塔的笔记'],
+    description: '碎石荒原的兽人异常好斗，可能和矿洞事件有关。调查并搜集情报。',
+    objectives: ['前往碎石荒原调查兽人营地 [荒原西部]', '在废弃瞭望塔找到冒险者调查笔记 [荒原东北]'],
     reward: { gold: 80, xp: 150 },
   },
 }
