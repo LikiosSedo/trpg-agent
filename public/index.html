@@ -1339,6 +1339,9 @@ function handleWsMessage(e) {
       document.getElementById('send').disabled = false
       combatMode = !msg.ended
       updateCombatBar()
+      if (msg.ended) {
+        document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
+      }
       if (!combatMode) showSceneActions()
       break
 
