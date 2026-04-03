@@ -1,3 +1,5 @@
 node_modules/
 saves/
 *.json.bak
+tmp.env
+*.env
