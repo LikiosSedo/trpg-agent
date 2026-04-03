@@ -5,6 +5,7 @@
  */
 
 import type { PlayerCharacter, GameSession, NPC, Spell, AbilityScores } from './types.js'
+import { createChapterState } from './chapter-manager.js'
 
 // ─── Character Class Templates ───────────────
 
@@ -217,5 +218,6 @@ export function createGameSession(name: string, classId: string): GameSession {
     events: [],
     turnCount: 0,
     combat: null,
+    chapter: createChapterState(),
   }
 }

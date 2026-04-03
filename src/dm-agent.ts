@@ -14,7 +14,8 @@ import {
   AttackTool, UseItemTool, SearchTool, RestTool,
   RenderSceneTool,
 } from './tools/index.js'
-import { getFacts } from './game-state.js'
+import { getFacts, getSession } from './game-state.js'
+import { ChapterManager } from './chapter-manager.js'
 import { buildDMPrompt } from './dm-prompt.js'
 
 // ─── Config ──────────────────────────────────
@@ -86,6 +87,18 @@ export function getDMAgent(): Agent {
 export async function* dmRespond(playerInput: string): AsyncGenerator<any> {
   const dm = getDMAgent()
   const context = getFacts().toPromptContext()
-  const message = `[游戏状态]\n${context}\n\n[玩家输入]\n${playerInput}`
+  const chapterCtx = getChapterContext()
+  const message = [
+    `[游戏状态]\n${context}`,
+    chapterCtx ? `\n[章节剧本]\n${chapterCtx}` : '',
+    `\n[玩家输入]\n${playerInput}`,
+  ].filter(Boolean).join('\n')
   yield* dm.run(message)
+}
+
+function getChapterContext(): string {
+  const session = getSession()
+  if (!session.chapter) return ''
+  const cm = new ChapterManager(session)
+  return cm.getPromptContext()
 }

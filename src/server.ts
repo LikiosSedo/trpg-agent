@@ -22,6 +22,7 @@ import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
+import { ChapterManager } from './chapter-manager.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -210,6 +211,11 @@ wss.on('connection', (ws: WebSocket, req) => {
         console.error('[server] game init failed:', err)
         send('error', { text: `游戏初始化失败: ${(err as Error).message.slice(0, 80)}` })
         return
+      }
+
+      // 处理章节自动事件
+      if (connSession.chapter) {
+        new ChapterManager(connSession).processAutoBeats()
       }
 
       // 发送说书人序幕
@@ -434,6 +440,20 @@ wss.on('connection', (ws: WebSocket, req) => {
         }})
         return
       }
+      if (input === '/chapter') {
+        if (!session.chapter) {
+          send('panel', { panel: 'info', data: {}, text: '当前存档不支持章节系统' })
+          return
+        }
+        const cm = new ChapterManager(session)
+        const exploration = cm.getExploration()
+        send('panel', { panel: 'chapter', data: {
+          title: cm.getChapterTitle(),
+          exploration,
+          discoveries: cm.getDiscoveryLabels(),
+        }})
+        return
+      }
       if (input === '/help') {
         send('panel', { panel: 'help', data: {
           commands: [
@@ -445,6 +465,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             { cmd: '/map', desc: '查看地图' },
             { cmd: '/inventory', desc: '查看背包' },
             { cmd: '/recap', desc: '故事回顾' },
+            { cmd: '/chapter', desc: '查看章节进度与探索度' },
             { cmd: '/save', desc: '保存游戏' },
             { cmd: '/saves', desc: '查看存档列表' },
             { cmd: '/load <名>', desc: '加载存档' },
@@ -488,6 +509,10 @@ wss.on('connection', (ws: WebSocket, req) => {
             ended: true,
             result: monsterResult.result,
           })
+          // 通知章节系统战斗结束
+          if (session.chapter) {
+            new ChapterManager(session).onEvent('combat_end')
+          }
         }
       } else if (session.combat?.active) {
         // 战斗中但无待处理怪物回合（如逃跑失败后）
@@ -511,6 +536,11 @@ wss.on('connection', (ws: WebSocket, req) => {
           const update = dossier.onInteraction(npc.name, npc.trust, session.turnCount)
           if (update) sysMsg(update.replace(/chalk\.\w+\(`([^`]*)`\)/g, '$1'))
         }
+      }
+
+      // 推进章节空闲计数（在 DM 响应和工具执行之后，避免 beat 触发前就递增）
+      if (session.chapter) {
+        new ChapterManager(session).advanceTurn()
       }
 
       // 同步存档到客户端 localStorage

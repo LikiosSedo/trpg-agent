@@ -33,6 +33,11 @@ const EARLY_GUIDANCE: Record<number, string> = {
  * 返回 null 表示当前轮次无需硬编码引导
  */
 export function getEarlyGuidance(turnCount: number): string | null {
+  // If chapter system is active, it handles guidance via beat facts
+  const session = getSession()
+  if (session.chapter) return null
+
+  // Legacy: only for old saves without chapter system
   return EARLY_GUIDANCE[turnCount] ?? null
 }
 

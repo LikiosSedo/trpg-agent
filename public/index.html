@@ -275,6 +275,16 @@
   .more-item .more-icon { font-size: 28px; margin-bottom: 6px; }
   .more-item .more-label { font-size: 14px; color: #ccc; }
 
+  /* 探索进度 */
+  .explore-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0;
+  }
+  .explore-loc { font-size: 13px; color: #ccc; }
+  .explore-loc.done { color: #4caf50; }
+  .explore-pct { font-size: 12px; color: #888; }
+  .bar-fill.explore { background: #e6b800; }
+
   /* 故事回顾 */
   .recap-item {
     padding: 6px 0; border-bottom: 1px solid #0f3460; font-size: 13px;
@@ -352,6 +362,9 @@
     text-align: center; line-height: 1.1;
   }
   .map-cell .cell-danger { font-size: 9px; letter-spacing: -1px; }
+  .map-cell .cell-explore {
+    font-size: 9px; color: #e6b800; display: block; margin-top: 2px;
+  }
   .map-conn {
     display: flex; align-items: center; justify-content: center;
     position: relative;
@@ -782,6 +795,7 @@ function renderMapPanel(data) {
   }))
   const current = data.currentLocation || data.currentArea || ''
   window._mapAreas = areas
+  const exploreData = window._exploreData || {}
 
   const TERRAIN = {
     '破晓镇':   { icon: '🏘️', color: '#8B4513', row: 3, col: 3 },
@@ -821,6 +835,11 @@ function renderMapPanel(data) {
       `<span class="cell-icon">${t.icon}</span>` +
       `<span class="cell-name">${esc(area.name)}</span>` +
       (danger != null ? `<span class="cell-danger">${renderDanger(danger)}</span>` : '') +
+      (function() {
+        const ei = exploreData[area.name]
+        if (ei && ei.total > 0) return `<span class="cell-explore">${ei.found}/${ei.total}</span>`
+        return ''
+      })() +
       `</div>`
     )
   }
@@ -881,6 +900,38 @@ function toggleMapDetail(idx) {
   if (area.description) h += `<div class="detail-desc">${esc(area.description)}</div>`
   h += `</div>`
   box.innerHTML = h
+}
+
+function renderChapterPanel(data) {
+  let html = ''
+  // 章节标题
+  html += `<div class="panel-card"><div class="panel-card-title">📖 ${esc(data.title || '未知章节')}</div></div>`
+  // 探索度
+  const exploration = data.exploration || {}
+  const locs = Object.entries(exploration)
+  if (locs.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">🗺️ 探索进度</div>`
+    for (const [loc, v] of locs) {
+      const pct = v.total > 0 ? Math.round(v.found / v.total * 100) : 0
+      const full = pct >= 100
+      html += `<div class="explore-row">`
+      html += `<span class="explore-loc${full ? ' done' : ''}">${esc(loc)}</span>`
+      html += `<span class="explore-pct">${v.found}/${v.total}</span>`
+      html += `</div>`
+      html += `<div class="bar-track"><div class="bar-fill explore" style="width:${pct}%"></div></div>`
+    }
+    html += `</div>`
+  }
+  // 已发现内容
+  const discoveries = data.discoveries || []
+  if (discoveries.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">✨ 已发现</div>`
+    for (const d of discoveries) {
+      html += `<div class="recap-item clue">${esc(d)}</div>`
+    }
+    html += `</div>`
+  }
+  return html
 }
 
 function renderRecapPanel(data) {
@@ -955,6 +1006,9 @@ function renderMorePanel() {
     </div>
     <div class="more-item" onclick="moreCmd('/recap', '故事回顾')">
       <div class="more-icon">📖</div><div class="more-label">故事回顾</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/chapter', '章节进度')">
+      <div class="more-icon">📊</div><div class="more-label">章节进度</div>
     </div>
     <div class="more-item" onclick="moreCmd('/help', '帮助')">
       <div class="more-icon">📋</div><div class="more-label">帮助</div>
@@ -1175,7 +1229,7 @@ function handleWsMessage(e) {
       sending = false
       document.getElementById('send').disabled = false
       const panelId = msg.panel || 'info'
-      const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', recap: '故事回顾', help: '帮助' }
+      const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', recap: '故事回顾', chapter: '章节进度', help: '帮助' }
       const title = msg.title || PANEL_TITLES[panelId] || '信息'
       let html = ''
       switch (panelId) {
@@ -1185,6 +1239,7 @@ function handleWsMessage(e) {
         case 'npc':      html = renderNPCListPanel(msg.data || {}); break
         case 'inventory': html = renderInventoryPanel(msg.data || {}); break
         case 'recap':    html = renderRecapPanel(msg.data || {}); break
+        case 'chapter':  window._exploreData = (msg.data || {}).exploration || {}; html = renderChapterPanel(msg.data || {}); break
         default:         html = `<div class="panel-card"><div style="white-space:pre-wrap;color:#ccc">${esc(msg.text || JSON.stringify(msg.data, null, 2))}</div></div>`
       }
       openPanel(panelId, title, html)

@@ -146,6 +146,16 @@ export interface WorldState {
   flags: Record<string, string | number | boolean> // 剧情标记 + 运行时数值
 }
 
+// ─── 章节状态 ──────────────────────────────────
+
+export interface ChapterState {
+  currentChapter: string        // 当前章节 id
+  completedBeats: string[]      // 已触发的 beat ids
+  discoveries: string[]         // 已发现的 discovery ids
+  idleTurns: number             // 自上次触发 beat 以来的空闲轮数
+  nudgeIndex: number            // 当前 nudge 提示索引
+}
+
 // ─── 游戏会话 ──────────────────────────────────
 
 export interface GameSession {
@@ -157,4 +167,5 @@ export interface GameSession {
   turnCount: number
   combat: CombatState | null
   dossierData?: Record<string, any>
+  chapter?: ChapterState        // 章节系统（新游戏有，旧存档可能没有）
 }

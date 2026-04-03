@@ -8,6 +8,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import { locations, connections } from '../data/maps.js'
 import { getSession, getFacts } from '../game-state.js'
+import { ChapterManager } from '../chapter-manager.js'
 
 export const MoveTool: Tool = {
   name: 'Move',
@@ -55,6 +56,12 @@ export const MoveTool: Tool = {
     if (!dest) return { output: `未知地点：${destination}`, isError: true }
 
     session.worldState.currentLocation = destination
+
+    // 通知章节系统
+    if (session.chapter) {
+      new ChapterManager(session).onEvent('arrive', destination)
+    }
+
     facts.addEvent(`移动至${dest.nameZh}(${dest.id})`)
 
     // 到达后自动描述新地点（减少玩家操作摩擦）

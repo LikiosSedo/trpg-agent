@@ -9,6 +9,7 @@ import type { Tool } from 'open-claude-cli/engine'
 import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { QuestManager } from '../quest-manager.js'
+import { ChapterManager } from '../chapter-manager.js'
 
 export const TalkTool: Tool = {
   name: 'Talk',
@@ -40,6 +41,11 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const npcLoc = locationNames[npc.location] ?? npc.location
       const recap = facts.getNPCRecap(npcId)
       return { output: `${npc.name}不在这里（目前在${npcLoc}），无法直接对话。\n${recap}`, isError: true }
+    }
+
+    // 通知章节系统（位置检查通过后才触发）
+    if (session.chapter) {
+      new ChapterManager(session).onEvent('talk', npcId)
     }
 
     const npcContext = facts.getNPCContext(npcId)
@@ -104,6 +110,10 @@ function tryAutoComplete(session: import('../types.js').GameSession, npcName: st
   for (const quest of active) {
     if (quest.objectivesCompleted.every(Boolean)) {
       const reward = qm.completeQuest(quest.name)
+      // 通知章节系统任务完成
+      if (session.chapter) {
+        new ChapterManager(session).onEvent('quest', quest.name)
+      }
       if (reward) {
         let msg = `\n★ 任务"${quest.name}"完成！奖励：${reward.gold}金币, ${reward.xp}经验！`
         if (reward.levelUp) msg += `\n\n★★★ 升级！Lv${reward.levelUp.level}！${reward.levelUp.flavor} ★★★`

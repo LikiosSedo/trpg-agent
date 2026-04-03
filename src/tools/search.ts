@@ -9,6 +9,7 @@ import type { Tool } from 'open-claude-cli/engine'
 import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { locations } from '../data/maps.js'
+import { ChapterManager } from '../chapter-manager.js'
 
 export const SearchTool: Tool = {
   name: 'Search',
@@ -27,6 +28,12 @@ DM 根据检定结果决定发现什么。`,
   async execute(input: any) {
     const session = getSession()
     const facts = getFacts()
+
+    // 通知章节系统
+    if (session.chapter) {
+      new ChapterManager(session).onEvent('search')
+    }
+
     const player = session.player
     const { type, target } = input
     const locId = session.worldState.currentLocation
