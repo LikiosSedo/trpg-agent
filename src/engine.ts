@@ -653,11 +653,16 @@ export class GameEngine {
       yield { type: 'quest_progress', questName: p.questName, text: p.text, current: p.current, required: p.required }
     }
 
-    // NPC 档案更新
+    // NPC 档案更新（只有同一位置的 NPC 被提到才解锁，避免车夫提到格雷格就解锁）
+    const spokeTo = new Set(speakers) // Talk 工具调用的 NPC 一定解锁
     for (const npc of session.npcs) {
       if (input.includes(npc.name) || fullText.includes(npc.name)) {
-        const unlock = this.dossier.unlock(npc.name, session.turnCount)
-        if (unlock) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
+        // 必须同区域才解锁（Talk 工具调过的除外——那是真正见面了）
+        const sameArea = npc.location === session.worldState.currentLocation
+        if (sameArea || spokeTo.has(npc.name)) {
+          const unlock = this.dossier.unlock(npc.name, session.turnCount)
+          if (unlock) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
+        }
         const update = this.dossier.onInteraction(npc.name, npc.trust, session.turnCount)
         if (update) yield { type: 'npc_update', text: update }
       }
@@ -733,11 +738,11 @@ export class GameEngine {
     const actions = consumeActions() ?? buildFallbackActions(session)
     yield { type: 'dm_end', combat: false, pendingMonster: false, actions }
 
-    // 开场 NPC 解锁
+    // 开场 NPC 解锁（只有同区域的 NPC 才解锁——车夫提到格雷格不算见面）
     for (const npc of session.npcs) {
-      if (fullText.includes(npc.name)) {
+      if (fullText.includes(npc.name) && npc.location === session.worldState.currentLocation) {
         const notice = this.dossier.unlock(npc.name, 0)
-        if (notice) yield { type: 'npc_unlock', npcName: npc.name }
+        if (notice) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
       }
     }
 

@@ -1320,12 +1320,14 @@ function renderNPCListPanel(data) {
     // 子串匹配立绘（档案名可能是"格雷格·铁拳头"，映射表用"格雷格"）
     const portrait = NPC_PORTRAIT_MAP[npc.name] ||
       Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
-    html += `<div class="npc-card">`
+    // 提取短名用于查询（"格雷格·铁拳头" → "格雷格"）
+    const shortName = Object.keys(NPC_PORTRAIT_MAP).find(k => npc.name.includes(k)) || npc.name
+    html += `<div class="npc-card" onclick="viewNPCDetail('${esc(shortName)}')" style="cursor:pointer">`
     html += `<div class="npc-avatar">${portrait
       ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
       : esc(npc.avatar || '👤')}</div>`
     html += `<div class="npc-info">`
-    html += `<div class="npc-name">${esc(npc.name)}</div>`
+    html += `<div class="npc-name">${esc(npc.name)} <span style="font-size:11px;color:#555">▶</span></div>`
     if (npc.role) html += `<div class="npc-role">${esc(npc.role)}</div>`
     html += `<div class="bar-label"><span>信任度</span><span>${trust}%</span></div>`
     html += `<div class="bar-track"><div class="bar-fill trust" style="width:${trust}%"></div></div>`
@@ -1359,6 +1361,65 @@ function renderInventoryPanel(data) {
     html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">背包空空如也</div></div>`
   }
   return html
+}
+
+function renderNPCDetailPanel(data) {
+  if (!data || !data.name) return `<div class="panel-card"><div style="color:#888;padding:20px;">未找到该人物信息</div></div>`
+
+  const portrait = NPC_PORTRAIT_MAP[data.name] ||
+    Object.entries(NPC_PORTRAIT_MAP).find(([k]) => data.name.includes(k))?.[1]
+
+  let html = ''
+  // 立绘 + 基本信息
+  html += `<div class="panel-card" style="text-align:center;padding:16px">`
+  if (portrait) {
+    html += `<img src="${portrait}" alt="${esc(data.name)}" style="width:120px;height:120px;border-radius:10px;border:2px solid #e6b800;image-rendering:pixelated;background:#0a0a1e;margin-bottom:10px" onerror="this.style.display='none'">`
+  }
+  html += `<div style="font-size:18px;font-weight:bold;color:#e6b800">${esc(data.name)}</div>`
+  html += `<div style="font-size:13px;color:#888;margin-top:4px">${esc(data.title || '')}</div>`
+  // 信任度条
+  const trust = data.trust ?? 0
+  const trustPct = Math.max(0, Math.min(100, (trust + 10) * 5)) // -10~10 → 0~100
+  html += `<div style="margin-top:10px"><div class="bar-label"><span>信任度</span><span>${trust}</span></div>`
+  html += `<div class="bar-track"><div class="bar-fill trust" style="width:${trustPct}%"></div></div></div>`
+  html += `</div>`
+
+  // 外貌
+  if (data.appearance) {
+    html += `<div class="panel-card"><div class="panel-card-title">外貌</div>`
+    html += `<div style="font-size:13px;color:#ccc;line-height:1.6">${esc(data.appearance)}</div></div>`
+  }
+
+  // 已知情报（按类别分组）
+  const discovered = data.discovered || []
+  if (discovered.length) {
+    const groups = {}
+    for (const d of discovered) {
+      const cat = d.category || '其他'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(d.fact)
+    }
+    html += `<div class="panel-card"><div class="panel-card-title">已知情报</div>`
+    for (const [cat, facts] of Object.entries(groups)) {
+      html += `<div style="font-size:11px;color:#e6b800;margin-top:8px;margin-bottom:4px">${esc(cat)}</div>`
+      for (const f of facts) {
+        html += `<div class="recap-item clue">${esc(f)}</div>`
+      }
+    }
+    html += `</div>`
+  }
+
+  // 未解锁情报提示
+  if (data.locked > 0) {
+    html += `<div style="text-align:center;color:#555;font-size:12px;padding:8px">🔒 还有 ${data.locked} 条情报未解锁（提升信任度）</div>`
+  }
+
+  return html
+}
+
+function viewNPCDetail(shortName) {
+  if (!ws) return
+  ws.send(JSON.stringify({ type: 'view', text: '/npc ' + shortName }))
 }
 
 function moreCmd(cmd, label) {
@@ -1519,7 +1580,7 @@ function handleWsMessage(e) {
           html += '</div>'
           break
         }
-        case 'npc_detail':
+        case 'npc_detail':  html = renderNPCDetailPanel(msg.data || {}); break
         default:         html = `<div class="panel-card"><div style="white-space:pre-wrap;color:#ccc">${esc(msg.text || JSON.stringify(msg.data, null, 2))}</div></div>`
       }
       openPanel(panelId, title, html)
