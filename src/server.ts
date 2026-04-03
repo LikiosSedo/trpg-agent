@@ -174,6 +174,24 @@ wss.on('connection', (ws: WebSocket, req) => {
     // 会话隔离：处理消息前，把全局 session 切换到当前连接的 session
     if (connSession) setSession(connSession)
 
+    // 恢复存档（从客户端 localStorage）
+    if (msg.type === 'resume') {
+      try {
+        connSession = msg.session
+        setSession(connSession)
+        initDMAgent()
+        dossier = msg.dossier ? DossierManager.fromJSON(msg.dossier) : new DossierManager()
+        resetIdleTracking()
+        gameStarted = true
+        console.log(`[server] resumed session for ${connSession.player.name}`)
+        send('resumed', {})
+      } catch (err) {
+        console.error('[server] resume failed:', err)
+        send('resume_failed', { text: `恢复失败: ${(err as Error).message.slice(0, 80)}` })
+      }
+      return
+    }
+
     // 角色创建
     if (msg.type === 'create') {
       const { name, classId } = msg
@@ -208,6 +226,9 @@ wss.on('connection', (ws: WebSocket, req) => {
           if (notice) sysMsg(`🔔 新角色档案解锁: ${npc.name}`)
         }
       }
+
+      // 同步初始存档到客户端
+      send('sync', { session: connSession, dossier: dossier.toJSON() })
       return
     }
 
@@ -468,6 +489,9 @@ wss.on('connection', (ws: WebSocket, req) => {
           if (update) sysMsg(update.replace(/chalk\.\w+\(`([^`]*)`\)/g, '$1'))
         }
       }
+
+      // 同步存档到客户端 localStorage
+      send('sync', { session: connSession, dossier: dossier.toJSON() })
 
       // 死亡检测
       if (session.player.hp <= 0) {

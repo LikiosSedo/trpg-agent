@@ -394,6 +394,16 @@
   <p id="auth-error" style="color:#ff6b6b; margin-top:10px; display:none;"></p>
 </div>
 
+<!-- 恢复存档 -->
+<div id="resume-screen" style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
+  <h2 style="color:#e6b800; margin-bottom:10px">⚔️ 欢迎回来</h2>
+  <div id="resume-info" style="color:#aaa; margin-bottom:20px; text-align:center; line-height:1.8;"></div>
+  <div style="display:flex; gap:12px;">
+    <button onclick="resumeGame()" style="background:#533483; color:white; border:none; padding:12px 30px; border-radius:8px; font-size:15px; cursor:pointer;">继续冒险</button>
+    <button onclick="newGame()" style="background:#333; color:#aaa; border:1px solid #555; padding:12px 20px; border-radius:8px; font-size:14px; cursor:pointer;">新游戏</button>
+  </div>
+</div>
+
 <!-- 角色创建 -->
 <div id="create-screen" style="display:none">
   <h2>⚔️ 破晓镇 · 蚀目之影</h2>
@@ -486,16 +496,81 @@ let currentDmDiv = null
 let authToken = null
 let combatMode = false
 let currentPanelId = null  // track which panel is open
+let isResuming = false     // true when reconnecting with saved session
 
-// ─── 密码认证 ───
+// ─── localStorage 存档 ───
+const SAVE_KEYS = { session: 'trpg_session', messages: 'trpg_messages', dossier: 'trpg_dossier' }
+
+function saveToLocal(session, dossier) {
+  try {
+    if (session) localStorage.setItem(SAVE_KEYS.session, JSON.stringify(session))
+    if (dossier) localStorage.setItem(SAVE_KEYS.dossier, JSON.stringify(dossier))
+  } catch {}
+}
+
+function saveMessage(role, text) {
+  try {
+    const raw = localStorage.getItem(SAVE_KEYS.messages)
+    const msgs = raw ? JSON.parse(raw) : []
+    msgs.push({ role, text: text.slice(0, 500) })
+    // 保留最近 20 条
+    while (msgs.length > 20) msgs.shift()
+    localStorage.setItem(SAVE_KEYS.messages, JSON.stringify(msgs))
+  } catch {}
+}
+
+function getSavedSession() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEYS.session)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function getSavedDossier() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEYS.dossier)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function getSavedMessages() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEYS.messages)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function clearSave() {
+  localStorage.removeItem(SAVE_KEYS.session)
+  localStorage.removeItem(SAVE_KEYS.messages)
+  localStorage.removeItem(SAVE_KEYS.dossier)
+}
+
+// ─── 密码认证 + 存档检查 ───
 ;(function checkSavedToken() {
   const saved = localStorage.getItem('trpg_token')
   if (saved) {
     authToken = saved
     document.getElementById('auth-screen').style.display = 'none'
-    document.getElementById('create-screen').style.display = 'flex'
+    showEntryScreen()
   }
 })()
+
+function showEntryScreen() {
+  const session = getSavedSession()
+  if (session && session.player) {
+    // 有存档 → 显示恢复界面
+    const p = session.player
+    const classNames = { fighter: '剑士', mage: '法师', ranger: '游侠', cleric: '牧师' }
+    const className = classNames[session.classId] || session.classId || ''
+    document.getElementById('resume-info').innerHTML =
+      `<strong style="color:#e0e0e0;font-size:18px">${esc(p.name)}</strong><br>` +
+      `${p.level}级${esc(className)} · HP ${p.hp}/${p.maxHp} · 金币 ${p.gold}`
+    document.getElementById('resume-screen').style.display = 'flex'
+  } else {
+    document.getElementById('create-screen').style.display = 'flex'
+  }
+}
 
 async function authenticate() {
   const pw = document.getElementById('auth-password').value
@@ -513,8 +588,7 @@ async function authenticate() {
       authToken = data.token ?? ''
       localStorage.setItem('trpg_token', authToken)
       document.getElementById('auth-screen').style.display = 'none'
-      document.getElementById('create-screen').style.display = 'flex'
-      document.getElementById('player-name').focus()
+      showEntryScreen()
     } else {
       errEl.textContent = data.error ?? '密码错误'
       errEl.style.display = 'block'
@@ -523,6 +597,38 @@ async function authenticate() {
     errEl.textContent = '网络错误'
     errEl.style.display = 'block'
   }
+}
+
+// ─── 恢复 / 新游戏 ───
+function resumeGame() {
+  const session = getSavedSession()
+  const dossier = getSavedDossier()
+  if (!session) { newGame(); return }
+
+  document.getElementById('resume-screen').style.display = 'none'
+  const gameScreen = document.getElementById('game-screen')
+  gameScreen.style.display = 'flex'
+  document.getElementById('tab-bar').style.display = 'flex'
+  isResuming = true
+
+  // 恢复聊天记录
+  const msgs = getSavedMessages()
+  const container = document.getElementById('messages')
+  for (const m of msgs) {
+    const cls = m.role === 'dm' ? 'dm' : m.role === 'player' ? 'player' : 'system'
+    appendMsg(m.text, cls)
+  }
+
+  connectWs((ws) => {
+    ws.send(JSON.stringify({ type: 'resume', session, dossier }))
+  })
+}
+
+function newGame() {
+  clearSave()
+  document.getElementById('resume-screen').style.display = 'none'
+  document.getElementById('create-screen').style.display = 'flex'
+  document.getElementById('player-name').focus()
 }
 
 document.getElementById('auth-password').addEventListener('keydown', (e) => {
@@ -768,13 +874,65 @@ function renderMorePanel() {
     <div class="more-item" onclick="moreCmd('/inventory', '背包')">
       <div class="more-icon">🎒</div><div class="more-label">背包</div>
     </div>
-    <div class="more-item" onclick="moreCmd('/save', '存档')">
-      <div class="more-icon">💾</div><div class="more-label">存档</div>
+    <div class="more-item" onclick="downloadSave()">
+      <div class="more-icon">📥</div><div class="more-label">下载存档</div>
+    </div>
+    <div class="more-item" onclick="triggerUploadSave()">
+      <div class="more-icon">📤</div><div class="more-label">上传存档</div>
     </div>
     <div class="more-item" onclick="moreCmd('/help', '帮助')">
       <div class="more-icon">📋</div><div class="more-label">帮助</div>
     </div>
-  </div>`
+  </div>
+  <input type="file" id="save-upload" accept=".json" style="display:none" onchange="uploadSave(this)">`
+}
+
+// ─── 下载/上传存档 ───
+function downloadSave() {
+  const session = getSavedSession()
+  if (!session) { closePanel(); appendMsg('没有可下载的存档', 'error'); return }
+  const dossier = getSavedDossier()
+  const data = { session, dossier, messages: getSavedMessages(), exportedAt: new Date().toISOString() }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `trpg-save-${session.player?.name || 'unknown'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  closePanel()
+}
+
+function triggerUploadSave() {
+  document.getElementById('save-upload').click()
+}
+
+function uploadSave(input) {
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result)
+      const session = data.session
+      if (!session?.player) throw new Error('无效存档')
+      // 写入 localStorage
+      saveToLocal(session, data.dossier)
+      if (data.messages) localStorage.setItem(SAVE_KEYS.messages, JSON.stringify(data.messages))
+      closePanel()
+      // 如果游戏已在运行，发 resume；否则刷新
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resume', session, dossier: data.dossier }))
+        appendMsg('存档已上传，正在恢复...', 'reconnect')
+      } else {
+        location.reload()
+      }
+    } catch (err) {
+      appendMsg('存档文件无效: ' + err.message, 'error')
+    }
+    input.value = ''
+  }
+  reader.readAsText(file)
 }
 
 function renderNPCListPanel(data) {
@@ -859,6 +1017,21 @@ function hideThinking() {
   if (el) el.remove()
 }
 
+// ─── WebSocket 连接 ───
+function connectWs(onOpen) {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
+  ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
+
+  ws.onopen = () => { if (onOpen) onOpen(ws) }
+  ws.onmessage = handleWsMessage
+  ws.onclose = handleWsClose
+  ws.onerror = () => {
+    sending = false
+    document.getElementById('send').disabled = false
+  }
+}
+
 // ─── 游戏启动 ───
 function startGame() {
   const name = document.getElementById('player-name').value.trim()
@@ -869,20 +1042,9 @@ function startGame() {
   gameScreen.style.display = 'flex'
   document.getElementById('tab-bar').style.display = 'flex'
 
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
-  ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
-
-  ws.onopen = () => {
+  connectWs((ws) => {
     ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))
-  }
-
-  ws.onmessage = handleWsMessage
-  ws.onclose = handleWsClose
-  ws.onerror = () => {
-    sending = false
-    document.getElementById('send').disabled = false
-  }
+  })
 }
 
 function handleWsMessage(e) {
@@ -895,13 +1057,18 @@ function handleWsMessage(e) {
       if (!currentDmDiv) {
         currentDmDiv = document.createElement('div')
         currentDmDiv.className = 'msg dm'
+        currentDmDiv._fullText = ''
         container.appendChild(currentDmDiv)
       }
       currentDmDiv.textContent += msg.text
+      currentDmDiv._fullText += msg.text
       container.scrollTop = container.scrollHeight
       break
 
     case 'dm_end':
+      if (currentDmDiv) {
+        saveMessage('dm', currentDmDiv._fullText || currentDmDiv.textContent)
+      }
       currentDmDiv = null
       if (msg.pendingMonster) {
         combatMode = true
@@ -950,6 +1117,7 @@ function handleWsMessage(e) {
       // System command text output → render as panel fallback
       sending = false
       document.getElementById('send').disabled = false
+      saveMessage('system', msg.text)
       openPanel('info', '系统', `<div class="panel-card"><div style="white-space:pre-wrap;color:#e6b800">${esc(msg.text)}</div></div>`)
       break
 
@@ -966,25 +1134,45 @@ function handleWsMessage(e) {
     case 'quest_progress':
       appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
       break
+
+    // ─── 存档同步 ───
+    case 'sync':
+      saveToLocal(msg.session, msg.dossier)
+      break
+
+    case 'resumed':
+      isResuming = false
+      appendMsg('── 存档已恢复，继续冒险 ──', 'reconnect')
+      break
+
+    case 'resume_failed':
+      isResuming = false
+      clearSave()
+      appendMsg('存档恢复失败，请开始新游戏', 'error')
+      // fallback: 回到角色创建
+      document.getElementById('game-screen').style.display = 'none'
+      document.getElementById('tab-bar').style.display = 'none'
+      document.getElementById('create-screen').style.display = 'flex'
+      break
   }
 }
 
 function handleWsClose() {
   sending = false
   document.getElementById('send').disabled = false
+  // 只在游戏界面可见时重连（不是在角色创建/恢复界面）
+  const gameVisible = document.getElementById('game-screen').style.display !== 'none'
+  if (!gameVisible) return
+
   appendMsg('连接断开，5秒后重连...', 'reconnect')
   setTimeout(() => {
     if (ws?.readyState === WebSocket.CLOSED) {
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
-      ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
-      ws.onopen = () => appendMsg('已重连', 'reconnect')
-      ws.onmessage = handleWsMessage
-      ws.onclose = handleWsClose
-      ws.onerror = () => {
-        sending = false
-        document.getElementById('send').disabled = false
-      }
+      const session = getSavedSession()
+      const dossier = getSavedDossier()
+      connectWs(session ? (ws) => {
+        isResuming = true
+        ws.send(JSON.stringify({ type: 'resume', session, dossier }))
+      } : null)
     }
   }, 5000)
 }
@@ -1047,6 +1235,7 @@ function sendInput() {
   if (!text || !ws || sending) return
 
   appendMsg('🗡️ ' + text, 'player')
+  saveMessage('player', text)
   ws.send(JSON.stringify({ type: 'input', text }))
   input.value = ''
   sending = true
