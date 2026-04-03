@@ -32,6 +32,11 @@ delta 限制 -3 到 +3（日常对话通常 ±1，显著事件 ±2~3）。
     const clampedDelta = Math.max(-3, Math.min(3, delta))
     if (clampedDelta === 0) return { output: '信任未变化。', isError: true }
 
+    // 每轮每个 NPC 最多变化一次（防止 DM 连调刷信任）
+    if (trustChangesThisTurn.some(t => t.npcName === npcName)) {
+      return { output: `本轮已对${npcName}修改过信任，不能重复调用。`, isError: true }
+    }
+
     const npc = session.npcs.find(n => n.name === npcName)
     if (!npc) return { output: `NPC"${npcName}"不存在。`, isError: true }
     if (npc.location !== session.worldState.currentLocation) {
