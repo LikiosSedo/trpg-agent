@@ -939,6 +939,16 @@ function renderStatusPanel(data) {
     html += `</div>`
   }
 
+  // 法术/技能
+  if (data.spells && data.spells.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">法术</div>`
+    for (const sp of data.spells) {
+      const usage = sp.isCantrip ? '戏法' : `${sp.remaining}/${sp.max}`
+      html += `<div class="item-row"><span class="item-name">${esc(sp.name)}</span><span class="item-detail">${usage}</span></div>`
+    }
+    html += `</div>`
+  }
+
   return html
 }
 
@@ -1659,6 +1669,7 @@ function handleWsMessage(e) {
     case 'resumed':
       isResuming = false
       appendMsg('── 存档已恢复，继续冒险 ──', 'reconnect')
+      { const s = getSavedSession(); if (s) updateHUD(s) }
       break
 
     case 'resume_failed':
