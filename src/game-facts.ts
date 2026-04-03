@@ -63,6 +63,22 @@ export class GameFactStore {
       criticalEvents.length ? `关键事件:\n${criticalEvents.join('\n')}` : '',
       recentEvents.length ? `最近发生:\n${recentEvents.join('\n')}` : '',
       npcs.length ? `NPC状态:\n${npcs.map(n => `- ${n.name}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}）`).join('\n')}` : '',
+      (() => {
+        const shopNpcs = this.session.npcs.filter(n => n.shopPricing && (n.inventory ?? []).length > 0)
+        if (!shopNpcs.length) return ''
+        const shopInfo = shopNpcs.map(n => {
+          const items = (n.inventory ?? []).map(i => {
+            const price = n.shopPricing?.[i.name]
+            return price ? `${i.name}(${price}金)` : i.name
+          })
+          // Deduplicate and count
+          const counts = new Map<string, number>()
+          for (const desc of items) counts.set(desc, (counts.get(desc) ?? 0) + 1)
+          const itemList = [...counts.entries()].map(([d, c]) => c > 1 ? `${d}×${c}` : d).join('、')
+          return `- ${n.name}: ${itemList}`
+        }).join('\n')
+        return `商店库存:\n${shopInfo}`
+      })(),
       getCombatSummary(this.session) ?? '',
     ].filter(Boolean).join('\n')
   }

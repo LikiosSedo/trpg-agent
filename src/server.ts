@@ -11,8 +11,8 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import type { GameSession } from './types.js'
-import { initGameState, getSession, getFacts, setSession } from './game-state.js'
-import { CLASS_TEMPLATES, createGameSession } from './game-data.js'
+import { initGameState, getSession, getFacts, setSession, initItemRegistry } from './game-state.js'
+import { CLASS_TEMPLATES, createGameSession, createInitialNPCs } from './game-data.js'
 import { initDMAgent, dmRespond } from './dm-agent.js'
 import { DossierManager } from './dossier.js'
 import { GameFactStore } from './game-facts.js'
@@ -33,6 +33,21 @@ function stripAnsi(s: string): string {
 }
 
 // CLASS_TEMPLATES and createGameSession imported from game-data.ts
+
+/** Migrate old saves that lack NPC inventories/roles */
+function migrateSession(session: GameSession): void {
+  const defaults = createInitialNPCs()
+  for (const npc of session.npcs) {
+    if (npc.role === undefined) {
+      const def = defaults.find(d => d.name === npc.name)
+      if (def) {
+        npc.role = def.role
+        if (npc.inventory === undefined) npc.inventory = def.inventory ?? []
+        if (npc.shopPricing === undefined) npc.shopPricing = def.shopPricing
+      }
+    }
+  }
+}
 
 // ─── Express + WebSocket Server ───
 
@@ -179,6 +194,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     if (msg.type === 'resume') {
       try {
         connSession = msg.session
+        migrateSession(connSession)
         setSession(connSession)
         initDMAgent()
         dossier = msg.dossier ? DossierManager.fromJSON(msg.dossier) : new DossierManager()
@@ -348,6 +364,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             const loaded = GameFactStore.load(slotName)
             const loadedSession = (loaded as any).session as GameSession
             connSession = loadedSession
+            migrateSession(connSession)
             setSession(connSession)
             initDMAgent()
             resetIdleTracking()
@@ -402,6 +419,28 @@ wss.on('connection', (ws: WebSocket, req) => {
           armor: p.equipped.armor ? { name: p.equipped.armor.name, desc: p.equipped.armor.description } : null,
           items: p.inventory.map(i => ({ name: i.name, type: i.type, desc: i.description })),
           gold: p.gold,
+        }})
+        return
+      }
+      if (input === '/shop') {
+        const loc = session.worldState.currentLocation
+        const shopNpc = session.npcs.find(n =>
+          n.shopPricing && (n.inventory ?? []).length > 0 && n.location === loc
+        )
+        if (!shopNpc) {
+          sysMsg('附近没有商店。')
+          return
+        }
+        send('panel', { panel: 'shop', data: {
+          npcName: shopNpc.name,
+          playerGold: session.player.gold,
+          items: (shopNpc.inventory ?? []).map(i => ({
+            name: i.name,
+            type: i.type,
+            description: i.description,
+            bonus: i.bonus,
+            price: shopNpc.shopPricing?.[i.name] ?? 0,
+          })),
         }})
         return
       }
@@ -464,6 +503,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             { cmd: '/world', desc: '查看世界指南' },
             { cmd: '/map', desc: '查看地图' },
             { cmd: '/inventory', desc: '查看背包' },
+            { cmd: '/shop', desc: '查看附近商店' },
             { cmd: '/recap', desc: '故事回顾' },
             { cmd: '/chapter', desc: '查看章节进度与探索度' },
             { cmd: '/save', desc: '保存游戏' },
@@ -611,6 +651,8 @@ function renderWorldGuideText(): string {
 }
 
 // ─── Start ───
+
+initItemRegistry()
 
 const PORT = parseInt(process.env.PORT ?? '3000')
 server.listen(PORT, () => {

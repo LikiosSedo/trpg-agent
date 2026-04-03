@@ -40,11 +40,11 @@ DM 根据检定结果决定发现什么。`,
     const loc = locations[locId]
 
     if (type === 'body') {
-      return { output: `搜索${target ?? '尸体'}。DM根据战斗结果决定掉落物品。` }
+      return { output: `搜索${target ?? '尸体'}。DM根据战斗结果决定掉落物品。如果发现物品，必须调用 TransferItem(transferType="loot") 来给予玩家。` }
     }
 
     if (type === 'container') {
-      return { output: `搜索${target ?? '容器'}。DM决定容器内容物。` }
+      return { output: `搜索${target ?? '容器'}。DM决定容器内容物。如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。` }
     }
 
     if (type === 'area') {
@@ -65,6 +65,7 @@ DM 根据检定结果决定发现什么。`,
           result.success && hiddenPois.length > 0
             ? `发现隐藏地点：${hiddenPois[0].nameZh}(${hiddenPois[0].name})——${hiddenPois[0].description}`
             : result.success ? '仔细搜索后未发现新事物。' : '',
+          result.success ? '如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。' : '',
         ].filter(Boolean).join('\n'),
       }
     }
@@ -75,7 +76,7 @@ DM 根据检定结果决定发现什么。`,
     const result = skillCheck(mod, dc)
 
     return {
-      output: `调查检定(搜索线索)：d20=${result.roll}, 修正+${mod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。DM根据结果提供线索。`,
+      output: `调查检定(搜索线索)：d20=${result.roll}, 修正+${mod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。DM根据结果提供线索。如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。`,
     }
   },
 }

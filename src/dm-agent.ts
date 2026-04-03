@@ -12,7 +12,7 @@ import { homedir } from 'node:os'
 import {
   DiceTool, MoveTool, LookTool, TalkTool,
   AttackTool, UseItemTool, SearchTool, RestTool,
-  RenderSceneTool,
+  RenderSceneTool, TransferItemTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -65,7 +65,7 @@ export function initDMAgent(): void {
     tools: [
       DiceTool, MoveTool, LookTool, TalkTool,
       AttackTool, UseItemTool, SearchTool, RestTool,
-      RenderSceneTool,
+      RenderSceneTool, TransferItemTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,

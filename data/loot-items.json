@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Rusty Dagger",
+    "nameEn": "Rusty Dagger",
+    "type": "weapon",
+    "description": "A corroded goblin dagger, barely holding together. Deals 1d4 piercing damage.",
+    "basePrice": 2
+  },
+  {
+    "name": "Wolf Pelt",
+    "nameEn": "Wolf Pelt",
+    "type": "misc",
+    "description": "A rough grey wolf pelt, valuable to tanners and merchants.",
+    "basePrice": 5
+  },
+  {
+    "name": "Cockatrice Feather",
+    "nameEn": "Cockatrice Feather",
+    "type": "misc",
+    "description": "An iridescent feather from a cockatrice. Sought by alchemists for petrification remedies.",
+    "basePrice": 12
+  },
+  {
+    "name": "Bone Fragment",
+    "nameEn": "Bone Fragment",
+    "type": "misc",
+    "description": "A shard of enchanted bone, faintly humming with residual necromantic energy.",
+    "basePrice": 3
+  },
+  {
+    "name": "Shadow Essence",
+    "nameEn": "Shadow Essence",
+    "type": "misc",
+    "description": "A wisp of condensed shadow trapped in a glass vial. Used in dark alchemy.",
+    "basePrice": 15
+  },
+  {
+    "name": "Spider Silk",
+    "nameEn": "Spider Silk",
+    "type": "misc",
+    "description": "A bundle of incredibly strong silk harvested from a giant spider's web.",
+    "basePrice": 8
+  },
+  {
+    "name": "Venom Sac",
+    "nameEn": "Venom Sac",
+    "type": "misc",
+    "description": "A giant spider's venom gland, still dripping with potent toxin. Useful for coating weapons or brewing antidotes.",
+    "basePrice": 10
+  },
+  {
+    "name": "Ghoul Claw",
+    "nameEn": "Ghoul Claw",
+    "type": "misc",
+    "description": "A severed ghoul claw coated in paralyzing residue. Herbalists prize it for medicinal extracts.",
+    "basePrice": 7
+  },
+  {
+    "name": "Crude Greataxe",
+    "nameEn": "Crude Greataxe",
+    "type": "weapon",
+    "description": "A heavy, poorly balanced greataxe of orcish make. Deals 1d10 slashing damage.",
+    "basePrice": 8
+  },
+  {
+    "name": "Mimic Adhesive",
+    "nameEn": "Mimic Adhesive",
+    "type": "misc",
+    "description": "A jar of incredibly sticky substance scraped from a dead mimic. Has many creative uses.",
+    "basePrice": 18
+  },
+  {
+    "name": "Void Shard",
+    "nameEn": "Void Shard",
+    "type": "quest",
+    "description": "A fragment of crystallized void energy from the Eclipsed Beast. Pulses with dark power.",
+    "basePrice": 50
+  },
+  {
+    "name": "Shadow Crystal",
+    "nameEn": "Shadow Crystal",
+    "type": "misc",
+    "description": "A dark crystal that absorbs nearby light. Radiates an unsettling chill.",
+    "basePrice": 30
+  }
+]

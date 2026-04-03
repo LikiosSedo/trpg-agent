@@ -86,6 +86,9 @@ export interface CombatState {
 
 // ─── NPC ──────────────────────────────────────
 
+export type NPCRole = 'blacksmith' | 'herbalist' | 'guild_leader' | 'guild_officer'
+                     | 'innkeeper' | 'mayor' | 'bard' | 'child' | 'general'
+
 export interface NPC {
   name: string
   trust: number // -10 ~ 10
@@ -94,6 +97,9 @@ export interface NPC {
   interactionLog: string[] // 交互摘要（最近10条，供不在场时回顾）
   location: string
   mood: string
+  role?: NPCRole
+  inventory?: Item[]
+  shopPricing?: Record<string, number> // item name -> gold price
 }
 
 // ─── 任务 ──────────────────────────────────────

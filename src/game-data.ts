@@ -82,6 +82,11 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '温和',
+      role: 'innkeeper',
+      inventory: [
+        { name: '火把', type: 'misc', description: '普通的火把，可照亮周围区域。', bonus: 0 },
+        { name: '火把', type: 'misc', description: '普通的火把，可照亮周围区域。', bonus: 0 },
+      ],
     },
     {
       name: '小莉',
@@ -91,6 +96,8 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '好奇',
+      role: 'child',
+      inventory: [],
     },
     {
       name: '艾琳娜',
@@ -100,6 +107,11 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '冷静',
+      role: 'guild_leader',
+      inventory: [
+        { name: '公会徽章', type: 'quest', description: '冒险者公会的银质徽章，证明持有者是受认可的冒险者。' },
+        { name: '矿道通行证', type: 'quest', description: '授权持有者进入灰脊矿道中层的官方文件。' },
+      ],
     },
     {
       name: '维克多',
@@ -109,6 +121,10 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '紧张',
+      role: 'mayor',
+      inventory: [
+        { name: '达里安的日志', type: 'quest', description: '一本破旧的日志，记录了20年前矿道深处的发现。封面有烧焦的痕迹。' },
+      ],
     },
     {
       name: '卡恩',
@@ -118,6 +134,8 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '从容',
+      role: 'bard',
+      inventory: [],
     },
     {
       name: '陈妈',
@@ -133,6 +151,10 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '热情',
+      role: 'innkeeper',
+      inventory: [
+        { name: '热汤', type: 'misc', description: '一碗冒着热气的浓汤，喝下后恢复些许精力。' },
+      ],
     },
     {
       name: '格罗姆',
@@ -148,6 +170,23 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '暴躁',
+      role: 'blacksmith',
+      inventory: [
+        { name: 'Longsword', type: 'weapon', description: '锋利的长剑。Deals 1d8 slashing damage.', bonus: 1 },
+        { name: 'Shortsword', type: 'weapon', description: '轻便的短剑。Deals 1d6 piercing damage.', bonus: 0 },
+        { name: 'Shortbow', type: 'weapon', description: '猎用短弓。Deals 1d6 piercing damage at range.', bonus: 0 },
+        { name: 'Leather Armor', type: 'armor', description: '柔韧的皮甲。AC+1.', bonus: 1 },
+        { name: 'Chain Shirt', type: 'armor', description: '铁链编织的锁子甲。AC+2，略微沉重。', bonus: 2 },
+        { name: '麻绳', type: 'misc', description: '50尺结实的麻绳。', bonus: 0 },
+      ],
+      shopPricing: {
+        'Longsword': 30,
+        'Shortsword': 15,
+        'Shortbow': 25,
+        'Leather Armor': 20,
+        'Chain Shirt': 50,
+        '麻绳': 5,
+      },
     },
     {
       name: '叶绿',
@@ -163,6 +202,20 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '温和',
+      role: 'herbalist',
+      inventory: [
+        { name: 'Healing Potion', type: 'potion', description: '红色治疗药水。恢复2d4+2生命值。', bonus: 2 },
+        { name: 'Healing Potion', type: 'potion', description: '红色治疗药水。恢复2d4+2生命值。', bonus: 2 },
+        { name: 'Healing Potion', type: 'potion', description: '红色治疗药水。恢复2d4+2生命值。', bonus: 2 },
+        { name: '解毒剂', type: 'potion', description: '浅绿色液体，可以解除普通毒素。', bonus: 0 },
+        { name: '解毒剂', type: 'potion', description: '浅绿色液体，可以解除普通毒素。', bonus: 0 },
+        { name: '暗影防护药水', type: 'potion', description: '深紫色药水，饮用后1小时内对暗影伤害有抗性。', bonus: 0 },
+      ],
+      shopPricing: {
+        'Healing Potion': 25,
+        '解毒剂': 15,
+        '暗影防护药水': 40,
+      },
     },
     {
       name: '韩猛',
@@ -178,6 +231,8 @@ export function createInitialNPCs(): NPC[] {
       interactionLog: [],
       location: 'dawnbreak-town',
       mood: '焦虑',
+      role: 'guild_officer',
+      inventory: [],
     },
   ]
 }

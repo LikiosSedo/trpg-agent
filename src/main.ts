@@ -9,7 +9,7 @@ import * as readline from 'node:readline'
 import { readFileSync } from 'node:fs'
 import chalk from 'chalk'
 import type { GameSession, NPC } from './types.js'
-import { initGameState, getSession, getFacts } from './game-state.js'
+import { initGameState, getSession, getFacts, initItemRegistry } from './game-state.js'
 import { CLASS_TEMPLATES, createGameSession } from './game-data.js'
 import { GameFactStore } from './game-facts.js'
 import { checkSafety } from './safety.js'
@@ -431,6 +431,7 @@ async function main() {
     const session = createGameSession(name, classId)
 
     initGameState(session)
+    initItemRegistry()
     // 存一个初始存档（Claude SDK 模式下 game-cmd.ts 需要读取）
     getFacts().save('autosave')
     initDMAgent()
