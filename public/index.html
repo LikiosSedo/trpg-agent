@@ -83,8 +83,17 @@
 </head>
 <body>
 
+<!-- 密码验证 -->
+<div id="auth-screen" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
+  <h2 style="color:#e6b800; margin-bottom:10px">⚔️ 破晓镇 · 蚀目之影</h2>
+  <p style="color:#888; margin-bottom:20px">请输入访问密码</p>
+  <input id="auth-password" type="password" placeholder="密码" style="background:#0f3460; border:1px solid #533483; color:#e0e0e0; padding:10px; border-radius:6px; font-size:16px; width:250px; text-align:center; margin-bottom:12px;">
+  <button id="auth-btn" onclick="authenticate()" style="background:#533483; color:white; border:none; padding:10px 30px; border-radius:6px; font-size:15px; cursor:pointer;">进入</button>
+  <p id="auth-error" style="color:#ff6b6b; margin-top:10px; display:none;"></p>
+</div>
+
 <!-- 角色创建 -->
-<div id="create-screen">
+<div id="create-screen" style="display:none">
   <h2>⚔️ 破晓镇 · 蚀目之影</h2>
   <p style="color:#888; margin-bottom:20px; text-align:center">一个 AI 驱动的跑团冒险游戏</p>
   <input id="player-name" placeholder="你叫什么名字？" autofocus>
@@ -138,6 +147,39 @@ let ws = null
 let selectedClass = null
 let sending = false
 let currentDmDiv = null
+let authToken = null
+
+// ─── 密码认证 ───
+async function authenticate() {
+  const pw = document.getElementById('auth-password').value
+  const errEl = document.getElementById('auth-error')
+  errEl.style.display = 'none'
+
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      authToken = data.token ?? ''
+      document.getElementById('auth-screen').style.display = 'none'
+      document.getElementById('create-screen').style.display = 'flex'
+      document.getElementById('player-name').focus()
+    } else {
+      errEl.textContent = data.error ?? '密码错误'
+      errEl.style.display = 'block'
+    }
+  } catch {
+    errEl.textContent = '网络错误'
+    errEl.style.display = 'block'
+  }
+}
+
+document.getElementById('auth-password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') authenticate()
+})
 
 function selectClass(el) {
   document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('selected'))
@@ -160,7 +202,9 @@ function startGame() {
 
   // 连接 WebSocket
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = new WebSocket(`${proto}//${location.host}`)
+  // 带 token 连接（密码验证后获得）
+  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
+  ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))

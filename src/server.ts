@@ -38,11 +38,62 @@ const app = express()
 const server = createServer(app)
 const wss = new WebSocketServer({ server })
 
+// ─── 访问密码保护 ───
+// 密码通过环境变量 TRPG_PASSWORD 设置，不写在代码中
+// 使用 timing-safe comparison 防止时序攻击
+import { timingSafeEqual, createHash } from 'crypto'
+
+const GAME_PASSWORD = process.env.TRPG_PASSWORD ?? ''
+const PASSWORD_ENABLED = GAME_PASSWORD.length > 0
+
+function hashPassword(pw: string): string {
+  return createHash('sha256').update(pw).digest('hex')
+}
+
+const PASSWORD_HASH = PASSWORD_ENABLED ? hashPassword(GAME_PASSWORD) : ''
+
+function verifyPassword(input: string): boolean {
+  if (!PASSWORD_ENABLED) return true
+  const inputHash = hashPassword(input)
+  try {
+    return timingSafeEqual(Buffer.from(inputHash), Buffer.from(PASSWORD_HASH))
+  } catch {
+    return false
+  }
+}
+
+// 密码验证 API（POST，不是 GET，防止浏览器历史泄露）
+app.use(express.json())
+app.post('/api/auth', (req, res) => {
+  if (!PASSWORD_ENABLED) {
+    res.json({ ok: true })
+    return
+  }
+  const { password } = req.body ?? {}
+  if (verifyPassword(password ?? '')) {
+    // 返回一个 session token（密码的 hash，有效期内免重复输入）
+    res.json({ ok: true, token: PASSWORD_HASH })
+  } else {
+    res.status(401).json({ ok: false, error: '密码错误' })
+  }
+})
+
 app.use(express.static(join(__dirname, '..', 'public')))
 
 // 每个 WebSocket 连接 = 一个独立的游戏会话
-wss.on('connection', (ws: WebSocket) => {
-  console.log('[server] new player connected')
+wss.on('connection', (ws: WebSocket, req) => {
+  // WebSocket 连接时验证 token（从 URL query 传入）
+  if (PASSWORD_ENABLED) {
+    const url = new URL(req.url ?? '', `http://${req.headers.host}`)
+    const token = url.searchParams.get('token')
+    if (token !== PASSWORD_HASH) {
+      ws.close(1008, 'Unauthorized')
+      console.log('[server] rejected: invalid token')
+      return
+    }
+  }
+
+  console.log('[server] new player connected (authenticated)')
   let dossier = new DossierManager()
   let connSession: GameSession | null = null
   let gameStarted = false
