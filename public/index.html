@@ -676,9 +676,9 @@
     <span class="tab-icon">👤</span>
     <span>状态</span>
   </div>
-  <div class="tab" data-tab="quest" onclick="switchTab('quest')">
-    <span class="tab-icon">⚔</span>
-    <span>任务</span>
+  <div class="tab" data-tab="npc" onclick="switchTab('npc')">
+    <span class="tab-icon">📋</span>
+    <span>人物</span>
   </div>
   <div class="tab" data-tab="map" onclick="switchTab('map')">
     <span class="tab-icon">🗺</span>
@@ -886,8 +886,8 @@ function switchTab(tab) {
     openPanel('more', '更多', renderMorePanel())
     return
   }
-  // 查看面板不受 sending 阻塞（DM 思考时也能查看地图/状态/任务）
-  const cmdMap = { status: '/status', quest: '/quest', map: '/map' }
+  // 查看面板不受 sending 阻塞（DM 思考时也能查看）
+  const cmdMap = { status: '/status', quest: '/quest', map: '/map', npc: '/npc' }
   const cmd = cmdMap[tab]
   if (cmd && ws) {
     ws.send(JSON.stringify({ type: 'view', text: cmd }))
@@ -1213,24 +1213,35 @@ function renderRecapPanel(data) {
 }
 
 function renderMorePanel() {
-  return `<div class="more-grid">
-    <div class="more-item" onclick="moreCmd('/npc', '人物')">
-      <div class="more-icon">👥</div><div class="more-label">人物</div>
+  return `
+  <div style="font-size:12px;color:#666;padding:0 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">冒险</div>
+  <div class="more-grid">
+    <div class="more-item" onclick="moreCmd('/quest', '任务')">
+      <div class="more-icon">⚔</div><div class="more-label">任务</div>
     </div>
     <div class="more-item" onclick="moreCmd('/inventory', '背包')">
       <div class="more-icon">🎒</div><div class="more-label">背包</div>
     </div>
-    <div class="more-item" onclick="downloadSave()">
-      <div class="more-icon">📥</div><div class="more-label">下载存档</div>
-    </div>
-    <div class="more-item" onclick="triggerUploadSave()">
-      <div class="more-icon">📤</div><div class="more-label">上传存档</div>
+    <div class="more-item" onclick="moreCmd('/shop', '商店')">
+      <div class="more-icon">🏪</div><div class="more-label">商店</div>
     </div>
     <div class="more-item" onclick="moreCmd('/recap', '故事回顾')">
       <div class="more-icon">📖</div><div class="more-label">故事回顾</div>
     </div>
     <div class="more-item" onclick="moreCmd('/chapter', '章节进度')">
       <div class="more-icon">📊</div><div class="more-label">章节进度</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/world', '世界知识')">
+      <div class="more-icon">🌍</div><div class="more-label">世界知识</div>
+    </div>
+  </div>
+  <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">系统</div>
+  <div class="more-grid">
+    <div class="more-item" onclick="downloadSave()">
+      <div class="more-icon">📥</div><div class="more-label">下载存档</div>
+    </div>
+    <div class="more-item" onclick="triggerUploadSave()">
+      <div class="more-icon">📤</div><div class="more-label">上传存档</div>
     </div>
     <div class="more-item" onclick="moreCmd('/help', '帮助')">
       <div class="more-icon">📋</div><div class="more-label">帮助</div>
@@ -1351,10 +1362,9 @@ function renderInventoryPanel(data) {
 }
 
 function moreCmd(cmd, label) {
-  if (!ws || sending) return
-  ws.send(JSON.stringify({ type: 'input', text: cmd }))
-  sending = true
-  document.getElementById('send').disabled = true
+  if (!ws) return
+  // 使用 view 类型，DM 思考时也不阻塞
+  ws.send(JSON.stringify({ type: 'view', text: cmd }))
 }
 
 
