@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>破晓镇 · 蚀目之影</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: 'Courier New', monospace; font-size: 15px;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  #header {
+    background: #16213e; padding: 12px 16px; border-bottom: 1px solid #0f3460;
+    text-align: center;
+  }
+  #header h1 { color: #e6b800; font-size: 18px; margin-bottom: 4px; }
+  #header .sub { color: #888; font-size: 12px; }
+  #messages {
+    flex: 1; overflow-y: auto; padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .msg { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.dm { color: #e0e0e0; }
+  .msg.system { color: #e6b800; font-size: 13px; }
+  .msg.error { color: #ff6b6b; }
+  .msg.player { color: #4ecdc4; }
+  .msg.prologue { color: #ccc; font-style: italic; }
+  #input-area {
+    background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
+    display: flex; gap: 8px;
+  }
+  #input {
+    flex: 1; background: #0f3460; border: 1px solid #533483;
+    color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
+    font-family: inherit; font-size: 15px; outline: none;
+  }
+  #input:focus { border-color: #e6b800; }
+  #input::placeholder { color: #666; }
+  #send {
+    background: #533483; color: white; border: none; padding: 10px 20px;
+    border-radius: 6px; font-size: 15px; cursor: pointer;
+  }
+  #send:hover { background: #6b44a0; }
+  #send:disabled { background: #333; cursor: wait; }
+
+  /* 角色创建界面 */
+  #create-screen {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  #create-screen h2 { color: #e6b800; margin-bottom: 20px; }
+  #create-screen input {
+    background: #0f3460; border: 1px solid #533483; color: #e0e0e0;
+    padding: 10px; border-radius: 6px; font-size: 16px; width: 250px;
+    text-align: center; margin-bottom: 16px;
+  }
+  .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .class-btn {
+    background: #16213e; border: 2px solid #533483; color: #e0e0e0;
+    padding: 12px 16px; border-radius: 8px; cursor: pointer; text-align: center;
+  }
+  .class-btn:hover { border-color: #e6b800; }
+  .class-btn.selected { border-color: #e6b800; background: #1a1a4e; }
+  .class-btn .name { font-size: 16px; font-weight: bold; }
+  .class-btn .desc { font-size: 12px; color: #888; margin-top: 4px; }
+  #start-btn {
+    background: #e6b800; color: #1a1a2e; border: none; padding: 12px 40px;
+    border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+  }
+  #start-btn:hover { background: #ffd000; }
+  #start-btn:disabled { background: #666; cursor: not-allowed; }
+
+  /* 快捷命令 */
+  #shortcuts { display: flex; gap: 6px; padding: 8px 16px; background: #16213e; flex-wrap: wrap; }
+  .shortcut {
+    background: #0f3460; color: #888; border: 1px solid #333; padding: 4px 10px;
+    border-radius: 12px; font-size: 12px; cursor: pointer;
+  }
+  .shortcut:hover { color: #e6b800; border-color: #e6b800; }
+</style>
+</head>
+<body>
+
+<!-- 角色创建 -->
+<div id="create-screen">
+  <h2>⚔️ 破晓镇 · 蚀目之影</h2>
+  <p style="color:#888; margin-bottom:20px; text-align:center">一个 AI 驱动的跑团冒险游戏</p>
+  <input id="player-name" placeholder="你叫什么名字？" autofocus>
+  <p style="color:#aaa; margin-bottom:10px">选择职业:</p>
+  <div class="class-grid">
+    <div class="class-btn" data-class="fighter" onclick="selectClass(this)">
+      <div class="name">⚔️ 剑士</div>
+      <div class="desc">力量与勇气 STR 16</div>
+    </div>
+    <div class="class-btn" data-class="mage" onclick="selectClass(this)">
+      <div class="name">🔮 法师</div>
+      <div class="desc">奥术知识 INT 16</div>
+    </div>
+    <div class="class-btn" data-class="ranger" onclick="selectClass(this)">
+      <div class="name">🏹 游侠</div>
+      <div class="desc">敏捷感知 DEX 16</div>
+    </div>
+    <div class="class-btn" data-class="cleric" onclick="selectClass(this)">
+      <div class="name">✨ 牧师</div>
+      <div class="desc">信仰治疗 WIS 16</div>
+    </div>
+  </div>
+  <button id="start-btn" disabled onclick="startGame()">开始冒险</button>
+</div>
+
+<!-- 游戏界面 -->
+<div id="game-screen" style="display:none; flex:1; flex-direction:column;">
+  <div id="header">
+    <h1>⚔️ 破晓镇 · 蚀目之影</h1>
+    <div class="sub">AI TRPG · powered by open-claude-cli</div>
+  </div>
+  <div id="messages"></div>
+  <div id="shortcuts">
+    <span class="shortcut" onclick="quickCmd('/status')">状态</span>
+    <span class="shortcut" onclick="quickCmd('/quest')">任务</span>
+    <span class="shortcut" onclick="quickCmd('/npc')">人物</span>
+    <span class="shortcut" onclick="quickCmd('/inventory')">背包</span>
+    <span class="shortcut" onclick="quickCmd('/world')">世界</span>
+    <span class="shortcut" onclick="quickCmd('/help')">帮助</span>
+  </div>
+  <div id="input-area">
+    <input id="input" placeholder="说点什么..." autocomplete="off">
+    <button id="send" onclick="sendInput()">发送</button>
+  </div>
+</div>
+
+<script>
+let ws = null
+let selectedClass = null
+let sending = false
+
+function selectClass(el) {
+  document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('selected'))
+  el.classList.add('selected')
+  selectedClass = el.dataset.class
+  document.getElementById('start-btn').disabled = !document.getElementById('player-name').value.trim()
+}
+
+document.getElementById('player-name').addEventListener('input', () => {
+  document.getElementById('start-btn').disabled = !document.getElementById('player-name').value.trim() || !selectedClass
+})
+
+function startGame() {
+  const name = document.getElementById('player-name').value.trim()
+  if (!name || !selectedClass) return
+
+  document.getElementById('create-screen').style.display = 'none'
+  const gameScreen = document.getElementById('game-screen')
+  gameScreen.style.display = 'flex'
+
+  // 连接 WebSocket
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  ws = new WebSocket(`${proto}//${location.host}`)
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))
+  }
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data)
+    switch (msg.type) {
+      case 'dm':
+        appendMsg(msg.text, 'dm')
+        break
+      case 'system':
+        appendMsg(msg.text, 'system')
+        break
+      case 'error':
+        appendMsg('⚠️ ' + msg.text, 'error')
+        break
+      case 'prologue':
+        appendMsg(msg.text, 'prologue')
+        break
+    }
+    sending = false
+    document.getElementById('send').disabled = false
+  }
+
+  ws.onclose = () => appendMsg('连接断开。刷新页面重新开始。', 'error')
+}
+
+function appendMsg(text, cls) {
+  const div = document.createElement('div')
+  div.className = 'msg ' + cls
+  div.textContent = text
+  const container = document.getElementById('messages')
+  container.appendChild(div)
+  container.scrollTop = container.scrollHeight
+}
+
+function sendInput() {
+  const input = document.getElementById('input')
+  const text = input.value.trim()
+  if (!text || !ws || sending) return
+
+  appendMsg('🗡️ ' + text, 'player')
+  ws.send(JSON.stringify({ type: 'input', text }))
+  input.value = ''
+  sending = true
+  document.getElementById('send').disabled = true
+}
+
+function quickCmd(cmd) {
+  if (!ws || sending) return
+  appendMsg(cmd, 'player')
+  ws.send(JSON.stringify({ type: 'input', text: cmd }))
+  sending = true
+  document.getElementById('send').disabled = true
+}
+
+// Enter 发送
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('create-screen').style.display !== 'none') {
+      startGame()
+    } else {
+      sendInput()
+    }
+  }
+})
+</script>
+</body>
+</html>
