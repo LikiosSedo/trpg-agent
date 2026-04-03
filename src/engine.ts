@@ -220,23 +220,35 @@ export class GameEngine {
     if (input === '/status') {
       const p = session.player
       const m = p.abilityModifiers
+
+      // Derive className from abilities
+      const classId = Object.entries(CLASS_TEMPLATES).find(([, t]) =>
+        t.abilities.STR === p.abilities.STR &&
+        t.abilities.DEX === p.abilities.DEX
+      )?.[0] ?? ''
+      const className = CLASS_TEMPLATES[classId]?.nameZh ?? ''
+
+      const xpNext = p.level < 3 ? (p.level === 1 ? 100 : 300) : 999
+
+      // Format attributes as object with displayable values (frontend reads attrs[key] directly)
+      const fmtMod = (v: number) => v >= 0 ? `+${v}` : `${v}`
+      const attributes: Record<string, string> = {}
+      for (const key of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const) {
+        attributes[key] = `${p.abilities[key]} (${fmtMod(m[key])})`
+      }
+
+      // Equipment as array (frontend expects data.equipment = [{name, desc, slot}])
+      const equipment: Array<{ name: string; desc: string; slot: string }> = []
+      if (p.equipped.weapon) equipment.push({ name: p.equipped.weapon.name, desc: p.equipped.weapon.description, slot: 'weapon' })
+      if (p.equipped.armor) equipment.push({ name: p.equipped.armor.name, desc: p.equipped.armor.description, slot: 'armor' })
+
       return {
         type: 'status',
         data: {
           name: p.name, level: p.level, hp: p.hp, maxHp: p.maxHp,
-          gold: p.gold, xp: p.xp, className: CLASS_TEMPLATES[Object.keys(CLASS_TEMPLATES).find(k => CLASS_TEMPLATES[k].nameZh === '' /* fallback */) ?? '']?.nameZh ?? '',
-          abilities: {
-            STR: { value: p.abilities.STR, mod: m.STR },
-            DEX: { value: p.abilities.DEX, mod: m.DEX },
-            CON: { value: p.abilities.CON, mod: m.CON },
-            INT: { value: p.abilities.INT, mod: m.INT },
-            WIS: { value: p.abilities.WIS, mod: m.WIS },
-            CHA: { value: p.abilities.CHA, mod: m.CHA },
-          },
-          equipped: {
-            weapon: p.equipped.weapon ? { name: p.equipped.weapon.name, desc: p.equipped.weapon.description } : null,
-            armor: p.equipped.armor ? { name: p.equipped.armor.name, desc: p.equipped.armor.description } : null,
-          },
+          gold: p.gold, xp: p.xp, xpNext, className,
+          attributes,
+          equipment,
           spells: p.spells.map(s => ({
             name: s.name, desc: s.description,
             remaining: s.remaining, max: s.usesPerRest,
@@ -251,12 +263,15 @@ export class GameEngine {
 
     if (input === '/inventory') {
       const p = session.player
+      // Equipment as array (frontend expects data.equipment = [{name, desc, slot}])
+      const equipment: Array<{ name: string; desc: string; slot: string }> = []
+      if (p.equipped.weapon) equipment.push({ name: p.equipped.weapon.name, desc: p.equipped.weapon.description, slot: 'weapon' })
+      if (p.equipped.armor) equipment.push({ name: p.equipped.armor.name, desc: p.equipped.armor.description, slot: 'armor' })
       return {
         type: 'inventory',
         data: {
-          weapon: p.equipped.weapon ? { name: p.equipped.weapon.name, desc: p.equipped.weapon.description } : null,
-          armor: p.equipped.armor ? { name: p.equipped.armor.name, desc: p.equipped.armor.description } : null,
-          items: p.inventory.map(i => ({ name: i.name, type: i.type, desc: i.description })),
+          equipment,
+          items: p.inventory.map(i => ({ name: i.name, type: i.type, description: i.description, quantity: 1 })),
           gold: p.gold,
         },
       }
@@ -264,21 +279,32 @@ export class GameEngine {
 
     if (input === '/quest') {
       const qm = new QuestManager(session)
-      const active = qm.getActiveQuests()
+      const activeQuests = qm.getActiveQuests()
+      const completedQuests = session.quests.filter(q => q.status === 'completed')
+      // Frontend expects data.quests (array) with status field and description (not desc)
+      const quests = [
+        ...activeQuests.map(q => ({
+          name: q.name, description: q.description, status: 'active' as const,
+          objectives: q.objectives.map((o, i) => ({
+            text: o, done: q.objectivesCompleted[i],
+          })),
+          reward: q.reward,
+        })),
+        ...completedQuests.map(q => ({
+          name: q.name, description: q.description, status: 'completed' as const,
+          objectives: q.objectives.map((o, i) => ({
+            text: o, done: q.objectivesCompleted[i],
+          })),
+          reward: q.reward,
+        })),
+      ]
       return {
         type: 'quest',
         data: {
-          active: active.map(q => ({
-            name: q.name, desc: q.description,
-            objectives: q.objectives.map((o, i) => ({
-              text: o, done: q.objectivesCompleted[i],
-            })),
-            reward: q.reward,
-          })),
-          completed: session.quests.filter(q => q.status === 'completed').map(q => q.name),
+          quests,
           xp: session.player.xp,
           level: session.player.level,
-          nextLevelXp: session.player.level < 3 ? (session.player.level === 1 ? 100 : 300) : null,
+          xpNext: session.player.level < 3 ? (session.player.level === 1 ? 100 : 300) : null,
         },
       }
     }

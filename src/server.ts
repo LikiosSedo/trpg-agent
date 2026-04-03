@@ -169,10 +169,12 @@ wss.on('connection', (ws: WebSocket, req) => {
       case 'recap':
       case 'chapter':
       case 'help':
-      case 'npc_list':
-      case 'npc_detail':
       case 'saves':
         send('panel', { panel: result.type, data: result.data }); break
+      case 'npc_list':
+        send('panel', { panel: 'npc', data: result.data }); break
+      case 'npc_detail':
+        send('panel', { panel: 'npc_detail', data: result.data, text: result.text }); break
       case 'shop':
         if (result.data) send('panel', { panel: 'shop', data: result.data })
         else send('system', { text: '附近没有商店。' })
