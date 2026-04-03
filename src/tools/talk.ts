@@ -10,7 +10,8 @@ import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { QuestManager } from '../quest-manager.js'
 import { ChapterManager } from '../chapter-manager.js'
-import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from '../npc-mobility.js'
+import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName, moveNPC } from '../npc-mobility.js'
+import { evaluateResponse, getAttitudeDirective, changeTrust } from '../trust-system.js'
 
 export const TalkTool: Tool = {
   name: 'Talk',
@@ -55,6 +56,20 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       }
     }
 
+    // 信任梯度检查
+    const npcResponse = evaluateResponse(npc)
+    if (npcResponse.type === 'combat_trigger') {
+      return {
+        output: `[信任度触发敌对] ${npcResponse.description}\nNPC反应: ${npcResponse.combatResponse}。信任度: ${npc.trust}`,
+      }
+    }
+    if (npcResponse.type === 'avoidance') {
+      moveNPC(npc, npc.homeBase ?? '', session)
+      return {
+        output: `${npcResponse.description}（信任度: ${npc.trust}）`,
+      }
+    }
+
     // 通知章节系统（位置检查通过后才触发）
     if (session.chapter) {
       new ChapterManager(session).onEvent('talk', npcId)
@@ -73,20 +88,24 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const dc = 10 + Math.max(0, -npc.trust) // Higher DC if NPC distrusts player
       const result = skillCheck(totalMod, dc)
 
-      // Trust changes based on check result
-      if (result.success) {
-        npc.trust = Math.min(10, npc.trust + 1)
-      } else {
-        npc.trust = Math.max(-10, npc.trust - 1)
-      }
-
       const approachZh = { persuade: '说服', deceive: '欺骗', intimidate: '威吓' }
+
+      // Trust changes based on check result
+      const trustDelta = result.success ? 1 : -1
+      changeTrust(session, {
+        npcName: npc.name,
+        channel: 'dialogue',
+        delta: trustDelta,
+        reason: `${approachZh[approach as keyof typeof approachZh]}${result.success ? '成功' : '失败'}`,
+        turn: session.turnCount,
+      })
+      const skillAttitude = getAttitudeDirective(npc)
       return {
         output: [
           `对话(${approachZh[approach as keyof typeof approachZh]})：玩家对${npc.name}说"${message}"。`,
           `${approachZh[approach as keyof typeof approachZh]}检定：d20=${result.roll}, 修正+${totalMod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`,
           `信任度变化: ${npc.trust + (result.success ? -1 : 1)} → ${npc.trust}`,
-          `NPC上下文：${npcContext}`,
+          `NPC上下文：${npcContext}${skillAttitude ? '\n' + skillAttitude : ''}`,
         ].join('\n'),
       }
     }
@@ -100,10 +119,11 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
     const completionInfo = tryAutoComplete(session, npc.name)
     const questInfo = tryAssignQuest(session, npc.name)
 
+    const attitude = getAttitudeDirective(npc)
     return {
       output: [
         `对话：玩家对${npc.name}说"${message}"。`,
-        `NPC上下文：${npcContext}`,
+        `NPC上下文：${npcContext}${attitude ? '\n' + attitude : ''}`,
         completionInfo ?? '',
         questInfo ?? '',
       ].filter(Boolean).join('\n'),

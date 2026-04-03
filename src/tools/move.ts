@@ -9,7 +9,8 @@ import type { Tool } from 'open-claude-cli/engine'
 import { locations, connections } from '../data/maps.js'
 import { getSession, getFacts } from '../game-state.js'
 import { ChapterManager } from '../chapter-manager.js'
-import { findSubLocationArea } from '../npc-mobility.js'
+import { findSubLocationArea, moveNPC } from '../npc-mobility.js'
+import { evaluateResponse } from '../trust-system.js'
 
 export const MoveTool: Tool = {
   name: 'Move',
@@ -71,6 +72,23 @@ export const MoveTool: Tool = {
       const npcsHere = session.npcs.filter(n => n.location === destination &&
         (!n.subLocation || n.subLocation === session.worldState.currentSubLocation))
         .map(n => n.name)
+
+      // NPC 回避检查：低信任 NPC 在玩家到达时离开
+      const avoidingNpcs: string[] = []
+      for (const npcName of npcsHere) {
+        const avoidNpc = session.npcs.find(n => n.name === npcName)
+        if (avoidNpc) {
+          const resp = evaluateResponse(avoidNpc)
+          if (resp.type === 'avoidance' && resp.moveAway) {
+            moveNPC(avoidNpc, avoidNpc.homeBase ?? '', session)
+            avoidingNpcs.push(npcName)
+          }
+        }
+      }
+      const remainingNpcs = npcsHere.filter(n => !avoidingNpcs.includes(n))
+      const avoidMsg = avoidingNpcs.length
+        ? `${avoidingNpcs.join('、')}看到你后匆匆离开了。` : ''
+
       const subLocs = destArea.pointsOfInterest
         .filter((p: any) => p.discovered && p.id !== session.worldState.currentSubLocation)
         .map((p: any) => p.nameZh)
@@ -79,7 +97,8 @@ export const MoveTool: Tool = {
         output: [
           `移动：${locations[current]?.nameZh ?? current} → ${destArea.nameZh}。${conn.description}`,
           defaultPoi?.arrivalText ?? `你来到了${destArea.nameZh}。`,
-          npcsHere.length ? `你看到了：${npcsHere.join('、')}。` : '',
+          remainingNpcs.length ? `你看到了：${remainingNpcs.join('、')}。` : '',
+          avoidMsg,
           subLocs.length ? `可前往：${subLocs.join('、')}。` : '',
         ].filter(Boolean).join('\n'),
       }
@@ -113,11 +132,28 @@ export const MoveTool: Tool = {
           (n.subLocation ?? n.homeBase) === targetPoi.id)
         .map(n => n.name)
 
+      // NPC 回避检查：低信任 NPC 在玩家到达时离开
+      const avoidingNpcs: string[] = []
+      for (const npcName of npcsHere) {
+        const avoidNpc = session.npcs.find(n => n.name === npcName)
+        if (avoidNpc) {
+          const resp = evaluateResponse(avoidNpc)
+          if (resp.type === 'avoidance' && resp.moveAway) {
+            moveNPC(avoidNpc, avoidNpc.homeBase ?? '', session)
+            avoidingNpcs.push(npcName)
+          }
+        }
+      }
+      const remainingNpcs = npcsHere.filter(n => !avoidingNpcs.includes(n))
+      const avoidMsg = avoidingNpcs.length
+        ? `${avoidingNpcs.join('、')}看到你后匆匆离开了。` : ''
+
       return {
         output: [
           targetPoi.arrivalText ?? `你来到了${targetPoi.nameZh}。`,
           targetPoi.description,
-          npcsHere.length ? `这里有：${npcsHere.join('、')}。` : '',
+          remainingNpcs.length ? `这里有：${remainingNpcs.join('、')}。` : '',
+          avoidMsg,
         ].filter(Boolean).join('\n'),
       }
     }

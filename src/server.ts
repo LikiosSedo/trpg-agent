@@ -24,6 +24,7 @@ import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { ChapterManager } from './chapter-manager.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
+import { checkBrokenPromises, changeTrust } from './trust-system.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -611,6 +612,15 @@ wss.on('connection', (ws: WebSocket, req) => {
       }
 
       session.turnCount++
+
+      // 检查过期承诺
+      const brokenPromises = checkBrokenPromises(session)
+      for (const bp of brokenPromises) {
+        const result = changeTrust(session, bp)
+        if (result.applied) {
+          sysMsg(`💔 ${bp.npcName}对你失望了：${bp.reason}`)
+        }
+      }
 
       // 构建 DM 输入
       const parts: string[] = []

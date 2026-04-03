@@ -11,6 +11,7 @@ import { getSession, getFacts, getRegistry } from '../game-state.js'
 import { validateTransfer, type TransferRequest } from '../item-validator.js'
 import type { ItemRegistry } from '../item-registry.js'
 import type { GameFactStore } from '../game-facts.js'
+import { changeTrust } from '../trust-system.js'
 
 export const TransferItemTool: Tool = {
   name: 'TransferItem',
@@ -125,6 +126,19 @@ function executeTransferAction(
       npc.inventory.push({ ...item })
       lines.push(`将"${item.name}"交给了${npc.name}`)
     }
+  }
+
+  // 送礼信任提升
+  if (request.transferType === 'player_to_npc' && request.toId) {
+    const giftValue = validation.autoPrice ?? 5
+    const trustDelta = giftValue >= 25 ? 2 : 1
+    changeTrust(session, {
+      npcName: request.toId,
+      channel: 'gift',
+      delta: trustDelta,
+      reason: `收到礼物: ${item.name}`,
+      turn: session.turnCount,
+    })
   }
 
   // 金币交换

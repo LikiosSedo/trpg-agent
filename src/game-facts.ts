@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import type { GameSession, GameEvent, NPC } from './types.js'
 import { getCombatSummary } from './combat-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
+import { getGatedFacts } from './trust-system.js'
 
 export class GameFactStore {
   constructor(private session: GameSession) {}
@@ -134,7 +135,8 @@ export class GameFactStore {
     const npc = this.session.npcs.find(n => n.name === name)
     if (!npc) throw new Error(`NPC not found: ${name}`)
     const promises = npc.playerPromises.length ? `玩家承诺: ${npc.playerPromises.join('；')}` : ''
-    const facts = npc.knownFacts.length ? `掌握情报: ${npc.knownFacts.join('；')}` : ''
+    const gatedFacts = getGatedFacts(npc)
+    const facts = gatedFacts.length ? `可透露情报: ${gatedFacts.join('；')}` : '不会透露任何有用信息'
     const log = (npc.interactionLog ?? []).length
       ? `最近交互: ${(npc.interactionLog ?? []).slice(-3).join('；')}`
       : ''

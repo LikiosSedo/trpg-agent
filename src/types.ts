@@ -84,6 +84,22 @@ export interface CombatState {
   pendingMonsterTurn?: boolean  // 玩家回合结束后，等待怪物回合执行
 }
 
+// ─── 信任系统 ─────────────────────────────────
+
+export interface TrustThresholds {
+  curt: number       // 冷淡阈值（默认 -2）
+  hostile: number    // 敌对阈值（默认 -5）
+  avoidance: number  // 回避阈值（默认 -6）
+  combat: number     // 战斗阈值（默认 -8）
+}
+
+export interface TrackedPromise {
+  text: string
+  madeTurn: number
+  deadlineTurn: number
+  fulfilled: boolean
+}
+
 // ─── NPC ──────────────────────────────────────
 
 export type NPCMobility = 'stationary' | 'local' | 'roaming'
@@ -105,6 +121,8 @@ export interface NPC {
   subLocation?: string          // 当前所在子地点 POI id
   homeBase?: string             // 默认驻留子地点 POI id
   mobility?: NPCMobility        // 移动能力
+  trackedPromises?: TrackedPromise[]
+  permanentGrudge?: boolean
 }
 
 // ─── 任务 ──────────────────────────────────────

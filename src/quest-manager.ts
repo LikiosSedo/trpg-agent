@@ -5,7 +5,8 @@
  */
 
 import type { GameSession, Quest, PlayerCharacter } from './types.js'
-import { getFacts } from './game-state.js'
+import { getFacts, getSession } from './game-state.js'
+import { changeTrust } from './trust-system.js'
 
 // ─── 怪物中英名映射（用于击杀目标匹配）──────────
 
@@ -105,6 +106,24 @@ export class QuestManager {
     this.session.player.gold += gold
     this.session.player.xp += xp
     getFacts().addEvent(`完成任务：${quest.name}（+${gold}金, +${xp}XP）`, 'critical')
+
+    // 任务完成信任提升
+    const questGivers: Record<string, string> = {
+      '森林试炼': '艾琳娜',
+      '矿道调查': '艾琳娜',
+      '荒原侦察': '艾琳娜',
+    }
+    const giver = questGivers[quest.name]
+    if (giver) {
+      const session = getSession()
+      changeTrust(session, {
+        npcName: giver,
+        channel: 'quest',
+        delta: 2,
+        reason: `完成任务: ${quest.name}`,
+        turn: session.turnCount,
+      })
+    }
 
     const levelUp = this.checkLevelUp(this.session.player)
     return { gold, xp, levelUp }
