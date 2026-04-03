@@ -34,7 +34,7 @@
   #input {
     flex: 1; background: #0f3460; border: 1px solid #533483;
     color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
-    font-family: inherit; font-size: 15px; outline: none;
+    font-family: inherit; font-size: 16px; outline: none;
   }
   #input:focus { border-color: #e6b800; }
   #input::placeholder { color: #666; }
@@ -185,7 +185,8 @@ function startGame() {
     document.getElementById('send').disabled = false
   }
 
-  ws.onclose = () => appendMsg('连接断开。刷新页面重新开始。', 'error')
+  ws.onclose = () => { appendMsg('连接断开。刷新页面重新开始。', 'error'); sending = false }
+  ws.onerror = () => appendMsg('连接出错，请检查网络。', 'error')
 }
 
 function appendMsg(text, cls) {

@@ -77,7 +77,13 @@ wss.on('connection', (ws: WebSocket) => {
   }
 
   ws.on('message', async (raw: Buffer) => {
-    const msg = JSON.parse(raw.toString())
+    let msg: any
+    try {
+      msg = JSON.parse(raw.toString())
+    } catch {
+      send('error', { text: '消息格式错误' })
+      return
+    }
 
     // 会话隔离：处理消息前，把全局 session 切换到当前连接的 session
     if (connSession) setSession(connSession)
@@ -194,8 +200,24 @@ wss.on('connection', (ws: WebSocket) => {
         sysMsg(`🎒 背包:\n${p.equipped.weapon ? `  [装备] ${p.equipped.weapon.name}\n` : ''}${p.equipped.armor ? `  [装备] ${p.equipped.armor.name}\n` : ''}${items}\n  💰 ${p.gold} 金币`)
         return
       }
+      if (input === '/saves') {
+        const saves = GameFactStore.listSaves()
+        if (saves.length === 0) { sysMsg('暂无存档。'); return }
+        let list = '── 存档列表 ──\n'
+        for (const s of saves) list += `  ${s.file} — ${s.name} (第${s.turn}轮)\n`
+        list += '用法: /load <存档名>'
+        sysMsg(list)
+        return
+      }
+      if (input === '/quit') {
+        session.dossierData = dossier.toJSON()
+        getFacts().save('web-quit')
+        sysMsg('游戏已保存。再见，冒险者！')
+        gameStarted = false
+        return
+      }
       if (input === '/help') {
-        sysMsg('命令: /status /quest /npc /npc <名> /world /map /inventory /save /load /help'); return
+        sysMsg('命令: /status /quest /npc /npc <名> /world /map /inventory /save /saves /load /quit /help'); return
       }
 
       // 安全检查
@@ -234,7 +256,11 @@ wss.on('connection', (ws: WebSocket) => {
 
       // 死亡检测
       if (session.player.hp <= 0) {
-        sysMsg('💀 你倒下了……意识逐渐远去。')
+        sysMsg('💀 你倒下了……意识逐渐远去。\n游戏结束。刷新页面重新开始。')
+        session.dossierData = dossier.toJSON()
+        facts.save('death-save')
+        gameStarted = false  // 停止接受后续输入
+        return
       }
 
       // 自动存档
