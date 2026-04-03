@@ -8,21 +8,24 @@
 import * as readline from 'node:readline'
 import { readFileSync } from 'node:fs'
 import chalk from 'chalk'
-import type { GameSession, NPC } from './types.js'
+import type { GameSession } from './types.js'
 import { initGameState, getSession, getFacts, initItemRegistry } from './game-state.js'
-import { CLASS_TEMPLATES, createGameSession } from './game-data.js'
+import { CLASS_TEMPLATES, createGameSession, createInitialNPCs } from './game-data.js'
 import { GameFactStore } from './game-facts.js'
 import { checkSafety } from './safety.js'
 import { DossierManager } from './dossier.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
+import { initDMAgent, dmRespond } from './dm-agent.js'
+import { WORLD_OVERVIEW, locations } from './data/maps.js'
+import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
+import { QuestManager } from './quest-manager.js'
+import { ChapterManager } from './chapter-manager.js'
+import { consumeActions } from './tools/set-actions.js'
+import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
+import { checkBrokenPromises, changeTrust } from './trust-system.js'
 
 // ─── Dossier (全局) ─────────────────────────
 let dossier = new DossierManager()
-
-import { initDMAgent, dmRespond } from './dm-agent.js'
-import { WORLD_OVERVIEW } from './data/maps.js'
-import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
-import { QuestManager } from './quest-manager.js'
 
 // CLASS_TEMPLATES and createGameSession imported from game-data.ts
 
@@ -68,7 +71,24 @@ function handleSlashCommand(cmd: string): boolean {
     }
     case '/map': {
       console.log(WORLD_OVERVIEW)
-      console.log(chalk.dim(`  当前位置: ${session.worldState.currentLocation}`))
+      const loc = locations[session.worldState.currentLocation]
+      const subLoc = session.worldState.currentSubLocation
+      console.log(chalk.dim(`  当前位置: ${loc?.nameZh ?? session.worldState.currentLocation}${subLoc ? ' · ' + getSubLocationName(subLoc) : ''}`))
+      if (loc) {
+        const pois = loc.pointsOfInterest.filter((p: any) => p.discovered !== false)
+        if (pois.length) {
+          console.log(chalk.dim('\n  区域内地点:'))
+          for (const p of pois) {
+            const isCurrent = (p as any).id === subLoc
+            const npcsHere = session.npcs.filter(n =>
+              n.location === session.worldState.currentLocation &&
+              ((n as any).subLocation ?? (n as any).homeBase) === (p as any).id
+            ).map(n => n.name)
+            const npcStr = npcsHere.length ? chalk.dim(` (${npcsHere.join('、')})`) : ''
+            console.log(`  ${isCurrent ? chalk.yellow('📍') : '  '} ${(p as any).nameZh}${npcStr}`)
+          }
+        }
+      }
       console.log()
       return true
     }
@@ -137,6 +157,76 @@ function handleSlashCommand(cmd: string): boolean {
       console.log(renderWorldGuide())
       return true
     }
+    case '/shop': {
+      const loc = session.worldState.currentLocation
+      const shopNpc = session.npcs.find(n =>
+        n.shopPricing && (n.inventory ?? []).length > 0 && n.location === loc
+      )
+      if (!shopNpc) {
+        console.log(chalk.dim('\n  附近没有商店。\n'))
+      } else {
+        console.log()
+        console.log(chalk.cyan(`  ── ${shopNpc.name}的商店 ──`))
+        console.log(chalk.yellow(`  你的金币: ${session.player.gold}`))
+        const seen = new Map<string, { name: string; type: string; price: number; count: number }>()
+        for (const item of shopNpc.inventory ?? []) {
+          const price = shopNpc.shopPricing?.[item.name] ?? 0
+          const key = item.name + '|' + price
+          if (!seen.has(key)) seen.set(key, { name: item.name, type: item.type, price, count: 0 })
+          seen.get(key)!.count++
+        }
+        for (const [, it] of seen) {
+          const qty = it.count > 1 ? ` ×${it.count}` : ''
+          console.log(`  ${it.name}${qty} (${it.type}) — ${chalk.yellow(it.price + '金')}`)
+        }
+        console.log(chalk.dim('  对DM说"我要买XX"即可购买。\n'))
+      }
+      return true
+    }
+    case '/chapter': {
+      if (!session.chapter) {
+        console.log(chalk.dim('\n  当前存档不支持章节系统。\n'))
+      } else {
+        const cm = new ChapterManager(session)
+        console.log()
+        console.log(chalk.cyan(`  ── ${cm.getChapterTitle()} ──`))
+        const exp = cm.getExploration()
+        for (const [loc, v] of Object.entries(exp)) {
+          const pct = v.total > 0 ? Math.round(v.found / v.total * 100) : 0
+          const bar = chalk.green('█'.repeat(Math.round(pct / 5))) + chalk.dim('░'.repeat(20 - Math.round(pct / 5)))
+          console.log(`  ${loc}: ${bar} ${v.found}/${v.total}`)
+        }
+        const labels = cm.getDiscoveryLabels()
+        if (labels.length) {
+          console.log(chalk.dim('\n  已发现:'))
+          for (const l of labels) console.log(chalk.dim(`    ✦ ${l}`))
+        }
+        console.log()
+      }
+      return true
+    }
+    case '/recap': {
+      const events = session.events
+      const critical = events.filter(e => e.importance === 'critical')
+      const recent = events.slice(-10)
+      console.log()
+      console.log(chalk.cyan('  ── 故事回顾 ──'))
+      if (critical.length) {
+        console.log(chalk.yellow('\n  关键事件:'))
+        for (const e of critical) console.log(`  [第${e.turn}轮] ${e.fact}`)
+      }
+      if (recent.length) {
+        console.log(chalk.dim('\n  近期事件:'))
+        for (const e of recent) console.log(chalk.dim(`  [第${e.turn}轮] ${e.fact}`))
+      }
+      const clues = session.player.clues
+      if (clues.length) {
+        console.log(chalk.blue('\n  已知线索:'))
+        for (const c of clues) console.log(`  • ${c}`)
+      }
+      console.log()
+      return true
+    }
     case '/help': {
       console.log()
       console.log(chalk.dim('  /status    — 查看角色状态'))
@@ -146,6 +236,9 @@ function handleSlashCommand(cmd: string): boolean {
       console.log(chalk.dim('  /npc <名>  — 查看角色详细档案'))
       console.log(chalk.dim('  /world     — 查看世界指南'))
       console.log(chalk.dim('  /map       — 查看世界地图'))
+      console.log(chalk.dim('  /shop      — 查看附近商店'))
+      console.log(chalk.dim('  /chapter   — 查看章节进度'))
+      console.log(chalk.dim('  /recap     — 故事回顾'))
       console.log(chalk.dim('  /save      — 手动存档'))
       console.log(chalk.dim('  /saves     — 列出所有存档'))
       console.log(chalk.dim('  /load      — 读取存档（/load <名称>）'))
@@ -244,11 +337,22 @@ async function gameLoop(rl: readline.Interface, classId: string) {
 
   // ── Main loop ──
   let turnsSinceLastSave = 0
+  let lastActions: { details: Array<{label: string; content: string}>; suggestions: string[] } | null = null
 
   while (true) {
     const input = (await ask(rl, chalk.bold('\n  ⚔️  你> '))).trim()
 
     if (!input) continue
+
+    // 检查是否点击了细节展开
+    if (lastActions) {
+      const detail = lastActions.details.find(d => d.label === input || input === d.label.replace('🔍 ', ''))
+      if (detail) {
+        console.log(chalk.italic.dim(`\n  ${detail.content}\n`))
+        lastActions = null
+        continue
+      }
+    }
 
     if (input === '/quit') {
       session.dossierData = dossier.toJSON()
@@ -275,6 +379,29 @@ async function gameLoop(rl: readline.Interface, classId: string) {
         try {
           const loaded = GameFactStore.load(slotName)
           const loadedSession = loaded['session'] as GameSession
+          // Migrate old saves
+          const defaults = createInitialNPCs()
+          for (const npc of loadedSession.npcs) {
+            if (npc.role === undefined) {
+              const def = defaults.find(d => d.name === npc.name)
+              if (def) {
+                npc.role = def.role
+                if (npc.inventory === undefined) npc.inventory = def.inventory ?? []
+                if (npc.shopPricing === undefined) npc.shopPricing = def.shopPricing
+              }
+            }
+            if ((npc as any).homeBase === undefined) {
+              const def = defaults.find(d => d.name === npc.name)
+              if (def) {
+                ;(npc as any).homeBase = (def as any).homeBase
+                ;(npc as any).mobility = (def as any).mobility
+                if ((npc as any).subLocation === undefined) (npc as any).subLocation = (def as any).subLocation
+              }
+            }
+          }
+          if ((loadedSession.worldState as any).currentSubLocation === undefined) {
+            (loadedSession.worldState as any).currentSubLocation = getDefaultSubLocation(loadedSession.worldState.currentLocation)
+          }
           initGameState(loadedSession)
           initDMAgent()
           resetIdleTracking()
@@ -313,6 +440,15 @@ async function gameLoop(rl: readline.Interface, classId: string) {
 
     session.turnCount++
 
+    // 检查过期承诺
+    const brokenPromises = checkBrokenPromises(session)
+    for (const bp of brokenPromises) {
+      const result = changeTrust(session, bp)
+      if (result.applied) {
+        console.log(chalk.red(`  💔 ${bp.npcName}对你失望了：${bp.reason}`))
+      }
+    }
+
     // ── 构建 DM 输入：安全指令 + 早期引导 + 防卡事件 ──
     const parts: string[] = []
 
@@ -333,7 +469,17 @@ async function gameLoop(rl: readline.Interface, classId: string) {
     parts.push(input)
     const dmInput = parts.join('\n\n')
     const dmResponse = await sendToDM(dmInput)
-    parseTrustChanges(dmResponse, session.npcs)
+
+    // 显示场景选项
+    lastActions = consumeActions()
+    if (lastActions) {
+      if (lastActions.details.length) {
+        console.log(chalk.dim('\n  🔍 ' + lastActions.details.map(d => d.label).join('  |  ')))
+      }
+      if (lastActions.suggestions.length) {
+        console.log(chalk.dim('  💡 ' + lastActions.suggestions.join('  |  ')))
+      }
+    }
 
     // ── 战斗胜利后检查任务目标 ──
     const qm = new QuestManager(session)
@@ -356,6 +502,11 @@ async function gameLoop(rl: readline.Interface, classId: string) {
         const updateNotice = dossier.onInteraction(npc.name, npc.trust, session.turnCount)
         if (updateNotice) console.log(updateNotice)
       }
+    }
+
+    // 推进章节空闲计数
+    if (session.chapter) {
+      new ChapterManager(session).advanceTurn()
     }
 
     // Auto-save every 5 turns
@@ -404,21 +555,6 @@ async function sendToDM(input: string): Promise<string> {
   return fullText
 }
 
-/** Parse [信任变化:NPC名:+N:原因] annotations from DM output and update NPC trust */
-function parseTrustChanges(text: string, npcs: NPC[]): void {
-  const pattern = /\[信任变化:(.+?):([+-]\d+):(.+?)\]/g
-  let match
-  while ((match = pattern.exec(text)) !== null) {
-    const [, npcName, deltaStr, reason] = match
-    const delta = parseInt(deltaStr, 10)
-    const npc = npcs.find(n => n.name === npcName)
-    if (npc) {
-      npc.trust += delta
-      console.log(chalk.dim(`  [${npcName} 信任度 ${delta > 0 ? '+' : ''}${delta} → ${npc.trust}：${reason}]`))
-    }
-  }
-}
-
 // ─── Main ────────────────────────────────────
 
 async function main() {
@@ -435,6 +571,11 @@ async function main() {
     // 存一个初始存档（Claude SDK 模式下 game-cmd.ts 需要读取）
     getFacts().save('autosave')
     initDMAgent()
+
+    // 处理章节自动事件
+    if (session.chapter) {
+      new ChapterManager(session).processAutoBeats()
+    }
 
     const template = CLASS_TEMPLATES[classId]
     console.log()
