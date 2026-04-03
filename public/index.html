@@ -1306,7 +1306,9 @@ function renderNPCListPanel(data) {
   let html = ''
   for (const npc of npcs) {
     const trust = npc.trust ?? 50
-    const portrait = NPC_PORTRAIT_MAP[npc.name]
+    // 子串匹配立绘（档案名可能是"格雷格·铁拳头"，映射表用"格雷格"）
+    const portrait = NPC_PORTRAIT_MAP[npc.name] ||
+      Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
     html += `<div class="npc-card">`
     html += `<div class="npc-avatar">${portrait
       ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
