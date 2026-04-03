@@ -7,7 +7,7 @@
 import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import { locations, connections } from '../data/maps.js'
-import { getSession, getFacts } from '../game-state.js'
+import { getSession, getFacts, advanceTime } from '../game-state.js'
 import { ChapterManager } from '../chapter-manager.js'
 import { findSubLocationArea, moveNPC } from '../npc-mobility.js'
 import { evaluateResponse } from '../trust-system.js'
@@ -62,7 +62,9 @@ export const MoveTool: Tool = {
       // Set sub-location to area's default entrance
       const defaultPoi = destArea.pointsOfInterest.find((p: any) => p.isDefault)
       session.worldState.currentSubLocation = defaultPoi?.id ?? destArea.pointsOfInterest[0]?.id
-      facts.addEvent(`移动至${destArea.nameZh}`)
+      // 区域间移动推进时间
+      const newTime = advanceTime()
+      facts.addEvent(`移动至${destArea.nameZh}（现在是${newTime}）`)
 
       // 通知章节系统
       if (session.chapter) {

@@ -43,3 +43,19 @@ export function getRegistry(): ItemRegistry {
   if (!registry) throw new Error('ItemRegistry not initialized — call initItemRegistry() first')
   return registry
 }
+
+// ─── 时间推进 ──────────────────────────────
+
+const TIME_ORDER: Array<'morning' | 'afternoon' | 'evening' | 'night'> = [
+  'morning', 'afternoon', 'evening', 'night',
+]
+
+/** 推进一个时段。移动（区域间）和休息时调用。 */
+export function advanceTime(): string {
+  const s = getSession()
+  const cur = TIME_ORDER.indexOf(s.worldState.timeOfDay)
+  const next = TIME_ORDER[(cur + 1) % TIME_ORDER.length]
+  s.worldState.timeOfDay = next
+  const names: Record<string, string> = { morning: '清晨', afternoon: '下午', evening: '黄昏', night: '深夜' }
+  return names[next]
+}

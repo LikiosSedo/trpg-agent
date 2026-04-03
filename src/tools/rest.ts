@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
-import { getSession, getFacts } from '../game-state.js'
+import { getSession, getFacts, advanceTime } from '../game-state.js'
 import { shortRest, longRest } from '../rules-engine.js'
 
 export const RestTool: Tool = {
@@ -35,8 +35,9 @@ export const RestTool: Tool = {
     if (input.type === 'short') {
       shortRest(player)
       const healed = player.hp - oldHp
+      const newTime = advanceTime()
       facts.addEvent(`短休息，恢复${healed}HP`)
-      return { output: `短休息完成。恢复${healed}HP(${oldHp}→${player.hp}/${player.maxHp})。` }
+      return { output: `短休息完成。恢复${healed}HP(${oldHp}→${player.hp}/${player.maxHp})。现在是${newTime}。` }
     }
 
     // Long rest
@@ -45,11 +46,13 @@ export const RestTool: Tool = {
     const spells = player.spells
       .filter(s => s.usesPerRest > 0)
       .map(s => `${s.name}(${s.remaining}/${s.usesPerRest})`)
+    const newTime = advanceTime()
     facts.addEvent(`长休息，完全恢复`, 'normal')
     return {
       output: [
         `长休息完成。HP完全恢复(${oldHp}→${player.hp}/${player.maxHp})。`,
         spells.length ? `法术位恢复：${spells.join('、')}。` : '',
+        `现在是${newTime}。`,
       ].filter(Boolean).join('\n'),
     }
   },
