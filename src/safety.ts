@@ -28,10 +28,9 @@ const BLOCK_PATTERNS = [
 ]
 
 // 警告级别（游戏内可以有后果的不当行为）
+// 注意：攻击 NPC 不在这里拦截——交给 Attack 工具 + 信任系统处理（允许行为，代码给后果）
 const WARN_PATTERNS = [
-  { pattern: /杀.*无辜|屠.*平民|灭.*村/, instruction: '玩家试图伤害无辜平民。作为DM，让卫兵立即出现制止，NPC好感度大幅下降。如果玩家坚持，让更强的NPC（如艾琳娜）介入。' },
-  { pattern: /偷.*NPC|抢.*商店|打劫/, instruction: '玩家试图偷窃/抢劫。进行一个高DC的检定(DC16)。失败则被抓住，需要付罚金或被关押。NPC信任度-3。' },
-  { pattern: /攻击.*格雷格|攻击.*艾琳娜|攻击.*小莉/, instruction: '玩家试图攻击重要NPC。这个NPC远比玩家强大。让NPC轻松制服玩家，并严正警告。信任度归零。' },
+  { pattern: /偷.*NPC|抢.*商店|打劫/, instruction: '玩家试图偷窃/抢劫。调用 ChangeTrust 对相关NPC减信任-3。描述被发现或检定失败的后果。' },
   { pattern: /自杀|自我伤害/, instruction: '玩家提到自我伤害。以温和的方式化解，让NPC表达关心。不要模拟自我伤害场景。' },
 ]
 

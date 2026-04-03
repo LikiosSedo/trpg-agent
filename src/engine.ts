@@ -20,6 +20,8 @@ import { consumeActions, type SceneActions } from './tools/set-actions.js'
 import { consumeTrustChanges } from './tools/change-trust.js'
 import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
 import { consumeSpeakingNPCs } from './tools/talk.js'
+import { classifyIntent, formatActionResult, shouldPreExecute, type ActionResult } from './rules-agent.js'
+import { executeAction } from './action-executor.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
@@ -561,11 +563,27 @@ export class GameEngine {
     if (session.turnCount % 5 === 0) reminders.push('伤害/物品/金币变化必须通过工具，不要在文本中编造数值。')
     if (reminders.length) parts.push(`[系统提醒] ${reminders.join(' ')}`)
 
+    // ── 规则预处理：分级意图识别 + 机械动作预执行 ──
+    const action = await classifyIntent(input, session)
+    let actionResult: ActionResult | null = null
+
+    if (shouldPreExecute(action)) {
+      actionResult = await executeAction(action, session)
+      // 把执行结果注入 DM 上下文（DM 只需叙事）
+      parts.push(formatActionResult(actionResult))
+      // 记录已调用的工具（防止 DM 重复调用）
+      for (const t of actionResult.toolsCalled) {
+        // 后续 narrative validator 会跳过已调用的工具
+      }
+    }
+
     parts.push(input)
 
     // DM 流式响应
     let fullText = ''
-    const toolsCalled: ToolCallRecord[] = []
+    const toolsCalled: ToolCallRecord[] = actionResult
+      ? actionResult.toolsCalled.map(t => ({ toolName: t }))
+      : []
     try {
       for await (const event of dmRespond(parts.join('\n\n'))) {
         if (event.type === 'text_delta') {
