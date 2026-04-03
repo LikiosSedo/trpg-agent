@@ -337,9 +337,12 @@ async function gameLoop(rl: readline.Interface, classId: string) {
 
     // ── 战斗胜利后检查任务目标 ──
     const qm = new QuestManager(session)
-    const objResults = qm.checkCombatObjectives()
-    for (const objResult of objResults) {
-      console.log(chalk.green(`\n  [任务进度] ${objResult.questName}：完成 "${objResult.text}"`))
+    const { completed: objCompleted, progress: objProgress } = qm.checkCombatObjectives()
+    for (const r of objCompleted) {
+      console.log(chalk.green(`\n  [任务完成] ${r.questName}：完成 "${r.text}"`))
+    }
+    for (const p of objProgress) {
+      console.log(chalk.yellow(`\n  [任务进度] ${p.questName}：${p.text}`))
     }
 
     // NPC 档案更新 — 检测玩家输入或 DM 回复中提到的 NPC

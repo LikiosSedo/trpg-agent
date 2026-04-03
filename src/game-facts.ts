@@ -72,15 +72,40 @@ export class GameFactStore {
     const { player } = this.session
     const m = player.abilityModifiers
     const fmt = (v: number) => v >= 0 ? `+${v}` : `${v}`
-    const equip = [player.equipped.weapon?.name, player.equipped.armor?.name].filter(Boolean).join('、')
-    const spells = player.spells.filter(s => s.remaining > 0 || s.usesPerRest === 0).map(s => s.name)
+
+    // 装备详情（含效果）
+    const equipLines: string[] = []
+    if (player.equipped.weapon) {
+      const w = player.equipped.weapon
+      const atkMod = m.STR + 2 + (w.bonus ?? 0) // STR + proficiency + weapon bonus
+      equipLines.push(`  武器: ${w.name} (攻击${fmt(atkMod)}, ${w.description.match(/\d+d\d+/)?.[0] ?? '?'}伤害)`)
+    }
+    if (player.equipped.armor) {
+      const a = player.equipped.armor
+      equipLines.push(`  护甲: ${a.name} (AC+${a.bonus ?? 0})`)
+    }
+
+    // 法术详情（含剩余次数）
+    const spellLines = player.spells.map(s => {
+      const uses = s.usesPerRest === 0 ? '无限' : `${s.remaining}/${s.usesPerRest}`
+      return `  ${s.name} — ${s.description} [${uses}]`
+    })
+
+    // 可用动作
+    const actions: string[] = ['weapon(武器攻击)']
+    if (player.spells.some(s => s.remaining > 0 || s.usesPerRest === 0)) {
+      actions.push('spell(施法)')
+    }
+    actions.push('flee(逃跑)')
+
     return [
       `${player.name} — ${player.level}级冒险者`,
       `生命: ${player.hp}/${player.maxHp} | 金币: ${player.gold} | 经验: ${player.xp}`,
       `属性: 力${fmt(m.STR)} 敏${fmt(m.DEX)} 体${fmt(m.CON)} 智${fmt(m.INT)} 感${fmt(m.WIS)} 魅${fmt(m.CHA)}`,
-      equip ? `装备: ${equip}` : '',
+      equipLines.length ? `装备:\n${equipLines.join('\n')}` : '',
       player.skills.length ? `技能: ${player.skills.join('、')}` : '',
-      spells.length ? `法术: ${spells.join('、')}` : '',
+      spellLines.length ? `法术:\n${spellLines.join('\n')}` : '',
+      `战斗动作: ${actions.join(' / ')}`,
       `背包: ${player.inventory.length}件 | 线索: ${player.clues.length}条`,
     ].filter(Boolean).join('\n')
   }

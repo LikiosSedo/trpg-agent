@@ -96,7 +96,7 @@ export class QuestManager {
     return { allDone }
   }
 
-  completeQuest(questName: string): { gold: number; xp: number; levelUp: number | null } | null {
+  completeQuest(questName: string): { gold: number; xp: number; levelUp: { level: number; flavor: string } | null } | null {
     const quest = this.session.quests.find(q => q.name === questName && q.status === 'active')
     if (!quest) return null
 
@@ -122,8 +122,8 @@ export class QuestManager {
     return this.session.quests.filter(q => q.status === 'active')
   }
 
-  /** 检查升级。返回新等级，或 null 表示没升级 */
-  checkLevelUp(player: PlayerCharacter): number | null {
+  /** 检查升级。返回新等级和职业特色描述，或 null 表示没升级 */
+  checkLevelUp(player: PlayerCharacter): { level: number; flavor: string } | null {
     for (const { level, xp } of LEVEL_THRESHOLDS) {
       if (player.level < level && player.xp >= xp) {
         player.level = level
@@ -141,16 +141,48 @@ export class QuestManager {
           })
         }
 
+        const flavor = this.getLevelUpFlavor(player, level)
         getFacts().addEvent(`升级！达到 Lv${level}（HP+5${level === 3 && player.spells.length > 0 ? ', 解锁Fireball' : ''}）`, 'critical')
-        return level
+        return { level, flavor }
       }
     }
     return null
   }
 
-  /** 根据击杀数按怪物名检查所有活跃任务的击杀目标 */
-  checkCombatObjectives(): { questName: string; objectiveIndex: number; text: string }[] {
-    const results: { questName: string; objectiveIndex: number; text: string }[] = []
+  /** 升级时的职业特色描述 */
+  private getLevelUpFlavor(player: PlayerCharacter, level: number): string {
+    const hasSpells = player.spells.length > 0
+    const isHealer = player.spells.some(s => s.name === 'Cure Wounds')
+
+    if (isHealer) {
+      // 牧师
+      return level === 2
+        ? '神圣之光在你掌心凝聚，信仰的力量更加坚定。生命上限+5。'
+        : '你感到与神祇的联系愈发紧密，治愈之力涌遍全身。生命上限+5。'
+    }
+    if (hasSpells) {
+      // 法师
+      if (level === 3) {
+        return '奥术领悟加深——你的手指间跳动着新的火焰。习得 Fireball！生命上限+5。'
+      }
+      return '魔力在血管中奔涌，奥术符文在脑海中更加清晰。生命上限+5。'
+    }
+    // 战士/游侠等物理职业
+    const highDex = player.abilityModifiers.DEX > player.abilityModifiers.STR
+    if (highDex) {
+      return '你的身体变得更加敏捷，直觉在战斗中愈发锐利。生命上限+5。'
+    }
+    return '力量涌上手臂，肌肉在战斗的磨砺中变得更加坚韧。生命上限+5。'
+  }
+
+  /** 根据击杀数按怪物名检查所有活跃任务的击杀目标。
+   *  返回已完成的目标 + 所有进行中击杀目标的进度。 */
+  checkCombatObjectives(): {
+    completed: { questName: string; objectiveIndex: number; text: string }[]
+    progress: { questName: string; text: string; current: number; required: number }[]
+  } {
+    const completed: { questName: string; objectiveIndex: number; text: string }[] = []
+    const progress: { questName: string; text: string; current: number; required: number }[] = []
 
     for (const quest of this.session.quests.filter(q => q.status === 'active')) {
       for (let i = 0; i < quest.objectives.length; i++) {
@@ -168,11 +200,13 @@ export class QuestManager {
         const kills = Number(this.session.worldState.flags[`kills_${monsterName}`] ?? 0)
         if (kills >= required) {
           this.completeObjective(quest.name, i)
-          results.push({ questName: quest.name, objectiveIndex: i, text: quest.objectives[i] })
+          completed.push({ questName: quest.name, objectiveIndex: i, text: quest.objectives[i] })
+        } else if (kills > 0) {
+          progress.push({ questName: quest.name, text: `击杀${targetZh} ${kills}/${required}`, current: kills, required })
         }
       }
     }
 
-    return results
+    return { completed, progress }
   }
 }

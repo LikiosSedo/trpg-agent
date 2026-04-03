@@ -121,7 +121,13 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '陈妈',
       trust: 0,
-      knownFacts: ['镇上来往旅客的动向', '最近有陌生人频繁出入镇外', '卡恩深夜独自外出'],
+      knownFacts: [
+        '镇上来往旅客的动向',
+        '最近有陌生人频繁出入镇外',
+        '卡恩深夜独自外出',
+        '那些陌生人总在月圆前后出现，每次都往矿道方向去',
+        '去年矿难后镇长变了一个人，以前常来旅店聊天现在连门都不出',
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -130,7 +136,13 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '格罗姆',
       trust: 0,
-      knownFacts: ['矿石品质近期下降', '矿石中出现不明黑色晶体', '保留了黑色晶体样本'],
+      knownFacts: [
+        '矿石品质近期下降',
+        '矿石中出现不明黑色晶体',
+        '保留了黑色晶体样本',
+        '黑色晶体靠近铁器时会发出微弱嗡鸣像在共振',
+        '北方矮人古矿志中有关于虚空矿脉的记载，症状与当前矿道异变惊人相似',
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -139,7 +151,13 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '叶绿',
       trust: 0,
-      knownFacts: ['助手近期行为古怪常深夜外出', '助手抽屉里有画着奇怪符号的纸', '怀疑助手加入了秘密组织'],
+      knownFacts: [
+        '助手近期行为古怪常深夜外出',
+        '助手抽屉里有画着奇怪符号的纸',
+        '怀疑助手加入了秘密组织',
+        '最近有矿工来求诊说在矿道里听到低语声，回来后频繁做噩梦',
+        '助手符号纸上有一个像眼睛被斜线划过的标记',
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -148,7 +166,13 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '韩猛',
       trust: 0,
-      knownFacts: ['派出调查矿道的小队接连失联', '失联小队最后报告中有暗影教团痕迹', '公会地下室囤积了应急武器'],
+      knownFacts: [
+        '派出调查矿道的小队接连失联',
+        '失联小队最后报告中有暗影教团痕迹',
+        '公会地下室囤积了应急武器',
+        '最后一支失联小队报告矿道中层异常寒冷，墙壁上有会动的符文',
+        '艾琳娜私下跟他说过这不是普通的塌方要做最坏准备',
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',

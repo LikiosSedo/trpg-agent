@@ -8,7 +8,7 @@ import { initGameState, getSession, getFacts } from './game-state.js'
 import { rollInitiative, calculatePlayerAC, parseAttackMod } from './rules-engine.js'
 import {
   startCombat, executePlayerAttack, executeMonsterTurns,
-  executeFullRound, checkCombatEnd, awardLoot, endCombat,
+  executePlayerTurn, executeMonsterPhase, checkCombatEnd, awardLoot, endCombat,
   getCombatSummary,
 } from './combat-manager.js'
 import type { GameSession, PlayerCharacter, Monster } from './types.js'
@@ -140,7 +140,7 @@ assert(combat2.monsters[2].id === 'Skeleton', 'skeleton id = "Skeleton"')
 assert(combat2.initiativeOrder.length === 4, '4 entries in initiative order')
 console.log('  startCombat(multiple): 2 Goblins + 1 Skeleton, initiative order has 4 entries')
 
-// Test: executeFullRound (run multiple rounds until combat ends)
+// Test: executePlayerTurn + executeMonsterPhase (run multiple rounds until combat ends)
 initGameState(makeTestSession())
 session = getSession()
 session.player.hp = 100
@@ -152,9 +152,18 @@ let ended = false
 let result = 'ongoing'
 while (!ended && rounds < 20) {
   rounds++
-  const round = executeFullRound(session, 'Goblin', 'weapon')
-  ended = round.ended
-  result = round.result
+  const playerTurn = executePlayerTurn(session, 'Goblin', 'weapon')
+  if (playerTurn.ended) {
+    ended = true
+    result = playerTurn.result
+    break
+  }
+  // Execute monster phase
+  const monsterPhase = executeMonsterPhase(session)
+  if (monsterPhase.ended) {
+    ended = true
+    result = monsterPhase.result
+  }
 }
 
 assert(ended, `combat ended within 20 rounds: ended=${ended}`)
@@ -164,10 +173,27 @@ if (result === 'victory') {
   assert(session.player.gold > 50, `gold increased from 50: got ${session.player.gold}`)
   const hasLoot = session.player.inventory.some(i => i.name === 'Rusty Dagger')
   assert(hasLoot, 'Rusty Dagger in inventory')
-  console.log(`  executeFullRound: victory in ${rounds} rounds, gold=${session.player.gold}, inventory has Rusty Dagger`)
+  console.log(`  executePlayerTurn: victory in ${rounds} rounds, gold=${session.player.gold}, inventory has Rusty Dagger`)
 } else {
-  console.log(`  executeFullRound: ${result} in ${rounds} rounds (player tanky, shouldn't lose to goblin)`)
+  console.log(`  executePlayerTurn: ${result} in ${rounds} rounds (player tanky, shouldn't lose to goblin)`)
 }
+
+// Test: pendingMonsterTurn flag
+initGameState(makeTestSession())
+session = getSession()
+session.player.hp = 100
+session.player.maxHp = 100
+startCombat(session, ['Goblin'], monstersDb)
+// Make goblin very tanky so it survives
+session.combat!.monsters[0].hp = 999
+session.combat!.monsters[0].maxHp = 999
+const ptResult = executePlayerTurn(session, 'Goblin', 'weapon')
+assert(!ptResult.ended, 'combat not ended after player turn (tanky goblin)')
+assert(session.combat!.pendingMonsterTurn === true, 'pendingMonsterTurn set after player turn')
+const mpResult = executeMonsterPhase(session)
+assert(session.combat?.pendingMonsterTurn === false, 'pendingMonsterTurn cleared after monster phase')
+console.log('  pendingMonsterTurn flag: set and cleared correctly')
+endCombat(session)
 
 // Test: combat with spell
 initGameState(makeTestSession())
@@ -176,12 +202,12 @@ session.player.hp = 100
 session.player.maxHp = 100
 startCombat(session, ['Goblin'], monstersDb)
 
-const spellRound = executeFullRound(session, 'Goblin', 'spell', 'Fire Bolt')
+const spellRound = executePlayerTurn(session, 'Goblin', 'spell', 'Fire Bolt')
 assert(spellRound.roundLog.length > 0, 'spell round has log entries')
 assert(spellRound.roundLog.some(l => l.includes('Fire Bolt')), 'spell round mentions Fire Bolt')
-console.log(`  executeFullRound(spell): ${spellRound.roundLog.find(l => l.includes('Fire Bolt'))}`)
+console.log(`  executePlayerTurn(spell): ${spellRound.roundLog.find(l => l.includes('Fire Bolt'))}`)
 
-// Test: player defeat
+// Test: player defeat via monster phase
 initGameState(makeTestSession())
 session = getSession()
 session.player.hp = 1 // extremely low HP
@@ -192,13 +218,14 @@ ended = false
 result = 'ongoing'
 while (!ended && rounds < 20) {
   rounds++
-  const round = executeFullRound(session, 'Goblin', 'weapon')
-  ended = round.ended
-  result = round.result
+  const pt = executePlayerTurn(session, 'Goblin', 'weapon')
+  if (pt.ended) { ended = true; result = pt.result; break }
+  const mp = executeMonsterPhase(session)
+  if (mp.ended) { ended = true; result = mp.result; break }
 }
 // Either victory or defeat, but should end
 assert(ended, 'combat ended')
-console.log(`  executeFullRound(low hp): ${result} in ${rounds} rounds, player HP=${session.player.hp}`)
+console.log(`  executePlayerTurn+MonsterPhase(low hp): ${result} in ${rounds} rounds, player HP=${session.player.hp}`)
 
 // Test: checkCombatEnd
 initGameState(makeTestSession())

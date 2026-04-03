@@ -339,13 +339,13 @@ export function endCombat(session: GameSession): void {
   }
 }
 
-// ─── 完整回合执行 ────────────────────────────────
+// ─── 玩家回合执行 ────────────────────────────────
 
 /**
- * 按先攻顺序执行完整一回合。
- * 返回该回合所有行动的日志。
+ * 只执行玩家的攻击回合。
+ * 怪物回合由 executeMonsterPhase 单独执行，实现分段发送。
  */
-export function executeFullRound(
+export function executePlayerTurn(
   session: GameSession,
   targetId: string,
   method: 'weapon' | 'spell',
@@ -360,73 +360,59 @@ export function executeFullRound(
   const roundLog: string[] = []
 
   roundLog.push(`--- 第${combat.round}轮 ---`)
+  roundLog.push(`[${session.player.name} 的回合]`)
 
-  // 按先攻顺序执行所有回合
-  let playerActed = false
+  const attackResult = executePlayerAttack(session, targetId, method, spellId)
+  roundLog.push(...attackResult.log)
 
-  for (const entry of combat.initiativeOrder) {
-    if (entry.isPlayer) {
-      // 玩家回合
-      roundLog.push(`[${entry.name} 的回合]`)
-      const result = executePlayerAttack(session, targetId, method, spellId)
-      roundLog.push(...result.log)
-      playerActed = true
-
-      // 检查是否所有怪物已死
-      const check = checkCombatEnd(session)
-      if (check.ended) {
-        const loot = check.result === 'victory' ? awardLoot(session) : undefined
-        if (loot) {
-          roundLog.push(`\n=== 战斗胜利 ===`)
-          if (loot.items.length) roundLog.push(`战利品: ${loot.items.join(', ')}`)
-          if (loot.gold > 0) roundLog.push(`获得金币: ${loot.gold}`)
-          getFacts().addEvent('战斗胜利，获得战利品', 'critical')
-          const victories = (Number(session.worldState.flags['combat_victories'] ?? 0)) + 1
-          session.worldState.flags['combat_victories'] = victories
-        }
-        endCombat(session)
-        return { roundLog, ended: true, result: check.result, loot }
-      }
-    } else {
-      // 怪物回合
-      const monster = combat.monsters.find(m => m.id === entry.id)
-      if (!monster || monster.hp <= 0) continue
-
-      roundLog.push(`[${monster.id} 的回合]`)
-      const playerAC = calculatePlayerAC(session.player)
-      const atk = attackRoll(monster.attackMod, playerAC)
-
-      if (!atk.hits) {
-        roundLog.push(`${monster.id} 攻击${session.player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → 未命中`)
-      } else {
-        let damage = rollDamage(monster.damageDice)
-        if (atk.isCritical) {
-          const diceOnly = monster.damageDice.replace(/[+-]\d+$/, '')
-          damage += rollDamage(diceOnly)
-        }
-        damage = Math.max(1, damage)
-        session.player.hp = Math.max(0, session.player.hp - damage)
-
-        roundLog.push(
-          `${monster.id} 攻击${session.player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → ${atk.isCritical ? '暴击！' : '命中'}`,
-          `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${session.player.name} HP: ${session.player.hp}/${session.player.maxHp}`,
-        )
-
-        if (session.player.hp <= 0) {
-          roundLog.push(`${session.player.name} 倒下了！`)
-          roundLog.push(`\n=== 战斗失败 ===`)
-          getFacts().addEvent(`${session.player.name}在战斗中倒下`, 'critical')
-          endCombat(session)
-          return { roundLog, ended: true, result: 'defeat' }
-        }
-      }
-    }
+  // 检查是否所有怪物已死
+  const check = checkCombatEnd(session)
+  if (check.ended && check.result === 'victory') {
+    const loot = awardLoot(session)
+    roundLog.push('\n=== 战斗胜利 ===')
+    if (loot.items.length) roundLog.push(`战利品: ${loot.items.join(', ')}`)
+    if (loot.gold > 0) roundLog.push(`获得金币: ${loot.gold}`)
+    getFacts().addEvent('战斗胜利，获得战利品', 'critical')
+    session.worldState.flags['combat_victories'] = (Number(session.worldState.flags['combat_victories'] ?? 0)) + 1
+    endCombat(session)
+    return { roundLog, ended: true, result: 'victory', loot }
   }
 
-  // 回合结束，准备下一轮
-  combat.round++
+  // 怪物仍存活 → 标记待执行怪物回合
+  if (!check.ended) {
+    combat.pendingMonsterTurn = true
+  }
 
-  return { roundLog, ended: false, result: 'ongoing' }
+  return { roundLog, ended: check.ended, result: check.result }
+}
+
+// ─── 怪物回合阶段 ────────────────────────────────
+
+/**
+ * 执行所有怪物的攻击回合，处理战斗结束和回合递增。
+ * 由 server.ts 在 DM 叙事完成后调用，实现分段发送。
+ */
+export function executeMonsterPhase(session: GameSession): {
+  log: string[]
+  ended: boolean
+  result: CombatResult
+} {
+  const combat = session.combat
+  if (!combat?.active) return { log: [], ended: true, result: 'ongoing' }
+
+  combat.pendingMonsterTurn = false
+  const log = executeMonsterTurns(session)
+
+  const check = checkCombatEnd(session)
+  if (check.ended && check.result === 'defeat') {
+    log.push('\n=== 战斗失败 ===')
+    endCombat(session)
+  } else if (!check.ended) {
+    // 回合结束，准备下一轮
+    combat.round++
+  }
+
+  return { log, ...check }
 }
 
 // ─── 战斗状态摘要 ────────────────────────────────

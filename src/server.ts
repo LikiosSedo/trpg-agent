@@ -21,6 +21,7 @@ import { QuestManager } from './quest-manager.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
 import { WORLD_OVERVIEW } from './data/maps.js'
+import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -149,7 +150,10 @@ wss.on('connection', (ws: WebSocket, req) => {
     } catch (err) {
       send('error', { text: (err as Error).message.slice(0, 100) })
     }
-    send('dm_end', {})
+    send('dm_end', {
+      combat: !!connSession?.combat?.active,
+      pendingMonster: !!connSession?.combat?.pendingMonsterTurn,
+    })
     return fullText
   }
 
@@ -228,8 +232,37 @@ wss.on('connection', (ws: WebSocket, req) => {
         const active = qm.getActiveQuests()
         if (active.length === 0) { sysMsg('暂无任务。去找冒险者公会接任务。'); return }
         for (const q of active) {
+          const lines: string[] = []
+          let nextHint: string | null = null
+          for (let i = 0; i < q.objectives.length; i++) {
+            const obj = q.objectives[i]
+            if (q.objectivesCompleted[i]) {
+              lines.push(`  ✅ ${obj}`)
+            } else {
+              // 击杀目标带进度条
+              const killMatch = obj.match(/击杀(\d+)只(.+?)(\s*\[.+\])?$/)
+              if (killMatch) {
+                const required = Number(killMatch[1])
+                const targetZh = killMatch[2]
+                const monsterEmoji = targetZh === '狼' ? '🐺' : targetZh === '哥布林' ? '👺' : '💀'
+                const monsterNameEn = ({ '狼': 'Wolf', '哥布林': 'Goblin', '骷髅': 'Skeleton', '巨型蜘蛛': 'Giant Spider', '暗影': 'Shadow', '食尸鬼': 'Ghoul', '兽人战士': 'Orc Warrior' } as Record<string, string>)[targetZh]
+                const kills = monsterNameEn ? Number(session.worldState.flags[`kills_${monsterNameEn}`] ?? 0) : 0
+                const bar = monsterEmoji.repeat(Math.min(kills, required)) + '⬜'.repeat(Math.max(0, required - kills))
+                lines.push(`  ➡️ ${obj}\n     ${bar} ${kills}/${required}`)
+              } else {
+                lines.push(`  ➡️ ${obj}`)
+              }
+              // 从第一个未完成目标提取下一步提示
+              if (!nextHint) {
+                const locMatch = obj.match(/\[(.+?)\]/)
+                nextHint = locMatch ? locMatch[1] : null
+              }
+            }
+          }
           const done = q.objectivesCompleted.filter(Boolean).length
-          sysMsg(`⚔ ${q.name} (${done}/${q.objectives.length})\n${q.objectives.map((o, i) => `  ${q.objectivesCompleted[i] ? '✓' : '○'} ${o}`).join('\n')}\n  奖励: ${q.reward.gold}金 + ${q.reward.xp}XP`)
+          let msg = `⚔ ${q.name} (${done}/${q.objectives.length})\n${lines.join('\n')}\n  奖励: ${q.reward.gold}金 + ${q.reward.xp}XP`
+          if (nextHint) msg += `\n  💡 下一步: ${nextHint}`
+          sysMsg(msg)
         }
         sysMsg(`经验: ${session.player.xp} XP (Lv${session.player.level})`)
         return
@@ -281,7 +314,8 @@ wss.on('connection', (ws: WebSocket, req) => {
       }
       if (input.startsWith('/npc ') && input.length > 5) {
         const npcName = input.slice(5).trim()
-        sysMsg(stripAnsi(dossier.renderProfile(npcName)))
+        const npcData = session.npcs.find(n => n.name.includes(npcName) || npcName.includes(n.name))
+        sysMsg(stripAnsi(dossier.renderProfile(npcName, npcData?.trust)))
         return
       }
       if (input === '/world') {
@@ -332,10 +366,35 @@ wss.on('connection', (ws: WebSocket, req) => {
 
       const response = await sendToDM(parts.join('\n\n'))
 
+      // 怪物回合分段发送（玩家回合已由 DM 叙事完成）
+      if (session.combat?.pendingMonsterTurn) {
+        const monsterResult = executeMonsterPhase(session)
+        if (monsterResult.log.length > 0) {
+          send('combat_monster', { text: monsterResult.log.join('\n') })
+        }
+        if (!monsterResult.ended) {
+          const status = getCombatSummary(session)
+          if (status) send('combat_status', { text: status, ended: false })
+        } else {
+          send('combat_status', {
+            text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
+            ended: true,
+            result: monsterResult.result,
+          })
+        }
+      } else if (session.combat?.active) {
+        // 战斗中但无待处理怪物回合（如逃跑失败后）
+        const status = getCombatSummary(session)
+        if (status) send('combat_status', { text: status, ended: false })
+      }
+
       // 任务检查
       const qm = new QuestManager(session)
-      const objResults = qm.checkCombatObjectives()
-      for (const r of objResults) sysMsg(`✓ 任务进度: ${r.questName} — ${r.text}`)
+      const { completed: objCompleted, progress: objProgress } = qm.checkCombatObjectives()
+      for (const r of objCompleted) sysMsg(`✓ 任务完成: ${r.questName} — ${r.text}`)
+      for (const p of objProgress) {
+        send('quest_progress', { quest: p.questName, text: p.text, current: p.current, required: p.required })
+      }
 
       // NPC 档案更新
       for (const npc of session.npcs) {

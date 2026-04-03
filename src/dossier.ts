@@ -327,8 +327,8 @@ export class DossierManager {
     return output
   }
 
-  /** 完整档案卡 */
-  renderProfile(name: string): string {
+  /** 完整档案卡 (trust: NPC当前信任度, 用于显示信任条) */
+  renderProfile(name: string, trust?: number): string {
     // 模糊匹配
     const key = Array.from(this.entries.keys()).find(k => k.includes(name) || name.includes(k))
     const entry = key ? this.entries.get(key) : undefined
@@ -365,6 +365,12 @@ export class DossierManager {
     out += chalk.yellow('  ╠════════════════════════════════════════╣\n')
     const bar = chalk.green('█'.repeat(Math.round(pct / 10))) + chalk.dim('░'.repeat(10 - Math.round(pct / 10)))
     out += chalk.yellow('  ║ ') + `关系: ${entry.relationship}`.padEnd(38) + chalk.yellow(' ║\n')
+    // 信任度条 (0-5)
+    if (trust !== undefined) {
+      const t = Math.max(0, Math.min(5, trust))
+      const trustBar = '▓'.repeat(t) + '░'.repeat(5 - t)
+      out += chalk.yellow('  ║ ') + `信任: ${trustBar} ${t}/5`.padEnd(38) + chalk.yellow(' ║\n')
+    }
     out += chalk.yellow('  ║ ') + `了解: ${bar} ${pct}%`.padEnd(38) + chalk.yellow(' ║\n')
     out += chalk.yellow('  ║ ') + chalk.dim(`初遇: 第${entry.firstMet}轮`).padEnd(47) + chalk.yellow(' ║\n')
 

@@ -81,6 +81,7 @@ export interface CombatState {
   initiativeOrder: InitiativeEntry[]
   monsters: MonsterInstance[]
   log: string[]         // 当前回合的战斗日志
+  pendingMonsterTurn?: boolean  // 玩家回合结束后，等待怪物回合执行
 }
 
 // ─── NPC ──────────────────────────────────────

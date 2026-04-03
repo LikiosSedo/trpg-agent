@@ -9,7 +9,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import type { Monster } from '../types.js'
 import { getSession } from '../game-state.js'
-import { startCombat, executeFullRound, getCombatSummary, attemptFlee } from '../combat-manager.js'
+import { startCombat, executePlayerTurn, getCombatSummary, attemptFlee } from '../combat-manager.js'
 
 export const AttackTool: Tool = {
   name: 'Attack',
@@ -85,9 +85,8 @@ export const AttackTool: Tool = {
         // 输出先攻结果
         const initLog = combat.log.join('\n')
 
-        // 执行第一回合
-        const round = executeFullRound(session, targetId, method, spellId)
-        const combatStatus = getCombatSummary(session)
+        // 执行玩家回合（怪物回合由 server 分段发送）
+        const round = executePlayerTurn(session, targetId, method, spellId)
 
         return {
           output: [
@@ -95,8 +94,6 @@ export const AttackTool: Tool = {
             initLog,
             '',
             ...round.roundLog,
-            '',
-            round.ended ? '' : combatStatus,
           ].filter(Boolean).join('\n'),
         }
       } catch (e: any) {
@@ -104,16 +101,13 @@ export const AttackTool: Tool = {
       }
     }
 
-    // 战斗已在进行中，执行下一回合
+    // 战斗已在进行中，执行玩家回合
     try {
-      const round = executeFullRound(session, targetId, method, spellId)
-      const combatStatus = getCombatSummary(session)
+      const round = executePlayerTurn(session, targetId, method, spellId)
 
       return {
         output: [
           ...round.roundLog,
-          '',
-          round.ended ? '' : combatStatus,
         ].filter(Boolean).join('\n'),
       }
     } catch (e: any) {
