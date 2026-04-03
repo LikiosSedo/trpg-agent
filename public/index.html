@@ -1374,19 +1374,24 @@ function renderNPCDetailPanel(data) {
     Object.entries(NPC_PORTRAIT_MAP).find(([k]) => data.name.includes(k))?.[1]
 
   let html = ''
-  // 立绘 + 基本信息
-  html += `<div class="panel-card" style="text-align:center;padding:16px">`
+  // 大幅立绘（类似首次解锁卡片风格）
   if (portrait) {
-    html += `<img src="${portrait}" alt="${esc(data.name)}" style="width:120px;height:120px;border-radius:10px;border:2px solid #e6b800;image-rendering:pixelated;background:#0a0a1e;margin-bottom:10px" onerror="this.style.display='none'">`
+    html += `<div style="position:relative;width:100%;padding-top:75%;background:#0a0a1e;border-radius:10px 10px 0 0;overflow:hidden">`
+    html += `<img src="${portrait}" alt="${esc(data.name)}" style="position:absolute;top:0;left:50%;transform:translateX(-50%);height:100%;width:auto;image-rendering:pixelated" onerror="this.style.display='none'">`
+    html += `<div style="position:absolute;bottom:0;left:0;right:0;height:40%;background:linear-gradient(transparent,#1a1a2e)"></div>`
+    html += `</div>`
   }
-  html += `<div style="font-size:18px;font-weight:bold;color:#e6b800">${esc(data.name)}</div>`
+  html += `<div class="panel-card" style="text-align:center;padding:16px;${portrait ? 'border-top-left-radius:0;border-top-right-radius:0;margin-top:0' : ''}">`
+  html += `<div style="font-size:20px;font-weight:bold;color:#e6b800">${esc(data.name)}</div>`
   html += `<div style="font-size:13px;color:#888;margin-top:4px">${esc(data.title || '')}</div>`
-  // 信任度条
+  // 信任度（双色渐变条 + 指针）
   const trust = data.trust ?? 0
-  const trustPct = ((trust + 10) / 20) * 100  // -10~10 → 0~100
-  const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
-  html += `<div style="margin-top:10px"><div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
-  html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div></div>`
+  const trustPct = ((trust + 10) / 20) * 100
+  html += `<div style="margin-top:14px">`
+  html += `<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#f44336">-10</span><span style="color:#ccc">信任度: <b>${trust > 0 ? '+' : ''}${trust}</b></span><span style="color:#4caf50">+10</span></div>`
+  html += `<div style="position:relative;height:8px;background:linear-gradient(to right,#6a1a1a,#333 50%,#1a4a1a);border-radius:4px">`
+  html += `<div style="position:absolute;left:${trustPct}%;top:-3px;width:4px;height:14px;background:#e6b800;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 6px rgba(230,184,0,0.5)"></div>`
+  html += `</div></div>`
   html += `</div>`
 
   // 外貌
