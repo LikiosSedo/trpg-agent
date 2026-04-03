@@ -151,11 +151,24 @@ export function getAttitudeDirective(npc: NPC): string {
 // ─── 信息门控 ──────────────────────────────
 
 /** 根据信任度决定 NPC 可以透露多少 knownFacts */
+/** 信任度 → 情报透露层数
+ * -10~-1: 不透露
+ *  0:     1条（基本）
+ *  1~2:   前2条（表面）
+ *  3~4:   前4条（多数）
+ *  5~6:   前6条（深层秘密）
+ *  7~8:   前8条（核心）
+ *  9~10:  全部
+ */
 export function getGatedFacts(npc: NPC): string[] {
-  if (npc.trust >= 5) return npc.knownFacts
-  if (npc.trust >= 3) return npc.knownFacts
-  if (npc.trust >= 1) return npc.knownFacts.slice(0, Math.min(3, npc.knownFacts.length))
-  if (npc.trust >= 0) return npc.knownFacts.slice(0, 1)
+  const t = npc.trust
+  const facts = npc.knownFacts
+  if (t >= 9) return facts
+  if (t >= 7) return facts.slice(0, Math.min(8, facts.length))
+  if (t >= 5) return facts.slice(0, Math.min(6, facts.length))
+  if (t >= 3) return facts.slice(0, Math.min(4, facts.length))
+  if (t >= 1) return facts.slice(0, Math.min(2, facts.length))
+  if (t >= 0) return facts.slice(0, 1)
   return []
 }
 
