@@ -624,7 +624,13 @@
 <div id="game-screen" style="display:none; flex:1; flex-direction:column;">
   <div id="header">
     <h1>⚔️ 破晓镇 · 蚀目之影</h1>
-    <div class="sub">AI TRPG · powered by open-claude-cli</div>
+    <div id="player-hud" style="display:none;font-size:12px;color:#aaa;margin-top:4px">
+      <span id="hud-hp" style="color:#4caf50">❤️ --/--</span>
+      <span style="margin:0 8px;color:#333">|</span>
+      <span id="hud-gold" style="color:#e6b800">💰 --</span>
+      <span style="margin:0 8px;color:#333">|</span>
+      <span id="hud-location" style="color:#888">📍 --</span>
+    </div>
   </div>
   <div id="messages"></div>
 
@@ -1647,6 +1653,7 @@ function handleWsMessage(e) {
     // ─── 存档同步 ───
     case 'sync':
       saveToLocal(msg.session, msg.dossier)
+      updateHUD(msg.session)
       break
 
     case 'resumed':
@@ -1878,6 +1885,27 @@ function showCombatPortraits(monsters) {
 
   container.appendChild(panel)
   container.scrollTop = container.scrollHeight
+}
+
+// ─── 常驻 HUD ───
+function updateHUD(session) {
+  if (!session?.player) return
+  const hud = document.getElementById('player-hud')
+  if (hud) hud.style.display = ''
+  const p = session.player
+  const hpEl = document.getElementById('hud-hp')
+  const goldEl = document.getElementById('hud-gold')
+  const locEl = document.getElementById('hud-location')
+  if (hpEl) {
+    const hpPct = p.maxHp > 0 ? p.hp / p.maxHp : 1
+    hpEl.style.color = hpPct > 0.5 ? '#4caf50' : hpPct > 0.25 ? '#ff9800' : '#f44336'
+    hpEl.textContent = `❤️ ${p.hp}/${p.maxHp}`
+  }
+  if (goldEl) goldEl.textContent = `💰 ${p.gold}`
+  if (locEl) {
+    const locNames = { 'dawnbreak-town':'破晓镇','twilight-woods':'暮色森林','greyspine-mines':'灰脊矿道','shatterstone-wastes':'碎石荒原' }
+    locEl.textContent = `📍 ${locNames[session.worldState?.currentLocation] ?? '未知'}`
+  }
 }
 
 // ─── 音频播放器 ───

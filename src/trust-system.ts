@@ -151,24 +151,22 @@ export function getAttitudeDirective(npc: NPC): string {
 // ─── 信息门控 ──────────────────────────────
 
 /** 根据信任度决定 NPC 可以透露多少 knownFacts */
-/** 信任度 → 情报透露层数
- * -10~-1: 不透露
- *  0:     1条（基本）
- *  1~2:   前2条（表面）
- *  3~4:   前4条（多数）
- *  5~6:   前6条（深层秘密）
- *  7~8:   前8条（核心）
- *  9~10:  全部
+/** 信任度 → 情报透露（五档）
+ * 负值:   不透露任何情报
+ * 0:      第1档 — 基本印象（前2条）
+ * 1~2:    第2档 — 表面了解（前4条）
+ * 3~4:    第3档 — 深入了解（前6条）
+ * 5~6:    第4档 — 核心秘密（前8条）
+ * 7~10:   第5档 — 全部情报
  */
 export function getGatedFacts(npc: NPC): string[] {
   const t = npc.trust
   const facts = npc.knownFacts
-  if (t >= 9) return facts
-  if (t >= 7) return facts.slice(0, Math.min(8, facts.length))
-  if (t >= 5) return facts.slice(0, Math.min(6, facts.length))
-  if (t >= 3) return facts.slice(0, Math.min(4, facts.length))
-  if (t >= 1) return facts.slice(0, Math.min(2, facts.length))
-  if (t >= 0) return facts.slice(0, 1)
+  if (t >= 7) return facts
+  if (t >= 5) return facts.slice(0, Math.min(8, facts.length))
+  if (t >= 3) return facts.slice(0, Math.min(6, facts.length))
+  if (t >= 1) return facts.slice(0, Math.min(4, facts.length))
+  if (t >= 0) return facts.slice(0, Math.min(2, facts.length))
   return []
 }
 
