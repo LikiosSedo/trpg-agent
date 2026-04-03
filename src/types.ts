@@ -52,6 +52,8 @@ export interface Monster {
 
 // ─── 战斗状态 ─────────────────────────────────
 
+export type CombatPhase = 'init' | 'player_turn' | 'monster_turn' | 'ended'
+
 /** 战斗中的怪物运行时实例 */
 export interface MonsterInstance {
   id: string            // 唯一 id，如 "Goblin" 或 "Goblin_2"
@@ -82,6 +84,8 @@ export interface CombatState {
   monsters: MonsterInstance[]
   log: string[]         // 当前回合的战斗日志
   pendingMonsterTurn?: boolean  // 玩家回合结束后，等待怪物回合执行
+  phase?: CombatPhase           // 当前战斗阶段
+  playerDefending?: boolean     // 防御姿态时 AC+2
 }
 
 // ─── 信任系统 ─────────────────────────────────

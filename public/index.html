@@ -227,21 +227,37 @@
   #tab-bar .tab.active { color: #e6b800; }
   #tab-bar .tab:hover { color: #e6b800; }
 
-  /* ─── 战斗快捷栏 ─── */
-  #combat-bar {
+  /* ─── 战斗面板 ─── */
+  #combat-panel {
     display: none;
-    background: #2a1a0e; border-top: 1px solid #ff8c42;
-    padding: 8px 12px; gap: 8px;
-    justify-content: space-around;
+    background: #16213e; border-top: 2px solid #ff8c42;
+    padding: 12px 16px;
+    flex-direction: column; gap: 8px;
   }
-  #combat-bar.show { display: flex; }
-  #combat-bar .combat-action {
-    flex: 1; text-align: center; padding: 8px 4px;
-    background: #3a2210; border: 1px solid #ff8c42; border-radius: 8px;
-    color: #ff8c42; font-size: 13px; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+  #combat-panel.show { display: flex; }
+  .combat-round { color: #ff8c42; font-size: 13px; font-weight: bold; }
+  .combat-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .combat-btn {
+    background: #2a1a0e; color: #ff8c42; border: 1px solid #ff8c42;
+    padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    -webkit-tap-highlight-color: transparent; transition: all 0.15s;
   }
-  #combat-bar .combat-action:hover { background: #4a2a10; color: #ffd000; border-color: #ffd000; }
+  .combat-btn:hover { background: #3a2a15; color: #ffd000; border-color: #ffd000; }
+  .combat-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .combat-selector {
+    display: none; background: #1a1a2e; border: 1px solid #ff8c42;
+    border-radius: 8px; padding: 8px; margin-top: 4px;
+  }
+  .combat-selector.show { display: block; }
+  .combat-selector-title { color: #ff8c42; font-size: 12px; margin-bottom: 6px; }
+  .combat-selector-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; cursor: pointer; border-radius: 6px; color: #e0e0e0;
+    font-size: 13px; transition: background 0.1s;
+  }
+  .combat-selector-item:hover { background: #2a1a0e; }
+  .combat-selector-item .item-info { color: #888; font-size: 11px; margin-left: 8px; }
+  .combat-hp-bar { color: #888; font-size: 11px; }
 
   /* ─── 面板内容样式 ─── */
   .panel-card {
@@ -634,12 +650,17 @@
   </div>
   <div id="messages"></div>
 
-  <!-- 战斗快捷栏 -->
-  <div id="combat-bar">
-    <div class="combat-action" onclick="combatCmd('用武器攻击')">⚔ 攻击</div>
-    <div class="combat-action" onclick="combatCmd('施放法术攻击')">✨ 法术</div>
-    <div class="combat-action" onclick="combatCmd('使用物品')">🧪 物品</div>
-    <div class="combat-action" onclick="combatCmd('逃跑')">🏃 逃跑</div>
+  <!-- 战斗操作面板 -->
+  <div id="combat-panel">
+    <div class="combat-round" id="combat-round-label"></div>
+    <div class="combat-actions" id="combat-actions">
+      <button class="combat-btn" onclick="combatAttack()">⚔ 攻击</button>
+      <button class="combat-btn" onclick="combatSpell()">✨ 法术</button>
+      <button class="combat-btn" onclick="combatItem()">🧪 物品</button>
+      <button class="combat-btn" onclick="combatFlee()">🏃 逃跑</button>
+      <button class="combat-btn" onclick="combatDefend()">🛡 防御</button>
+    </div>
+    <div class="combat-selector" id="combat-selector"></div>
   </div>
 
   <div id="input-area">
@@ -705,6 +726,10 @@ let sending = false
 let currentDmDiv = null
 let authToken = null
 let combatMode = false
+let combatTargets = []     // alive monsters for target selection
+let combatSpells = []      // available spells
+let combatItems = []       // available items (potions)
+let combatRound = 1        // current combat round
 let currentPanelId = null  // track which panel is open
 let isResuming = false     // true when reconnecting with saved session
 
@@ -1553,9 +1578,29 @@ function handleWsMessage(e) {
         sending = false
         document.getElementById('send').disabled = false
         combatMode = !!msg.combat
-        updateCombatBar()
+        updateCombatPanel()
         if (!combatMode) showSceneActions(msg.actions)
       }
+      break
+
+    case 'combat_init':
+      combatMode = true
+      combatRound = msg.round || 1
+      combatTargets = (msg.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
+      updateCombatPanel()
+      if (msg.narrative) appendMsg(msg.narrative, 'combat-monster')
+      break
+
+    case 'combat_action_req':
+      combatMode = true
+      combatTargets = msg.targets || []
+      combatSpells = msg.spells || []
+      combatItems = msg.items || []
+      sending = false
+      document.getElementById('send').disabled = false
+      setCombatButtonsEnabled(true)
+      hideCombatSelector()
+      updateCombatPanel()
       break
 
     case 'combat_monster':
@@ -1564,14 +1609,17 @@ function handleWsMessage(e) {
 
     case 'combat_status':
       appendMsg(msg.text, 'combat-status')
-      sending = false
-      document.getElementById('send').disabled = false
-      combatMode = !msg.ended
-      updateCombatBar()
       if (msg.ended) {
+        combatMode = false
+        combatTargets = []
+        combatSpells = []
+        combatItems = []
+        sending = false
+        document.getElementById('send').disabled = false
         document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
+        updateCombatPanel()
+        showSceneActions()
       }
-      if (!combatMode) showSceneActions()
       break
 
     case 'panel': {
@@ -1664,12 +1712,28 @@ function handleWsMessage(e) {
     case 'sync':
       saveToLocal(msg.session, msg.dossier)
       updateHUD(msg.session)
+      // Update combat round from session if in combat
+      if (msg.session?.combat?.active) {
+        combatRound = msg.session.combat.round || 1
+      }
       break
 
     case 'resumed':
       isResuming = false
       appendMsg('── 存档已恢复，继续冒险 ──', 'reconnect')
-      { const s = getSavedSession(); if (s) updateHUD(s) }
+      {
+        const s = getSavedSession()
+        if (s) {
+          updateHUD(s)
+          // Restore combat mode if session had active combat
+          if (s.combat?.active) {
+            combatMode = true
+            combatRound = s.combat.round || 1
+            combatTargets = (s.combat.monsters || []).filter(m => m.hp > 0).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
+            updateCombatPanel()
+          }
+        }
+      }
       break
 
     case 'resume_failed':
@@ -1716,19 +1780,120 @@ function appendMsg(text, cls) {
   container.scrollTop = container.scrollHeight
 }
 
-// ─── 战斗栏 ───
-function updateCombatBar() {
-  const bar = document.getElementById('combat-bar')
-  bar.classList.toggle('show', combatMode)
+// ─── 战斗面板 ───
+function updateCombatPanel() {
+  const panel = document.getElementById('combat-panel')
+  const inputArea = document.getElementById('input-area')
+  panel.classList.toggle('show', combatMode)
+  inputArea.style.display = combatMode ? 'none' : ''
+  if (combatMode) {
+    const label = document.getElementById('combat-round-label')
+    if (label) label.textContent = `第 ${combatRound} 轮 — 你的回合`
+  }
 }
 
-function combatCmd(text) {
+function setCombatButtonsEnabled(enabled) {
+  document.querySelectorAll('#combat-actions .combat-btn').forEach(btn => {
+    btn.disabled = !enabled
+  })
+}
+
+function hideCombatSelector() {
+  const sel = document.getElementById('combat-selector')
+  sel.classList.remove('show')
+  sel.innerHTML = ''
+}
+
+function showCombatSelector(title, items, onSelect) {
+  const sel = document.getElementById('combat-selector')
+  sel.innerHTML = ''
+  sel.classList.add('show')
+  const titleEl = document.createElement('div')
+  titleEl.className = 'combat-selector-title'
+  titleEl.textContent = title
+  sel.appendChild(titleEl)
+  for (const item of items) {
+    const row = document.createElement('div')
+    row.className = 'combat-selector-item'
+    row.innerHTML = `<span>${esc(item.label)}</span>${item.info ? `<span class="item-info">${esc(item.info)}</span>` : ''}`
+    row.addEventListener('click', () => {
+      hideCombatSelector()
+      onSelect(item)
+    })
+    sel.appendChild(row)
+  }
+  // Cancel option
+  const cancel = document.createElement('div')
+  cancel.className = 'combat-selector-item'
+  cancel.style.color = '#888'
+  cancel.textContent = '取消'
+  cancel.addEventListener('click', () => hideCombatSelector())
+  sel.appendChild(cancel)
+}
+
+function sendCombatAction(action, targetId, spellId, itemId) {
   if (!ws || sending) return
-  appendMsg('🗡️ ' + text, 'player')
-  ws.send(JSON.stringify({ type: 'input', text }))
+  const labels = { attack: '⚔ 攻击', spell: '✨ 法术', item: '🧪 物品', flee: '🏃 逃跑', defend: '🛡 防御' }
+  const target = targetId ? combatTargets.find(t => t.id === targetId) : null
+  const spell = spellId ? combatSpells.find(s => s.name === spellId) : null
+  const item = itemId ? combatItems.find(i => i.name === itemId) : null
+  let desc = labels[action] || action
+  if (target) desc += ` → ${target.name}`
+  if (spell) desc += `（${spell.name}）`
+  if (item) desc += `（${item.name}）`
+  appendMsg(desc, 'player')
+  ws.send(JSON.stringify({ type: 'combat_action', action, targetId, spellId, itemId }))
   sending = true
-  document.getElementById('send').disabled = true
+  setCombatButtonsEnabled(false)
   showThinking()
+}
+
+function combatAttack() {
+  if (combatTargets.length === 0) return
+  if (combatTargets.length === 1) {
+    sendCombatAction('attack', combatTargets[0].id)
+  } else {
+    showCombatSelector('选择目标', combatTargets.map(t => ({
+      label: t.name, info: `HP ${t.hp}/${t.maxHp}`, value: t.id,
+    })), (item) => sendCombatAction('attack', item.value))
+  }
+}
+
+function combatSpell() {
+  if (combatSpells.length === 0) {
+    appendMsg('没有可用的法术。', 'system')
+    return
+  }
+  // Need target selection after spell selection for attack spells
+  showCombatSelector('选择法术', combatSpells.map(s => ({
+    label: s.name, info: s.isCantrip ? '戏法' : `${s.remaining}/${s.max}`, value: s.name, desc: s.desc,
+  })), (spell) => {
+    if (combatTargets.length === 1) {
+      sendCombatAction('spell', combatTargets[0].id, spell.value)
+    } else {
+      showCombatSelector('选择目标', combatTargets.map(t => ({
+        label: t.name, info: `HP ${t.hp}/${t.maxHp}`, value: t.id,
+      })), (target) => sendCombatAction('spell', target.value, spell.value))
+    }
+  })
+}
+
+function combatItem() {
+  if (combatItems.length === 0) {
+    appendMsg('没有可用的物品。', 'system')
+    return
+  }
+  showCombatSelector('选择物品', combatItems.map(i => ({
+    label: i.name, info: i.desc || '', value: i.name,
+  })), (item) => sendCombatAction('item', undefined, undefined, item.value))
+}
+
+function combatFlee() {
+  sendCombatAction('flee')
+}
+
+function combatDefend() {
+  sendCombatAction('defend')
 }
 
 // ─── 场景动作（DM 动态生成 + fallback） ───

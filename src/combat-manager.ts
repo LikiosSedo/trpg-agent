@@ -201,7 +201,9 @@ export function executeMonsterTurns(session: GameSession): string[] {
   if (!combat?.active) return []
 
   const player = session.player
-  const playerAC = calculatePlayerAC(player)
+  let playerAC = calculatePlayerAC(player)
+  // 防御姿态 AC+2
+  if (combat.playerDefending) playerAC += 2
   const log: string[] = []
 
   for (const entry of combat.initiativeOrder) {

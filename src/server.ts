@@ -138,6 +138,10 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('combat_monster', { text: ev.text }); break
         case 'combat_status':
           send('combat_status', { text: ev.text, ended: ev.ended, result: ev.result }); break
+        case 'combat_init':
+          send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative }); break
+        case 'combat_action_req':
+          send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp }); break
         case 'quest_completed':
           send('system', { text: `✓ 任务完成: ${ev.questName} — ${ev.text}` }); break
         case 'quest_progress':
@@ -255,6 +259,19 @@ wss.on('connection', (ws: WebSocket, req) => {
       if (cmd) {
         const result = engine.executeCommand(cmd)
         if (result) sendCommandResult(result)
+      }
+      return
+    }
+
+    // ── 战斗动作（结构化按钮点击） ──
+    if (msg.type === 'combat_action') {
+      if (!gameStarted || !engine) return
+      if (processing) { send('error', { text: '处理中...' }); return }
+      processing = true
+      try {
+        await streamEvents(engine.processCombatAction(msg))
+      } finally {
+        processing = false
       }
       return
     }

@@ -22,7 +22,11 @@ import { validateNarrative, type ToolCallRecord } from './narrative-validator.js
 import { consumeSpeakingNPCs } from './tools/talk.js'
 import { classifyIntent, formatActionResult, shouldPreExecute, type ActionResult } from './rules-agent.js'
 import { executeAction } from './action-executor.js'
-import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
+import {
+  executeMonsterPhase, getCombatSummary, executePlayerTurn,
+  attemptFlee, checkCombatEnd, awardLoot, endCombat,
+} from './combat-manager.js'
+import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
@@ -73,6 +77,8 @@ export type TurnEvent =
   | { type: 'dm_error'; message: string }
   | { type: 'combat_monster'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
+  | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[]; narrative?: string }
+  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[]; playerHp: number; playerMaxHp: number }
   | { type: 'quest_completed'; questName: string; text: string }
   | { type: 'quest_progress'; questName: string; text: string; current?: number; required?: number }
   | { type: 'npc_unlock'; npcName: string; portrait: string; firstFacts: string[] }
@@ -521,6 +527,12 @@ export class GameEngine {
     const session = this.session
     const facts = getFacts()
 
+    // 战斗中禁止自由文本输入，必须使用操作按钮
+    if (session.combat?.active) {
+      yield { type: 'dm_error', message: '战斗中请使用操作按钮（攻击/法术/物品/逃跑/防御）。' }
+      return
+    }
+
     // 安全检查
     const safety = checkSafety(input)
     if (safety.level === 'block') {
@@ -673,10 +685,12 @@ export class GameEngine {
         const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
         const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
         const allDb = [...monstersJson, ...npcCombatJson]
-        const { startCombat } = await import('./combat-manager.js')
-        startCombat(session, monsterNames, allDb as any)
+        const { startCombat: startCombatFn } = await import('./combat-manager.js')
+        startCombatFn(session, monsterNames, allDb as any)
         console.log(`[combat] 区域遭遇触发：${monsterNames.join(', ')}`)
         yield { type: 'narrative_warning', text: `⚔️ 遭遇战斗！${monsterNames.join('和')}向你发起攻击！` }
+        // Emit combat_init + combat_action_req for structured combat UI
+        yield* this.emitCombatStart(`${monsterNames.join('和')}向你发起攻击！`)
       } catch (err) {
         console.error(`[combat] 遭遇触发失败:`, (err as Error).message)
       }
@@ -714,10 +728,14 @@ export class GameEngine {
       } else {
         const status = getCombatSummary(session)
         if (status) yield { type: 'combat_status', text: status, ended: false }
+        // Emit combat_action_req for next player turn
+        yield* this.emitCombatStart()
       }
     } else if (session.combat?.active) {
       const status = getCombatSummary(session)
       if (status) yield { type: 'combat_status', text: status, ended: false }
+      // Combat was started by attack pre-execution, emit structured combat events
+      yield* this.emitCombatStart()
     }
 
     // 任务检查
@@ -771,6 +789,186 @@ export class GameEngine {
       facts.save('autosave')
       this.turnsSinceLastSave = 0
       yield { type: 'auto_save' }
+    }
+  }
+
+  // ─── 战斗初始化事件辅助 ────────────────────
+
+  /** 生成 combat_init + combat_action_req 事件对 */
+  private *emitCombatStart(narrative?: string): Generator<TurnEvent> {
+    const combat = this.session.combat
+    if (!combat?.active) return
+
+    combat.phase = 'player_turn'
+
+    const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+    yield {
+      type: 'combat_init',
+      monsters: aliveMonsters.map(m => ({
+        id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp,
+        portrait: MONSTER_PORTRAITS[m.name] ?? '',
+      })),
+      round: combat.round,
+      initiative: combat.initiativeOrder,
+      narrative,
+    }
+    yield {
+      type: 'combat_action_req',
+      targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
+      spells: this.session.player.spells
+        .filter(s => s.remaining > 0 || s.usesPerRest === 0)
+        .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0 })),
+      items: this.session.player.inventory
+        .filter(i => i.type === 'potion')
+        .map(i => ({ name: i.name, desc: i.description })),
+      playerHp: this.session.player.hp,
+      playerMaxHp: this.session.player.maxHp,
+    }
+  }
+
+  // ─── 结构化战斗动作处理 ────────────────────
+
+  /** 处理结构化战斗输入（按钮点击），返回事件流 */
+  async *processCombatAction(action: {
+    action: 'attack' | 'spell' | 'item' | 'flee' | 'defend'
+    targetId?: string
+    spellId?: string
+    itemId?: string
+  }): AsyncGenerator<TurnEvent> {
+    this.activate()
+    const session = this.session
+    const combat = session.combat
+    if (!combat?.active) {
+      yield { type: 'dm_error', message: '当前没有战斗。' }
+      return
+    }
+
+    // Execute player action
+    let skipMonsterPhase = false
+    if (action.action === 'flee') {
+      // attemptFlee already executes monster turns on failure, so skip the monster phase below
+      skipMonsterPhase = true
+      const result = attemptFlee(session)
+      yield {
+        type: 'combat_status',
+        text: result.log.join('\n'),
+        ended: result.ended,
+        result: result.ended ? (result.result === 'defeat' ? 'defeat' : 'fled') : undefined,
+      }
+      if (result.ended) {
+        combat.phase = 'ended'
+        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        return
+      }
+    } else if (action.action === 'defend') {
+      combat.playerDefending = true
+      yield { type: 'combat_status', text: '你摆出防御姿态，AC临时+2。', ended: false }
+    } else if (action.action === 'item' && action.itemId) {
+      // Use potion/item in combat
+      const useResult = await UseItemTool.execute({ itemId: action.itemId, action: 'use' })
+      yield { type: 'combat_status', text: useResult.output, ended: false }
+    } else {
+      // Attack or spell
+      const method = action.action === 'spell' ? 'spell' : 'weapon'
+      const targetId = action.action === 'spell' ? (action.targetId ?? combat.monsters.find(m => m.hp > 0)?.id ?? '') : (action.targetId ?? '')
+      const turnResult = executePlayerTurn(session, targetId, method, action.spellId)
+
+      // executePlayerTurn already handles victory (endCombat + loot)
+      if (turnResult.ended) {
+        // Combine round log + loot into a single ended message
+        const lines = [...turnResult.roundLog]
+        if (turnResult.result === 'victory' && turnResult.loot) {
+          const { items, gold } = turnResult.loot
+          if (items.length || gold) lines.push(`获得: ${items.join(', ')}${gold ? ` + ${gold}金币` : ''}`)
+        }
+        yield { type: 'combat_status', text: lines.join('\n'), ended: true, result: turnResult.result }
+        if (session.chapter) new ChapterManager(session).onEvent('combat_end')
+        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        return
+      }
+      yield { type: 'combat_status', text: turnResult.roundLog.join('\n'), ended: false }
+    }
+
+    // Check if combat ended after player action (defend/item won't end it, but flee might have returned above)
+    const endCheck = checkCombatEnd(session)
+    if (endCheck.ended) {
+      combat.phase = 'ended'
+      if (endCheck.result === 'victory') {
+        const loot = awardLoot(session)
+        const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
+        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
+      } else if (endCheck.result === 'defeat') {
+        yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
+      }
+      endCombat(session)
+      if (session.chapter) new ChapterManager(session).onEvent('combat_end')
+      yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+      return
+    }
+
+    // Monster phase (skip if flee already handled it)
+    if (!skipMonsterPhase) {
+      combat.phase = 'monster_turn'
+      combat.pendingMonsterTurn = false
+      const monsterResult = executeMonsterPhase(session)
+      if (monsterResult.log.length > 0) {
+        yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+      }
+
+      // Check end after monster phase
+      if (monsterResult.ended) {
+        combat.phase = 'ended'
+        yield {
+          type: 'combat_status',
+          text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
+          ended: true, result: monsterResult.result,
+        }
+        if (session.chapter) new ChapterManager(session).onEvent('combat_end')
+        // endCombat already called by executeMonsterPhase for defeat
+        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        if (session.player.hp <= 0) {
+          session.dossierData = this.dossier.toJSON()
+          getFacts().save('death-save')
+          yield { type: 'death' }
+        }
+        return
+      }
+    }
+
+    // Next round — send updated state for player's next turn
+    if (session.combat?.active) {
+      const activeCombat = session.combat
+      activeCombat.phase = 'player_turn'
+      activeCombat.playerDefending = false
+      const aliveMonsters = activeCombat.monsters.filter(m => m.hp > 0)
+      yield {
+        type: 'combat_action_req',
+        targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
+        spells: session.player.spells
+          .filter(s => s.remaining > 0 || s.usesPerRest === 0)
+          .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0 })),
+        items: session.player.inventory
+          .filter(i => i.type === 'potion')
+          .map(i => ({ name: i.name, desc: i.description })),
+        playerHp: session.player.hp, playerMaxHp: session.player.maxHp,
+      }
+      yield {
+        type: 'combat_portraits',
+        monsters: aliveMonsters.map(m => ({
+          id: m.id, name: m.name,
+          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+          hp: m.hp, maxHp: m.maxHp,
+        })),
+      }
+    }
+
+    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+
+    // Death check
+    if (session.player.hp <= 0) {
+      session.dossierData = this.dossier.toJSON()
+      getFacts().save('death-save')
+      yield { type: 'death' }
     }
   }
 
