@@ -49,6 +49,55 @@ function migrateSession(session: GameSession): void {
   }
 }
 
+/** 重连后构建对话回顾，注入 DM 首轮消息 */
+function buildResumeRecap(session: GameSession): string {
+  const locationNames: Record<string, string> = {
+    'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
+    'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
+  }
+  const loc = locationNames[session.worldState.currentLocation] ?? session.worldState.currentLocation
+
+  const lines: string[] = [
+    `[断线重连 — 对话回顾，请基于以下信息延续之前的对话，不要重新开场]`,
+    `当前位置: ${loc} | 第${session.turnCount}轮`,
+  ]
+
+  // 最近事件
+  const recentEvents = session.events.slice(-5)
+  if (recentEvents.length) {
+    lines.push(`\n最近发生的事：`)
+    for (const e of recentEvents) lines.push(`  - [第${e.turn}轮] ${e.fact}`)
+  }
+
+  // NPC 交互记录（最关键——告诉 DM 刚才在跟谁聊什么）
+  const recentNpcLogs: string[] = []
+  for (const npc of session.npcs) {
+    const logs = npc.interactionLog ?? []
+    if (logs.length > 0) {
+      const recent = logs.slice(-3)
+      recentNpcLogs.push(`  ${npc.name}: ${recent.join('；')}`)
+    }
+  }
+  if (recentNpcLogs.length) {
+    lines.push(`\n最近的NPC对话：`)
+    lines.push(...recentNpcLogs)
+  }
+
+  // 活跃任务
+  const activeQuests = session.quests.filter(q => q.status === 'active')
+  if (activeQuests.length) {
+    lines.push(`\n当前任务: ${activeQuests.map(q => q.name).join('、')}`)
+  }
+
+  // 章节信息
+  if (session.chapter) {
+    const cm = new ChapterManager(session)
+    lines.push(`当前章节: ${cm.getChapterTitle()}`)
+  }
+
+  return lines.join('\n')
+}
+
 // ─── Express + WebSocket Server ───
 
 const app = express()
@@ -144,6 +193,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   let dossier = new DossierManager()
   let connSession: GameSession | null = null
   let gameStarted = false
+  let justResumed = false  // 重连后首轮注入对话回顾
 
   // 发消息给前端
   function send(type: string, data: any) {
@@ -200,6 +250,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         dossier = msg.dossier ? DossierManager.fromJSON(msg.dossier) : new DossierManager()
         resetIdleTracking()
         gameStarted = true
+        justResumed = true
         console.log(`[server] resumed session for ${connSession.player.name}`)
         send('resumed', {})
       } catch (err) {
@@ -525,6 +576,14 @@ wss.on('connection', (ws: WebSocket, req) => {
 
       // 构建 DM 输入
       const parts: string[] = []
+
+      // 重连后首轮：注入对话回顾，让 DM 知道"刚才在干什么"
+      if (justResumed) {
+        justResumed = false
+        const recap = buildResumeRecap(session)
+        if (recap) parts.push(recap)
+      }
+
       if (safety.level === 'warn') parts.push(`[DM安全指令: ${safety.dmInstruction}]`)
       const guidance = getEarlyGuidance(session.turnCount)
       if (guidance) parts.push(guidance)
