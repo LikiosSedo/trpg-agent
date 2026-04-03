@@ -81,16 +81,19 @@ function renderCommand(result: CommandResult, engine: GameEngine): void {
       if (!result.data.items.length && !result.data.weapon && !result.data.armor) console.log('  (空)')
       console.log(chalk.yellow(`  金币: ${result.data.gold}`) + '\n')
       break
-    case 'quest':
+    case 'quest': {
       console.log('\n' + chalk.cyan('  ══════ 任 务 日 志 ══════'))
-      if (!result.data.active.length) {
+      const quests = result.data.quests || []
+      const activeQ = quests.filter((q: any) => q.status === 'active')
+      const completedQ = quests.filter((q: any) => q.status === 'completed')
+      if (!activeQ.length) {
         console.log(chalk.dim('\n  暂无进行中的任务。'))
         console.log(chalk.dim('  去找冒险者公会的艾琳娜或韩猛接任务。\n'))
       } else {
-        for (const q of result.data.active) {
+        for (const q of activeQ) {
           const doneCount = q.objectives.filter((o: any) => o.done).length
           console.log(`\n  ${chalk.yellow.bold('⚔')} ${chalk.bold(q.name)} ${chalk.dim(`(${doneCount}/${q.objectives.length})`)}`)
-          console.log(chalk.dim(`    ${q.desc}`))
+          console.log(chalk.dim(`    ${q.description}`))
           for (const obj of q.objectives) {
             console.log(`    ${obj.done ? chalk.green('✓') : chalk.dim('○')} ${obj.done ? chalk.green(obj.text) : obj.text}`)
           }
@@ -98,16 +101,17 @@ function renderCommand(result: CommandResult, engine: GameEngine): void {
         }
         console.log()
       }
-      if (result.data.completed.length) console.log(chalk.dim(`  已完成: ${result.data.completed.map((n: string) => '✓ ' + n).join('  ')}`))
-      if (result.data.nextLevelXp) {
-        const pct = Math.min(100, Math.round((result.data.xp / result.data.nextLevelXp) * 100))
+      if (completedQ.length) console.log(chalk.dim(`  已完成: ${completedQ.map((q: any) => '✓ ' + q.name).join('  ')}`))
+      if (result.data.xpNext) {
+        const pct = Math.min(100, Math.round((result.data.xp / result.data.xpNext) * 100))
         const bar = chalk.green('█'.repeat(Math.round(pct / 10))) + chalk.dim('░'.repeat(10 - Math.round(pct / 10)))
-        console.log(`  经验: ${bar} ${result.data.xp}/${result.data.nextLevelXp} XP (Lv${result.data.level})`)
+        console.log(`  经验: ${bar} ${result.data.xp}/${result.data.xpNext} XP (Lv${result.data.level})`)
       } else {
         console.log(chalk.dim(`  经验: ${result.data.xp} XP (Lv${result.data.level} MAX)`))
       }
       console.log()
       break
+    }
     case 'map':
       console.log(result.data.worldOverview)
       const mapLoc = result.data.locations.find((l: any) => l.id === result.data.currentLocation)
@@ -235,17 +239,14 @@ function renderTurnEvent(event: TurnEvent): void {
       console.log(chalk.yellow(`\n  [任务进度] ${event.questName}：${event.text}`))
       break
     case 'npc_unlock':
-      console.log(chalk.cyan(`  🔔 新角色档案解锁: ${event.npcName}`))
-      break
-    case 'npc_update':
-      console.log(event.text)
-      break
-    case 'npc_unlock':
       console.log(chalk.yellow.bold(`\n  🔔 新角色档案解锁：${event.npcName}`))
-      if (event.firstFacts.length) {
+      if (event.firstFacts?.length) {
         for (const f of event.firstFacts) console.log(chalk.dim(`    · ${f}`))
       }
       console.log(chalk.dim('    已收藏到人物档案\n'))
+      break
+    case 'npc_update':
+      console.log(event.text)
       break
     case 'game_over':
       console.log(chalk.red.bold(`\n  ═══ 游戏终局 ═══`))
