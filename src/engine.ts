@@ -17,6 +17,7 @@ import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
 import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages } from './dm-agent.js'
 import { consumeActions, type SceneActions } from './tools/set-actions.js'
+import { consumeSpeakingNPCs } from './tools/talk.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
@@ -38,16 +39,6 @@ const NPC_PORTRAITS: Record<string, string> = {
   // '韩猛': 'portraits/han-meng.png',  // 暂无立绘
 }
 
-/** 从文本中检测最可能正在对话的 NPC */
-function detectSpeakingNPC(input: string, npcs: Array<{ name: string }>): string | null {
-  // 玩家输入中直接提到的 NPC
-  for (const npc of npcs) {
-    if (input.includes(npc.name) && NPC_PORTRAITS[npc.name]) {
-      return npc.name
-    }
-  }
-  return null
-}
 
 // ─── 命令结果类型 ──────────────────────────────
 
@@ -551,12 +542,6 @@ export class GameEngine {
     if (idle) parts.push(idle)
     parts.push(input)
 
-    // 检测对话 NPC → 发射立绘事件
-    const speakingNPC = detectSpeakingNPC(input, session.npcs)
-    if (speakingNPC && NPC_PORTRAITS[speakingNPC]) {
-      yield { type: 'npc_speaking', npcName: speakingNPC, portrait: NPC_PORTRAITS[speakingNPC] }
-    }
-
     // DM 流式响应
     let fullText = ''
     try {
@@ -571,15 +556,20 @@ export class GameEngine {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }
 
-    // 如果玩家输入没命中 NPC，但 DM 回复提到了 NPC 对话，补发立绘
-    if (!speakingNPC) {
+    // NPC 立绘：Talk 工具记录了本轮所有说话的 NPC
+    const speakers = consumeSpeakingNPCs()
+    if (speakers.length === 0) {
+      // Fallback：DM 叙事中出现 NPC 对话格式但没调 Talk 工具
       for (const npc of session.npcs) {
-        if (fullText.includes(`${npc.name}:`) || fullText.includes(`${npc.name}："`)) {
-          if (NPC_PORTRAITS[npc.name]) {
-            yield { type: 'npc_speaking', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] }
-            break
-          }
+        if ((fullText.includes(`${npc.name}:`) || fullText.includes(`${npc.name}：`))
+            && NPC_PORTRAITS[npc.name]) {
+          speakers.push(npc.name)
         }
+      }
+    }
+    for (const name of speakers) {
+      if (NPC_PORTRAITS[name]) {
+        yield { type: 'npc_speaking', npcName: name, portrait: NPC_PORTRAITS[name] }
       }
     }
 

@@ -13,6 +13,16 @@ import { ChapterManager } from '../chapter-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName, moveNPC } from '../npc-mobility.js'
 import { evaluateResponse, getAttitudeDirective, changeTrust } from '../trust-system.js'
 
+// ─── 对话中的 NPC 追踪（供引擎读取） ───
+const speakingNPCs: string[] = []
+
+/** 消费本轮所有说话的 NPC 列表 */
+export function consumeSpeakingNPCs(): string[] {
+  const result = [...speakingNPCs]
+  speakingNPCs.length = 0
+  return result
+}
+
 export const TalkTool: Tool = {
   name: 'Talk',
   description: `与 NPC 对话。DM Agent 用此工具将对话请求转发给对应的 NPC Agent。
@@ -69,6 +79,9 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
         output: `${npcResponse.description}（信任度: ${npc.trust}）`,
       }
     }
+
+    // 记录正在说话的 NPC（供引擎发射立绘事件）
+    if (!speakingNPCs.includes(npcId)) speakingNPCs.push(npcId)
 
     // 通知章节系统（位置检查通过后才触发）
     if (session.chapter) {

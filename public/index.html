@@ -1504,14 +1504,26 @@ function showSceneActions(actions) {
 }
 
 // ─── NPC 立绘显示 ───
+let lastPortraitTurn = 0
 function showNPCPortrait(npcName, portraitSrc) {
   const container = document.getElementById('messages')
-  // 移除上一个立绘条（同一轮只显示一个）
-  const prev = container.querySelector('.npc-portrait-bar')
-  if (prev) prev.remove()
+
+  // 新一轮对话开始时清除上一轮的立绘
+  const turnNow = Date.now()
+  if (turnNow - lastPortraitTurn > 3000) {
+    container.querySelectorAll('.npc-portrait-bar').forEach(el => el.remove())
+  }
+  lastPortraitTurn = turnNow
+
+  // 同一轮内同名 NPC 不重复显示
+  const existing = container.querySelectorAll('.npc-portrait-bar')
+  for (const el of existing) {
+    if (el.dataset.npc === npcName) return
+  }
 
   const bar = document.createElement('div')
   bar.className = 'npc-portrait-bar'
+  bar.dataset.npc = npcName
   bar.innerHTML = `<img src="${esc(portraitSrc)}" alt="${esc(npcName)}" onerror="this.style.display='none'">` +
     `<div><div class="npc-speak-name">${esc(npcName)}</div>` +
     `<div class="npc-speak-hint">正在与你对话</div></div>`
