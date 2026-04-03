@@ -1318,7 +1318,9 @@ function renderNPCListPanel(data) {
 
   let html = ''
   for (const npc of npcs) {
-    const trust = npc.trust ?? 50
+    const trust = npc.trust ?? 0  // -10 to +10
+    const trustPct = ((trust + 10) / 20) * 100  // map to 0-100%
+    const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
     // 子串匹配立绘（档案名可能是"格雷格·铁拳头"，映射表用"格雷格"）
     const portrait = NPC_PORTRAIT_MAP[npc.name] ||
       Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
@@ -1330,9 +1332,9 @@ function renderNPCListPanel(data) {
       : esc(npc.avatar || '👤')}</div>`
     html += `<div class="npc-info">`
     html += `<div class="npc-name">${esc(npc.name)} <span style="font-size:11px;color:#555">▶</span></div>`
-    if (npc.role) html += `<div class="npc-role">${esc(npc.role)}</div>`
-    html += `<div class="bar-label"><span>信任度</span><span>${trust}%</span></div>`
-    html += `<div class="bar-track"><div class="bar-fill trust" style="width:${trust}%"></div></div>`
+    if (npc.title) html += `<div class="npc-role">${esc(npc.title)}</div>`
+    html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
+    html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
     html += `</div></div>`
   }
   return html
@@ -1381,9 +1383,10 @@ function renderNPCDetailPanel(data) {
   html += `<div style="font-size:13px;color:#888;margin-top:4px">${esc(data.title || '')}</div>`
   // 信任度条
   const trust = data.trust ?? 0
-  const trustPct = Math.max(0, Math.min(100, (trust + 10) * 5)) // -10~10 → 0~100
-  html += `<div style="margin-top:10px"><div class="bar-label"><span>信任度</span><span>${trust}</span></div>`
-  html += `<div class="bar-track"><div class="bar-fill trust" style="width:${trustPct}%"></div></div></div>`
+  const trustPct = ((trust + 10) / 20) * 100  // -10~10 → 0~100
+  const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
+  html += `<div style="margin-top:10px"><div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
+  html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div></div>`
   html += `</div>`
 
   // 外貌
