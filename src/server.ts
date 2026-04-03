@@ -79,6 +79,9 @@ app.post('/api/auth', (req, res) => {
 })
 
 app.use(express.static(join(__dirname, '..', 'public')))
+app.get('/', (_req, res) => {
+  res.sendFile(join(__dirname, '..', 'public', 'index.html'))
+})
 
 // 每个 WebSocket 连接 = 一个独立的游戏会话
 wss.on('connection', (ws: WebSocket, req) => {
