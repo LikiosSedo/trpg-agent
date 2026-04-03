@@ -69,6 +69,24 @@
     margin: 4px 0; border-radius: 4px; line-height: 1.5;
   }
   .msg.reconnect { color: #666 !important; font-size: 11px; }
+  /* NPC 立绘 */
+  .npc-portrait-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #0f1a2e 0%, #1a2a4e 100%);
+    border: 1px solid #0f3460; border-radius: 8px;
+    padding: 8px 12px; margin: 4px 0;
+  }
+  .npc-portrait-bar img {
+    width: 56px; height: 56px; border-radius: 6px;
+    border: 2px solid #e6b800; image-rendering: pixelated;
+    background: #0a0a1e;
+  }
+  .npc-portrait-bar .npc-speak-name {
+    font-size: 14px; font-weight: bold; color: #e6b800;
+  }
+  .npc-portrait-bar .npc-speak-hint {
+    font-size: 11px; color: #666; margin-top: 2px;
+  }
   #input-area {
     background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
     display: flex; gap: 8px;
@@ -1358,6 +1376,11 @@ function handleWsMessage(e) {
       appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
       break
 
+    // ─── NPC 立绘 ───
+    case 'npc_speaking':
+      showNPCPortrait(msg.npcName, msg.portrait)
+      break
+
     // ─── 音频 ───
     case 'audio':
       switchAudio(msg.bgm, msg.ambient)
@@ -1477,6 +1500,22 @@ function showSceneActions(actions) {
   }
 
   container.appendChild(div)
+  container.scrollTop = container.scrollHeight
+}
+
+// ─── NPC 立绘显示 ───
+function showNPCPortrait(npcName, portraitSrc) {
+  const container = document.getElementById('messages')
+  // 移除上一个立绘条（同一轮只显示一个）
+  const prev = container.querySelector('.npc-portrait-bar')
+  if (prev) prev.remove()
+
+  const bar = document.createElement('div')
+  bar.className = 'npc-portrait-bar'
+  bar.innerHTML = `<img src="${esc(portraitSrc)}" alt="${esc(npcName)}" onerror="this.style.display='none'">` +
+    `<div><div class="npc-speak-name">${esc(npcName)}</div>` +
+    `<div class="npc-speak-hint">正在与你对话</div></div>`
+  container.appendChild(bar)
   container.scrollTop = container.scrollHeight
 }
 

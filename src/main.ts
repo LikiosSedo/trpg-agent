@@ -240,6 +240,9 @@ function renderTurnEvent(event: TurnEvent): void {
     case 'npc_update':
       console.log(event.text)
       break
+    case 'npc_speaking':
+      console.log(chalk.cyan(`\n  [${event.npcName}]`))
+      break
     case 'audio':
       break // CLI 不播放音频
     case 'auto_save':

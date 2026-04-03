@@ -145,6 +145,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('system', { text: `🔔 档案解锁: ${ev.npcName}` }); break
         case 'npc_update':
           send('system', { text: ev.text }); break
+        case 'npc_speaking':
+          send('npc_speaking', { npcName: ev.npcName, portrait: ev.portrait }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
         case 'auto_save':

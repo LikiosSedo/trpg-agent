@@ -24,6 +24,31 @@ import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 
+// ─── NPC 立绘映射 ──────────────────────────────
+
+const NPC_PORTRAITS: Record<string, string> = {
+  '格雷格': 'portraits/greg-ironfist.png',
+  '小莉': 'portraits/xiao-li.png',
+  '艾琳娜': 'portraits/elena-silverleaf.png',
+  '维克多': 'portraits/victor-blackstone.png',
+  '卡恩': 'portraits/kahn-the-traveler.png',
+  '陈妈': 'portraits/chen-ma.png',
+  '格罗姆': 'portraits/grom.png',
+  '叶绿': 'portraits/ye-lv.png',
+  // '韩猛': 'portraits/han-meng.png',  // 暂无立绘
+}
+
+/** 从文本中检测最可能正在对话的 NPC */
+function detectSpeakingNPC(input: string, npcs: Array<{ name: string }>): string | null {
+  // 玩家输入中直接提到的 NPC
+  for (const npc of npcs) {
+    if (input.includes(npc.name) && NPC_PORTRAITS[npc.name]) {
+      return npc.name
+    }
+  }
+  return null
+}
+
 // ─── 命令结果类型 ──────────────────────────────
 
 export interface CommandResult {
@@ -51,6 +76,7 @@ export type TurnEvent =
   | { type: 'npc_update'; text: string }
   | { type: 'auto_save'; path?: string }
   | { type: 'audio'; bgm: string; ambient: string }
+  | { type: 'npc_speaking'; npcName: string; portrait: string }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -525,6 +551,12 @@ export class GameEngine {
     if (idle) parts.push(idle)
     parts.push(input)
 
+    // 检测对话 NPC → 发射立绘事件
+    const speakingNPC = detectSpeakingNPC(input, session.npcs)
+    if (speakingNPC && NPC_PORTRAITS[speakingNPC]) {
+      yield { type: 'npc_speaking', npcName: speakingNPC, portrait: NPC_PORTRAITS[speakingNPC] }
+    }
+
     // DM 流式响应
     let fullText = ''
     try {
@@ -537,6 +569,18 @@ export class GameEngine {
       }
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
+    }
+
+    // 如果玩家输入没命中 NPC，但 DM 回复提到了 NPC 对话，补发立绘
+    if (!speakingNPC) {
+      for (const npc of session.npcs) {
+        if (fullText.includes(`${npc.name}:`) || fullText.includes(`${npc.name}："`)) {
+          if (NPC_PORTRAITS[npc.name]) {
+            yield { type: 'npc_speaking', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] }
+            break
+          }
+        }
+      }
     }
 
     // 音频：DM 可能通过 SetAmbiance 覆盖，否则代码自动选择
