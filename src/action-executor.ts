@@ -17,6 +17,7 @@ import { SearchTool } from './tools/search.js'
 import { UseItemTool } from './tools/use-item.js'
 import { RestTool } from './tools/rest.js'
 import { TransferItemTool } from './tools/transfer-item.js'
+import { TalkTool } from './tools/talk.js'
 
 /**
  * 执行已分类的玩家动作，返回工具结果
@@ -131,6 +132,18 @@ export async function executeAction(action: PlayerAction, session: GameSession):
         return {
           action, success: !result.isError,
           output: result.output, toolsCalled: ['TransferItem'],
+        }
+      }
+
+      case 'TALK': {
+        const result = await TalkTool.execute({
+          npcId: action.npc,
+          message: action.message || '',
+          approach: action.approach,
+        })
+        return {
+          action, success: !result.isError,
+          output: result.output, toolsCalled: ['Talk'],
         }
       }
 

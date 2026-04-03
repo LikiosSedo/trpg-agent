@@ -141,6 +141,7 @@ async function llmClassify(input: string, session: GameSession): Promise<PlayerA
   ].filter(Boolean).join(' | ')
 
   const prompt = `${context}\n\n玩家输入：${input}`
+  console.log(`[rules-agent] LLM 分类请求: ${prompt.slice(0, 100)}...`)
 
   try {
     const agent = new Agent({
@@ -163,8 +164,12 @@ async function llmClassify(input: string, session: GameSession): Promise<PlayerA
       if (event.type === 'text_delta') text += event.text ?? ''
     }
 
-    return parseClassification(text)
-  } catch {
+    console.log(`[rules-agent] LLM 原始返回: "${text.slice(0, 200)}"`)
+    const parsed = parseClassification(text)
+    console.log(`[rules-agent] 解析结果: ${JSON.stringify(parsed)}`)
+    return parsed
+  } catch (err) {
+    console.error(`[rules-agent] LLM 分类失败:`, (err as Error).message)
     return { type: 'NARRATIVE' }
   }
 }
@@ -243,8 +248,9 @@ export function formatActionResult(result: ActionResult): string {
 
 /**
  * 判断动作是否需要预执行（机械性动作）
- * TALK 和 NARRATIVE 不预执行——交给 DM
+ * 只有 NARRATIVE 不预执行——其他全走代码
+ * TALK 也预执行：位置检查 + NPC 上下文获取 + 章节触发
  */
 export function shouldPreExecute(action: PlayerAction): boolean {
-  return !['TALK', 'NARRATIVE'].includes(action.type)
+  return action.type !== 'NARRATIVE'
 }

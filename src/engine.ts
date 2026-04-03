@@ -565,16 +565,16 @@ export class GameEngine {
 
     // ── 规则预处理：分级意图识别 + 机械动作预执行 ──
     const action = await classifyIntent(input, session)
+    console.log(`[rules-agent] 输入: "${input}" → 分类: ${JSON.stringify(action)}`)
     let actionResult: ActionResult | null = null
 
     if (shouldPreExecute(action)) {
       actionResult = await executeAction(action, session)
-      // 把执行结果注入 DM 上下文（DM 只需叙事）
+      console.log(`[rules-agent] 预执行: ${action.type} → 成功:${actionResult.success} 工具:${actionResult.toolsCalled.join(',')}`)
+      console.log(`[rules-agent] 结果: ${actionResult.output.slice(0, 200)}`)
       parts.push(formatActionResult(actionResult))
-      // 记录已调用的工具（防止 DM 重复调用）
-      for (const t of actionResult.toolsCalled) {
-        // 后续 narrative validator 会跳过已调用的工具
-      }
+    } else {
+      console.log(`[rules-agent] 跳过预执行: ${action.type} (TALK/NARRATIVE 交给 DM)`)
     }
 
     parts.push(input)
@@ -611,7 +611,10 @@ export class GameEngine {
     }
 
     // Unified narrative validation
+    console.log(`[validator] 本轮工具调用: ${toolsCalled.map(t => t.toolName).join(',') || '无'}`)
+    console.log(`[validator] DM文本长度: ${fullText.length}字`)
     const narrativeWarnings = validateNarrative(fullText, toolsCalled, session)
+    if (narrativeWarnings.length) console.log(`[validator] 警告: ${narrativeWarnings.map(w => `${w.category}:${w.autoApplied ? '自动修正' : '仅警告'}`).join(', ')}`)
     for (const w of narrativeWarnings) {
       if (w.autoApplied) {
         yield { type: 'npc_update', text: `[信任修正] ${w.description}` }
