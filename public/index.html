@@ -71,21 +71,21 @@
   .msg.reconnect { color: #666 !important; font-size: 11px; }
   /* NPC 立绘 */
   .npc-portrait-bar {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 12px;
     background: linear-gradient(135deg, #0f1a2e 0%, #1a2a4e 100%);
-    border: 1px solid #0f3460; border-radius: 8px;
-    padding: 8px 12px; margin: 4px 0;
+    border: 1px solid #e6b800; border-radius: 10px;
+    padding: 10px 14px; margin: 6px 0;
   }
   .npc-portrait-bar img {
-    width: 56px; height: 56px; border-radius: 6px;
+    width: 80px; height: 80px; border-radius: 8px;
     border: 2px solid #e6b800; image-rendering: pixelated;
-    background: #0a0a1e;
+    background: #0a0a1e; flex-shrink: 0;
   }
   .npc-portrait-bar .npc-speak-name {
-    font-size: 14px; font-weight: bold; color: #e6b800;
+    font-size: 16px; font-weight: bold; color: #e6b800;
   }
   .npc-portrait-bar .npc-speak-hint {
-    font-size: 11px; color: #666; margin-top: 2px;
+    font-size: 12px; color: #888; margin-top: 3px;
   }
   /* 战斗怪物立绘面板 */
   .combat-portraits {
@@ -361,6 +361,11 @@
     padding: 12px; margin-bottom: 10px;
   }
   .npc-avatar { font-size: 32px; }
+  .npc-avatar img {
+    width: 48px; height: 48px; border-radius: 6px;
+    image-rendering: pixelated; background: #0a0a1e;
+    border: 1px solid #333;
+  }
   .npc-info { flex: 1; }
   .npc-name { font-size: 14px; font-weight: bold; color: #e0e0e0; }
   .npc-role { font-size: 11px; color: #888; margin-top: 2px; }
@@ -771,6 +776,11 @@ function closePanel() {
 
 // ─── Tab 切换 ───
 function switchTab(tab) {
+  // 再点同一个 tab → 关闭面板（回到游戏）
+  if (currentPanelId === tab || (tab === 'game' && !currentPanelId)) {
+    closePanel()
+    return
+  }
   if (tab === 'game') {
     closePanel()
     return
@@ -779,7 +789,6 @@ function switchTab(tab) {
     openPanel('more', '更多', renderMorePanel())
     return
   }
-  // Send command to server; panel will open when server responds with panel data
   const cmdMap = { status: '/status', quest: '/quest', map: '/map' }
   const cmd = cmdMap[tab]
   if (cmd && ws && !sending) {
@@ -1182,6 +1191,18 @@ function uploadSave(input) {
   reader.readAsText(file)
 }
 
+const NPC_PORTRAIT_MAP = {
+  '格雷格': 'portraits/greg-ironfist.png',
+  '小莉': 'portraits/xiao-li.png',
+  '艾琳娜': 'portraits/elena-silverleaf.png',
+  '维克多': 'portraits/victor-blackstone.png',
+  '卡恩': 'portraits/kahn-the-traveler.png',
+  '陈妈': 'portraits/chen-ma.png',
+  '格罗姆': 'portraits/grom.png',
+  '叶绿': 'portraits/ye-lv.png',
+  '韩猛': 'portraits/han-meng.png',
+}
+
 function renderNPCListPanel(data) {
   const npcs = data.npcs || []
   if (!npcs.length) return `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">尚未遇到任何人物</div></div>`
@@ -1189,8 +1210,11 @@ function renderNPCListPanel(data) {
   let html = ''
   for (const npc of npcs) {
     const trust = npc.trust ?? 50
+    const portrait = NPC_PORTRAIT_MAP[npc.name]
     html += `<div class="npc-card">`
-    html += `<div class="npc-avatar">${esc(npc.avatar || '👤')}</div>`
+    html += `<div class="npc-avatar">${portrait
+      ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
+      : esc(npc.avatar || '👤')}</div>`
     html += `<div class="npc-info">`
     html += `<div class="npc-name">${esc(npc.name)}</div>`
     if (npc.role) html += `<div class="npc-role">${esc(npc.role)}</div>`
