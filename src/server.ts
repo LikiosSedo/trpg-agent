@@ -68,6 +68,7 @@ wss.on('connection', (ws: WebSocket) => {
     } catch (err) {
       send('error', { text: (err as Error).message.slice(0, 100) })
     }
+    send('dm_end', {})
     return fullText
   }
 

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: trpg-agent
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npx tsx src/server.ts
+    envVars:
+      - key: PORT
+        value: 10000

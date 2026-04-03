@@ -137,6 +137,7 @@
 let ws = null
 let selectedClass = null
 let sending = false
+let currentDmDiv = null
 
 function selectClass(el) {
   document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('selected'))
@@ -167,22 +168,38 @@ function startGame() {
 
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data)
+    const container = document.getElementById('messages')
     switch (msg.type) {
       case 'dm':
-        appendMsg(msg.text, 'dm')
+        // Append streaming chunks to the same div
+        if (!currentDmDiv) {
+          currentDmDiv = document.createElement('div')
+          currentDmDiv.className = 'msg dm'
+          container.appendChild(currentDmDiv)
+        }
+        currentDmDiv.textContent += msg.text
+        container.scrollTop = container.scrollHeight
+        break
+      case 'dm_end':
+        // DM finished responding
+        currentDmDiv = null
+        sending = false
+        document.getElementById('send').disabled = false
         break
       case 'system':
         appendMsg(msg.text, 'system')
+        sending = false
+        document.getElementById('send').disabled = false
         break
       case 'error':
         appendMsg('⚠️ ' + msg.text, 'error')
+        sending = false
+        document.getElementById('send').disabled = false
         break
       case 'prologue':
         appendMsg(msg.text, 'prologue')
         break
     }
-    sending = false
-    document.getElementById('send').disabled = false
   }
 
   ws.onclose = () => { appendMsg('连接断开。刷新页面重新开始。', 'error'); sending = false }

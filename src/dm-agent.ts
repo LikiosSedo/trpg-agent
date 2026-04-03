@@ -20,9 +20,18 @@ import { buildDMPrompt } from './dm-prompt.js'
 // ─── Config ──────────────────────────────────
 
 function loadConfig() {
+  // 优先用环境变量（Render 等云平台），其次读本地配置文件
+  if (process.env.TRPG_API_KEY) {
+    return {
+      apiKey: process.env.TRPG_API_KEY,
+      baseUrl: process.env.TRPG_BASE_URL ?? 'https://your-llm-endpoint/v1',
+      model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
+      type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
+    }
+  }
   const configPath = join(homedir(), '.occ', 'config.json')
   if (!existsSync(configPath)) {
-    throw new Error(`未找到配置文件: ${configPath}\n请先配置: {"provider":"openai","apiKey":"...","baseUrl":"...","model":"..."}`)
+    throw new Error('未找到配置。设置环境变量 TRPG_API_KEY + TRPG_BASE_URL + TRPG_MODEL，或创建 ~/.occ/config.json')
   }
   return JSON.parse(readFileSync(configPath, 'utf-8'))
 }
@@ -41,6 +50,8 @@ export function initDMAgent(): void {
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
       type: config.type ?? 'openai',
+      headers: config.headers,
+      streamUsage: config.streamUsage,
     },
     tools: [
       DiceTool, MoveTool, LookTool, TalkTool,
