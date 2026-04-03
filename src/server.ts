@@ -78,6 +78,11 @@ app.post('/api/auth', (req, res) => {
   }
 })
 
+// 健康检查 + 诊断
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, password: PASSWORD_ENABLED, env: !!process.env.TRPG_API_KEY })
+})
+
 app.use(express.static(join(__dirname, '..', 'public')))
 app.get('/', (_req, res) => {
   res.sendFile(join(__dirname, '..', 'public', 'index.html'))
@@ -85,6 +90,7 @@ app.get('/', (_req, res) => {
 
 // 每个 WebSocket 连接 = 一个独立的游戏会话
 wss.on('connection', (ws: WebSocket, req) => {
+  console.log('[ws] connection from:', req.headers['user-agent']?.slice(0, 50))
   // WebSocket 连接时验证 token（从 URL query 传入）
   if (PASSWORD_ENABLED) {
     const url = new URL(req.url ?? '', `http://${req.headers.host}`)
@@ -174,7 +180,11 @@ wss.on('connection', (ws: WebSocket, req) => {
     }
 
     // 游戏指令
-    if (msg.type === 'input' && gameStarted) {
+    if (msg.type === 'input') {
+      if (!gameStarted) {
+        send('error', { text: '游戏未开始。请先创建角色（刷新页面）。' })
+        return
+      }
       const input = msg.text?.trim()
       if (!input) return
 
@@ -326,7 +336,17 @@ wss.on('connection', (ws: WebSocket, req) => {
     }
   })
 
-  ws.on('close', () => console.log('[server] player disconnected'))
+  ws.on('close', () => {
+    // 断线自动存档
+    if (connSession && gameStarted) {
+      try {
+        connSession.dossierData = dossier.toJSON()
+        getFacts().save('autosave')
+        console.log('[server] auto-saved on disconnect')
+      } catch {}
+    }
+    console.log('[server] player disconnected')
+  })
 })
 
 // ─── 纯文本版本的世界指南（去掉 chalk 颜色） ───
