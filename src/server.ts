@@ -23,6 +23,7 @@ import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { ChapterManager } from './chapter-manager.js'
+import { consumeActions, type SceneActions } from './tools/set-actions.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { checkBrokenPromises, changeTrust } from './trust-system.js'
 
@@ -114,6 +115,37 @@ function buildResumeRecap(session: GameSession): string {
   }
 
   return lines.join('\n')
+}
+
+/** DM 没调用 SetActions 时的默认选项（基于游戏状态生成） */
+function buildFallbackActions(session: GameSession | null): SceneActions {
+  if (!session) return { details: [], suggestions: [] }
+  const loc = session.worldState.currentLocation
+  const subLoc = session.worldState.currentSubLocation
+
+  // 在场 NPC → 推荐对话
+  const npcsHere = session.npcs.filter(n =>
+    n.location === loc && (n.subLocation ?? n.homeBase) === subLoc
+  )
+  const suggestions: string[] = []
+  if (npcsHere.length) {
+    suggestions.push(`和${npcsHere[0].name}交谈`)
+  }
+
+  // 当前位置的邻近子地点
+  const area = locations[loc]
+  if (area) {
+    const otherPois = area.pointsOfInterest.filter(
+      (p: any) => p.discovered !== false && p.id !== subLoc
+    )
+    if (otherPois.length) {
+      suggestions.push(`前往${(otherPois[0] as any).nameZh}`)
+    }
+  }
+
+  suggestions.push('四处看看')
+
+  return { details: [], suggestions: suggestions.slice(0, 3) }
 }
 
 // ─── Express + WebSocket Server ───
@@ -234,9 +266,14 @@ wss.on('connection', (ws: WebSocket, req) => {
     } catch (err) {
       send('error', { text: (err as Error).message.slice(0, 100) })
     }
+    // 收集 DM 设置的场景选项（SetActions 工具写入）
+    const dmActions = consumeActions()
+    const actions = dmActions ?? buildFallbackActions(connSession)
+
     send('dm_end', {
       combat: !!connSession?.combat?.active,
       pendingMonster: !!connSession?.combat?.pendingMonsterTurn,
+      actions,
     })
     return fullText
   }
