@@ -10,6 +10,7 @@ import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { QuestManager } from '../quest-manager.js'
 import { ChapterManager } from '../chapter-manager.js'
+import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from '../npc-mobility.js'
 
 export const TalkTool: Tool = {
   name: 'Talk',
@@ -41,6 +42,17 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const npcLoc = locationNames[npc.location] ?? npc.location
       const recap = facts.getNPCRecap(npcId)
       return { output: `${npc.name}不在这里（目前在${npcLoc}），无法直接对话。\n${recap}`, isError: true }
+    }
+
+    // 子地点检查：玩家必须和NPC在同一子地点
+    const npcSub = getNPCSubLocation(npc)
+    const playerSub = getPlayerSubLocation(session)
+    if (npcSub && playerSub && npcSub !== playerSub) {
+      const poiName = getSubLocationName(npcSub)
+      return {
+        output: `${npc.name}不在这里，目前在${poiName}。你需要先去那里（Move到${npcSub}）。`,
+        isError: true,
+      }
     }
 
     // 通知章节系统（位置检查通过后才触发）

@@ -86,6 +86,8 @@ export interface CombatState {
 
 // ─── NPC ──────────────────────────────────────
 
+export type NPCMobility = 'stationary' | 'local' | 'roaming'
+
 export type NPCRole = 'blacksmith' | 'herbalist' | 'guild_leader' | 'guild_officer'
                      | 'innkeeper' | 'mayor' | 'bard' | 'child' | 'general'
 
@@ -100,6 +102,9 @@ export interface NPC {
   role?: NPCRole
   inventory?: Item[]
   shopPricing?: Record<string, number> // item name -> gold price
+  subLocation?: string          // 当前所在子地点 POI id
+  homeBase?: string             // 默认驻留子地点 POI id
+  mobility?: NPCMobility        // 移动能力
 }
 
 // ─── 任务 ──────────────────────────────────────
@@ -148,6 +153,7 @@ export interface GameEvent {
 
 export interface WorldState {
   currentLocation: string
+  currentSubLocation?: string   // 当前子地点 POI id
   timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night'
   flags: Record<string, string | number | boolean> // 剧情标记 + 运行时数值
 }

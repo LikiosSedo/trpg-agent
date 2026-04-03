@@ -87,6 +87,9 @@ export function createInitialNPCs(): NPC[] {
         { name: '火把', type: 'misc', description: '普通的火把，可照亮周围区域。', bonus: 0 },
         { name: '火把', type: 'misc', description: '普通的火把，可照亮周围区域。', bonus: 0 },
       ],
+      homeBase: 'shattered-shield-tavern',
+      mobility: 'local',
+      subLocation: 'shattered-shield-tavern',
     },
     {
       name: '小莉',
@@ -98,6 +101,9 @@ export function createInitialNPCs(): NPC[] {
       mood: '好奇',
       role: 'child',
       inventory: [],
+      homeBase: 'shattered-shield-tavern',
+      mobility: 'stationary',
+      subLocation: 'shattered-shield-tavern',
     },
     {
       name: '艾琳娜',
@@ -112,6 +118,9 @@ export function createInitialNPCs(): NPC[] {
         { name: '公会徽章', type: 'quest', description: '冒险者公会的银质徽章，证明持有者是受认可的冒险者。' },
         { name: '矿道通行证', type: 'quest', description: '授权持有者进入灰脊矿道中层的官方文件。' },
       ],
+      homeBase: 'adventurer-guild',
+      mobility: 'local',
+      subLocation: 'adventurer-guild',
     },
     {
       name: '维克多',
@@ -125,6 +134,9 @@ export function createInitialNPCs(): NPC[] {
       inventory: [
         { name: '达里安的日志', type: 'quest', description: '一本破旧的日志，记录了20年前矿道深处的发现。封面有烧焦的痕迹。' },
       ],
+      homeBase: 'mayor-office',
+      mobility: 'local',
+      subLocation: 'mayor-office',
     },
     {
       name: '卡恩',
@@ -136,6 +148,9 @@ export function createInitialNPCs(): NPC[] {
       mood: '从容',
       role: 'bard',
       inventory: [],
+      homeBase: 'town-square',
+      mobility: 'roaming',
+      subLocation: 'town-square',
     },
     {
       name: '陈妈',
@@ -155,6 +170,9 @@ export function createInitialNPCs(): NPC[] {
       inventory: [
         { name: '热汤', type: 'misc', description: '一碗冒着热气的浓汤，喝下后恢复些许精力。' },
       ],
+      homeBase: 'dawns-rest-inn',
+      mobility: 'local',
+      subLocation: 'dawns-rest-inn',
     },
     {
       name: '格罗姆',
@@ -187,6 +205,9 @@ export function createInitialNPCs(): NPC[] {
         'Chain Shirt': 50,
         '麻绳': 5,
       },
+      homeBase: 'sturdy-anvil',
+      mobility: 'local',
+      subLocation: 'sturdy-anvil',
     },
     {
       name: '叶绿',
@@ -216,6 +237,9 @@ export function createInitialNPCs(): NPC[] {
         '解毒剂': 15,
         '暗影防护药水': 40,
       },
+      homeBase: 'greenleaf-apothecary',
+      mobility: 'local',
+      subLocation: 'greenleaf-apothecary',
     },
     {
       name: '韩猛',
@@ -233,6 +257,9 @@ export function createInitialNPCs(): NPC[] {
       mood: '焦虑',
       role: 'guild_officer',
       inventory: [],
+      homeBase: 'adventurer-guild',
+      mobility: 'local',
+      subLocation: 'adventurer-guild',
     },
   ]
 }
@@ -267,6 +294,7 @@ export function createGameSession(name: string, classId: string): GameSession {
     quests: [],
     worldState: {
       currentLocation: 'dawnbreak-town',
+      currentSubLocation: 'town-square',
       timeOfDay: 'night',
       flags: {},
     },

@@ -23,6 +23,7 @@ import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { ChapterManager } from './chapter-manager.js'
+import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -46,6 +47,17 @@ function migrateSession(session: GameSession): void {
         if (npc.shopPricing === undefined) npc.shopPricing = def.shopPricing
       }
     }
+    if ((npc as any).homeBase === undefined) {
+      const def = defaults.find(d => d.name === npc.name)
+      if (def) {
+        ;(npc as any).homeBase = (def as any).homeBase
+        ;(npc as any).mobility = (def as any).mobility
+        if ((npc as any).subLocation === undefined) (npc as any).subLocation = (def as any).subLocation
+      }
+    }
+  }
+  if ((session.worldState as any).currentSubLocation === undefined) {
+    (session.worldState as any).currentSubLocation = getDefaultSubLocation(session.worldState.currentLocation)
   }
 }
 
@@ -61,6 +73,11 @@ function buildResumeRecap(session: GameSession): string {
     `[断线重连 — 对话回顾，请基于以下信息延续之前的对话，不要重新开场]`,
     `当前位置: ${loc} | 第${session.turnCount}轮`,
   ]
+
+  const subLocId = (session.worldState as any).currentSubLocation as string | undefined
+  if (subLocId) {
+    lines[1] = `当前位置: ${loc} · ${getSubLocationName(subLocId)} | 第${session.turnCount}轮`
+  }
 
   // 最近事件
   const recentEvents = session.events.slice(-5)
@@ -437,6 +454,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         return
       }
       if (input === '/map') {
+        const currentLoc = locations[session.worldState.currentLocation]
         send('panel', { panel: 'map', data: {
           currentLocation: session.worldState.currentLocation,
           locations: Object.values(locations).map(loc => ({
@@ -445,6 +463,19 @@ wss.on('connection', (ws: WebSocket, req) => {
             danger: loc.dangerLevel,
             description: loc.description,
           })),
+          currentSubLocation: (session.worldState as any).currentSubLocation,
+          subLocations: currentLoc?.pointsOfInterest
+            ?.filter((p: any) => p.discovered !== false)
+            .map((p: any) => ({
+              id: p.id,
+              nameZh: p.nameZh,
+              description: p.description,
+              isCurrent: p.id === (session.worldState as any).currentSubLocation,
+              npcs: session.npcs
+                .filter(n => n.location === session.worldState.currentLocation &&
+                  ((n as any).subLocation ?? (n as any).homeBase) === p.id)
+                .map(n => n.name),
+            })) ?? [],
         }})
         return
       }

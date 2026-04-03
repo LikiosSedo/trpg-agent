@@ -394,6 +394,19 @@
   .map-detail .detail-danger { color: #ff8c42; font-size: 12px; margin-bottom: 4px; }
   .map-detail .detail-desc { color: #aaa; font-size: 12px; line-height: 1.5; }
 
+  /* ─── Sub-location list ─── */
+  .subloc-item {
+    padding: 8px 12px; border-bottom: 1px solid #0f3460;
+    cursor: pointer; transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .subloc-item:last-child { border-bottom: none; }
+  .subloc-item:hover { background: #0f3460; }
+  .subloc-item.current { background: #1a2a4e; border-left: 3px solid #e6b800; }
+  .subloc-name { font-size: 13px; color: #e0e0e0; }
+  .subloc-item.current .subloc-name { color: #e6b800; font-weight: bold; }
+  .subloc-npcs { font-size: 11px; color: #888; margin-top: 2px; }
+
   /* ─── DM Thinking ─── */
   .thinking {
     color: #888; font-style: italic; font-size: 14px; padding: 4px 0;
@@ -876,6 +889,22 @@ function renderMapPanel(data) {
   if (!areas.length) {
     html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">地图未知</div></div>`
   }
+
+  // Sub-location list (when available)
+  const subLocs = data.subLocations || []
+  if (subLocs.length > 0) {
+    html += `<div class="panel-card" style="margin-top:12px"><div class="panel-card-title">📍 当前区域内地点</div>`
+    for (const sl of subLocs) {
+      const isCurrent = sl.isCurrent
+      const npcList = (sl.npcs || []).join('、')
+      html += `<div class="subloc-item${isCurrent ? ' current' : ''}" onclick="quickMove('${esc(sl.nameZh)}')">`
+      html += `<div class="subloc-name">${isCurrent ? '📍 ' : ''}${esc(sl.nameZh)}</div>`
+      if (npcList) html += `<div class="subloc-npcs">👤 ${esc(npcList)}</div>`
+      html += `</div>`
+    }
+    html += `</div>`
+  }
+
   return html
 }
 
@@ -1143,6 +1172,14 @@ function moreCmd(cmd, label) {
   ws.send(JSON.stringify({ type: 'input', text: cmd }))
   sending = true
   document.getElementById('send').disabled = true
+}
+
+function quickMove(destName) {
+  if (!ws || sending) return
+  ws.send(JSON.stringify({ type: 'input', text: '我要去' + destName }))
+  sending = true
+  document.getElementById('send').disabled = true
+  closePanel()
 }
 
 function esc(str) {

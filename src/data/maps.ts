@@ -9,6 +9,10 @@ export interface PointOfInterest {
   position: { x: number; y: number };
   /** Whether this POI is initially visible to players */
   discovered: boolean;
+  /** Is this the default entry point when entering the area? */
+  isDefault?: boolean;
+  /** Short arrival text */
+  arrivalText?: string;
 }
 
 export interface Location {
@@ -68,12 +72,23 @@ export const dawnbreakTown: Location = {
   ].join('\n'),
   pointsOfInterest: [
     {
+      id: 'town-square',
+      name: 'Town Square',
+      nameZh: '镇中广场',
+      description: '破晓镇的中心广场，晨光石碑矗立其中。几条道路从这里通向镇上各处。',
+      position: { x: 7, y: 14 },
+      discovered: true,
+      isDefault: true,
+      arrivalText: '你来到破晓镇中心的广场，四周是低矮的石墙建筑。',
+    },
+    {
       id: 'dawn-stele',
       name: 'Dawn Stele',
       nameZh: '晨光石碑',
       description: '镇中心的古代石碑，刻有无人能读的符文。暗影教团相信它是封印之钥。',
       position: { x: 7, y: 5 },
       discovered: true,
+      arrivalText: '古老的石碑在月光下泛着淡淡银灰色的光。',
     },
     {
       id: 'dawns-rest-inn',
@@ -82,6 +97,7 @@ export const dawnbreakTown: Location = {
       description: '冒险者常驻之处，老板娘陈妈消息灵通。',
       position: { x: 3, y: 3 },
       discovered: true,
+      arrivalText: '推开旅店木门，暖意和饭菜香扑面而来。',
     },
     {
       id: 'sturdy-anvil',
@@ -90,6 +106,7 @@ export const dawnbreakTown: Location = {
       description: '矮人铁匠格罗姆经营，出售武器护甲。',
       position: { x: 8, y: 3 },
       discovered: true,
+      arrivalText: '叮叮当当的锤打声从铁匠铺中传来。',
     },
     {
       id: 'greenleaf-apothecary',
@@ -98,6 +115,7 @@ export const dawnbreakTown: Location = {
       description: '半精灵药剂师叶绿经营。其助手是暗影教团的蚀语者。',
       position: { x: 3, y: 7 },
       discovered: true,
+      arrivalText: '草药堂门口挂着几束晾晒的药草，空气中弥漫着淡淡的草木香。',
     },
     {
       id: 'adventurer-guild',
@@ -106,6 +124,7 @@ export const dawnbreakTown: Location = {
       description: '由退役战士"独臂"韩猛管理，发布任务、提供情报。',
       position: { x: 7, y: 7 },
       discovered: true,
+      arrivalText: '公会大门上刻着交叉的剑与盾徽记。',
     },
     {
       id: 'mayor-office',
@@ -114,6 +133,7 @@ export const dawnbreakTown: Location = {
       description: '镇长维克多·黑石的办公室，暗中收受商会贿赂。',
       position: { x: 3, y: 11 },
       discovered: true,
+      arrivalText: '镇长府大门紧闭，门口站着一个无精打采的卫兵。',
     },
     {
       id: 'silver-scale-guild',
@@ -122,6 +142,7 @@ export const dawnbreakTown: Location = {
       description: '控制矿石贸易的商会总部，会长卢银舟富甲一方。',
       position: { x: 8, y: 11 },
       discovered: true,
+      arrivalText: '商会大厅富丽堂皇，与镇上其他建筑格格不入。',
     },
     {
       id: 'shattered-shield-tavern',
@@ -130,6 +151,7 @@ export const dawnbreakTown: Location = {
       description: '前佣兵格雷格·铁拳头经营的酒馆，冒险者聚集之处。帮工小莉拥有灵视能力。',
       position: { x: 12, y: 7 },
       discovered: true,
+      arrivalText: '碎盾亭的招牌在风中吱呀作响，暖黄灯光从窗内透出。',
     },
   ],
 };
@@ -161,6 +183,16 @@ export const twilightWoods: Location = {
     'TTTTTTTTTTTTTTTT',
   ].join('\n'),
   pointsOfInterest: [
+    {
+      id: 'forest-entrance',
+      name: 'Forest Entrance',
+      nameZh: '森林入口',
+      description: '暮色森林边缘，古木参天，阳光透过枝叶洒下斑驳光影。',
+      position: { x: 5, y: 14 },
+      discovered: true,
+      isDefault: true,
+      arrivalText: '踏入森林边缘，光线骤然暗淡，空气变得潮湿。',
+    },
     {
       id: 'old-lumber-camp',
       name: 'Old Lumber Camp',
@@ -225,6 +257,8 @@ export const greyspineMines: Location = {
       description: '仍有矿工作业，但产量骤降。偶尔能听到深处回音。',
       position: { x: 8, y: 3 },
       discovered: true,
+      isDefault: true,
+      arrivalText: '矿道入口处冷风扑面，生锈的铁轨向黑暗深处延伸。',
     },
     {
       id: 'abandoned-barracks',
@@ -280,6 +314,16 @@ export const shatterstoneWastes: Location = {
     '................',
   ].join('\n'),
   pointsOfInterest: [
+    {
+      id: 'wastes-entrance',
+      name: 'Wasteland Entrance',
+      nameZh: '荒原入口',
+      description: '干燥的空气扑面而来，碎裂的灰色岩石如骨骼般从黄沙中刺出。',
+      position: { x: 10, y: 13 },
+      discovered: true,
+      isDefault: true,
+      arrivalText: '踏上荒原，脚下碎石嘎吱作响，远处隐约可见烟柱。',
+    },
     {
       id: 'orc-camp',
       name: 'Orc War Camp',

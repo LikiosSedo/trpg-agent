@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import type { GameSession, GameEvent, NPC } from './types.js'
 import { getCombatSummary } from './combat-manager.js'
+import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
 
 export class GameFactStore {
   constructor(private session: GameSession) {}
@@ -50,10 +51,12 @@ export class GameFactStore {
     }
     const loc = locationNames[worldState.currentLocation] ?? worldState.currentLocation
     const time = timeNames[worldState.timeOfDay] ?? worldState.timeOfDay
+    const subLocId = (this.session as any).worldState.currentSubLocation as string | undefined
+    const subLocName = subLocId ? getSubLocationName(subLocId) : ''
 
     return [
       `=== 游戏状态（第${turnCount}轮） ===`,
-      `位置: ${loc} | 时间: ${time}`,
+      `位置: ${loc}${subLocName ? ' · ' + subLocName : ''} | 时间: ${time}`,
       `玩家: ${player.name}（等级${player.level}）生命:${player.hp}/${player.maxHp} 金币:${player.gold}`,
       player.equipped.weapon ? `武器: ${player.equipped.weapon.name}` : '',
       player.equipped.armor ? `护甲: ${player.equipped.armor.name}` : '',
@@ -62,7 +65,7 @@ export class GameFactStore {
       player.clues.length ? `已知线索: ${player.clues.join('；')}` : '',
       criticalEvents.length ? `关键事件:\n${criticalEvents.join('\n')}` : '',
       recentEvents.length ? `最近发生:\n${recentEvents.join('\n')}` : '',
-      npcs.length ? `NPC状态:\n${npcs.map(n => `- ${n.name}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}）`).join('\n')}` : '',
+      npcs.length ? `NPC状态:\n${npcs.map(n => `- ${n.name}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）`).join('\n')}` : '',
       (() => {
         const shopNpcs = this.session.npcs.filter(n => n.shopPricing && (n.inventory ?? []).length > 0)
         if (!shopNpcs.length) return ''

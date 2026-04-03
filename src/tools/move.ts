@@ -9,6 +9,7 @@ import type { Tool } from 'open-claude-cli/engine'
 import { locations, connections } from '../data/maps.js'
 import { getSession, getFacts } from '../game-state.js'
 import { ChapterManager } from '../chapter-manager.js'
+import { findSubLocationArea } from '../npc-mobility.js'
 
 export const MoveTool: Tool = {
   name: 'Move',
@@ -36,46 +37,108 @@ export const MoveTool: Tool = {
       return { output: `战斗移动：玩家移至坐标(${input.combatPosition?.x ?? '?'},${input.combatPosition?.y ?? '?'})。` }
     }
 
-    // Find connection (bidirectional)
-    const conn = connections.find(
-      c => (c.from === current && c.to === destination) ||
-           (c.to === current && c.from === destination),
-    )
-    if (!conn) {
-      const loc = locations[current]
-      const available = connections
-        .filter(c => c.from === current || c.to === current)
-        .map(c => c.from === current ? c.to : c.from)
+    // Check if destination is an area
+    const destArea = locations[destination]
+
+    if (destArea) {
+      // ── Inter-area movement ──
+      const conn = connections.find(
+        c => (c.from === current && c.to === destination) ||
+             (c.to === current && c.from === destination),
+      )
+      if (!conn) {
+        const loc = locations[current]
+        const available = connections
+          .filter(c => c.from === current || c.to === current)
+          .map(c => c.from === current ? c.to : c.from)
+        return {
+          output: `无法从${loc?.nameZh ?? current}到达${destination}。可前往：${available.join(', ') || '无'}。`,
+          isError: true,
+        }
+      }
+
+      session.worldState.currentLocation = destination
+      // Set sub-location to area's default entrance
+      const defaultPoi = destArea.pointsOfInterest.find((p: any) => p.isDefault)
+      session.worldState.currentSubLocation = defaultPoi?.id ?? destArea.pointsOfInterest[0]?.id
+      facts.addEvent(`移动至${destArea.nameZh}`)
+
+      // 通知章节系统
+      if (session.chapter) {
+        new ChapterManager(session).onEvent('arrive', destination)
+      }
+
+      const npcsHere = session.npcs.filter(n => n.location === destination &&
+        (!n.subLocation || n.subLocation === session.worldState.currentSubLocation))
+        .map(n => n.name)
+      const subLocs = destArea.pointsOfInterest
+        .filter((p: any) => p.discovered && p.id !== session.worldState.currentSubLocation)
+        .map((p: any) => p.nameZh)
+
       return {
-        output: `无法从${loc?.nameZh ?? current}到达${destination}。可前往：${available.join(', ') || '无'}。`,
-        isError: true,
+        output: [
+          `移动：${locations[current]?.nameZh ?? current} → ${destArea.nameZh}。${conn.description}`,
+          defaultPoi?.arrivalText ?? `你来到了${destArea.nameZh}。`,
+          npcsHere.length ? `你看到了：${npcsHere.join('、')}。` : '',
+          subLocs.length ? `可前往：${subLocs.join('、')}。` : '',
+        ].filter(Boolean).join('\n'),
       }
     }
 
-    const dest = locations[destination]
-    if (!dest) return { output: `未知地点：${destination}`, isError: true }
+    // ── Intra-area movement ──
+    const currentArea = locations[current]
+    if (!currentArea) return { output: `当前位置未知`, isError: true }
 
-    session.worldState.currentLocation = destination
+    // Find the POI in current area
+    const targetPoi = currentArea.pointsOfInterest.find(
+      (p: any) => p.id === destination || p.nameZh === destination || p.name === destination
+    )
 
-    // 通知章节系统
-    if (session.chapter) {
-      new ChapterManager(session).onEvent('arrive', destination)
+    if (targetPoi) {
+      if (!targetPoi.discovered) {
+        return { output: `你还没有发现这个地方。`, isError: true }
+      }
+
+      session.worldState.currentSubLocation = targetPoi.id
+      facts.addEvent(`前往${targetPoi.nameZh}`)
+
+      // 通知章节系统
+      if (session.chapter) {
+        new ChapterManager(session).onEvent('arrive', targetPoi.id)
+      }
+
+      // NPCs at this sub-location
+      const npcsHere = session.npcs
+        .filter(n => n.location === current &&
+          (n.subLocation ?? n.homeBase) === targetPoi.id)
+        .map(n => n.name)
+
+      return {
+        output: [
+          targetPoi.arrivalText ?? `你来到了${targetPoi.nameZh}。`,
+          targetPoi.description,
+          npcsHere.length ? `这里有：${npcsHere.join('、')}。` : '',
+        ].filter(Boolean).join('\n'),
+      }
     }
 
-    facts.addEvent(`移动至${dest.nameZh}(${dest.id})`)
+    // ── Check if it's a POI in a different area ──
+    const otherArea = findSubLocationArea(destination)
+    if (otherArea) {
+      const areaName = locations[otherArea]?.nameZh ?? otherArea
+      return { output: `${destination}在${areaName}，你需要先前往那个区域。`, isError: true }
+    }
 
-    // 到达后自动描述新地点（减少玩家操作摩擦）
-    const npcsHere = session.npcs.filter(n => n.location === destination).map(n => n.name)
-    const poiList = dest.pointsOfInterest?.map((p: any) => p.nameZh ?? p.name) ?? []
-
+    // ── Nothing matched ──
+    const available = currentArea.pointsOfInterest
+      .filter((p: any) => p.discovered)
+      .map((p: any) => `${p.nameZh}(${p.id})`)
+    const areaConnections = connections
+      .filter(c => c.from === current || c.to === current)
+      .map(c => c.from === current ? c.to : c.from)
     return {
-      output: [
-        `移动：${locations[current]?.nameZh ?? current} → ${dest.nameZh}。${conn.description}`,
-        `你来到了${dest.nameZh}。${dest.description}`,
-        npcsHere.length ? `你看到了：${npcsHere.join('、')}。` : '',
-        poiList.length ? `附近有：${poiList.join('、')}。` : '',
-        `（可以 Talk 对话、Look 仔细观察、Search 搜索、或继续移动）`,
-      ].filter(Boolean).join('\n'),
+      output: `无法前往"${destination}"。\n区域内可去：${available.join('、') || '无'}\n其他区域：${areaConnections.join('、') || '无'}`,
+      isError: true,
     }
   },
 }
