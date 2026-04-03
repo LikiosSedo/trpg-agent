@@ -275,6 +275,23 @@
   .more-item .more-icon { font-size: 28px; margin-bottom: 6px; }
   .more-item .more-label { font-size: 14px; color: #ccc; }
 
+  /* 故事回顾 */
+  .recap-item {
+    padding: 6px 0; border-bottom: 1px solid #0f3460; font-size: 13px;
+    color: #ccc; line-height: 1.5;
+  }
+  .recap-item:last-child { border-bottom: none; }
+  .recap-turn {
+    display: inline-block; background: #0f3460; color: #888; font-size: 11px;
+    padding: 1px 6px; border-radius: 4px; margin-right: 6px;
+  }
+  .recap-item.clue { color: #64b5f6; padding-left: 8px; }
+  .recap-item.clue::before { content: '• '; color: #64b5f6; }
+  .recap-item.dialogue { color: #aaa; font-size: 12px; padding-left: 12px; }
+  .recap-npc-name { color: #e6b800; font-size: 13px; font-weight: bold; margin-top: 8px; }
+  .recap-item.quest { font-size: 13px; }
+  .recap-item.quest.done { color: #4caf50; }
+
   /* NPC 卡片 */
   .npc-card {
     display: flex; align-items: center; gap: 12px;
@@ -513,8 +530,8 @@ function saveMessage(role, text) {
     const raw = localStorage.getItem(SAVE_KEYS.messages)
     const msgs = raw ? JSON.parse(raw) : []
     msgs.push({ role, text: text.slice(0, 500) })
-    // 保留最近 20 条
-    while (msgs.length > 20) msgs.shift()
+    // 保留最近 50 条
+    while (msgs.length > 50) msgs.shift()
     localStorage.setItem(SAVE_KEYS.messages, JSON.stringify(msgs))
   } catch {}
 }
@@ -866,6 +883,62 @@ function toggleMapDetail(idx) {
   box.innerHTML = h
 }
 
+function renderRecapPanel(data) {
+  let html = ''
+  const critical = data.critical || []
+  if (critical.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">⚡ 关键事件</div>`
+    for (const e of critical) {
+      html += `<div class="recap-item"><span class="recap-turn">第${e.turn}轮</span>${esc(e.fact)}</div>`
+    }
+    html += `</div>`
+  }
+  const recent = data.recent || []
+  if (recent.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">📜 近期事件</div>`
+    for (const e of recent) {
+      html += `<div class="recap-item"><span class="recap-turn">第${e.turn}轮</span>${esc(e.fact)}</div>`
+    }
+    html += `</div>`
+  }
+  const clues = data.clues || []
+  if (clues.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">🔍 已知线索</div>`
+    for (const c of clues) {
+      html += `<div class="recap-item clue">${esc(c)}</div>`
+    }
+    html += `</div>`
+  }
+  const npcDialogues = data.npcDialogues || []
+  if (npcDialogues.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">💬 对话记录</div>`
+    for (const nd of npcDialogues) {
+      html += `<div class="recap-npc-name">${esc(nd.name)}</div>`
+      for (const log of nd.logs.slice(-5)) {
+        html += `<div class="recap-item dialogue">${esc(log)}</div>`
+      }
+    }
+    html += `</div>`
+  }
+  const quests = data.quests || {}
+  const active = quests.active || []
+  const completed = quests.completed || []
+  if (active.length || completed.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">📋 任务</div>`
+    for (const q of active) {
+      html += `<div class="recap-item quest active">🔸 ${esc(q)}</div>`
+    }
+    for (const q of completed) {
+      html += `<div class="recap-item quest done">✅ ${esc(q)}</div>`
+    }
+    html += `</div>`
+  }
+  if (!critical.length && !recent.length && !clues.length && !npcDialogues.length && !active.length && !completed.length) {
+    html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">冒险才刚刚开始…</div></div>`
+  }
+  return html
+}
+
 function renderMorePanel() {
   return `<div class="more-grid">
     <div class="more-item" onclick="moreCmd('/npc', '人物')">
@@ -879,6 +952,9 @@ function renderMorePanel() {
     </div>
     <div class="more-item" onclick="triggerUploadSave()">
       <div class="more-icon">📤</div><div class="more-label">上传存档</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/recap', '故事回顾')">
+      <div class="more-icon">📖</div><div class="more-label">故事回顾</div>
     </div>
     <div class="more-item" onclick="moreCmd('/help', '帮助')">
       <div class="more-icon">📋</div><div class="more-label">帮助</div>
@@ -1099,7 +1175,8 @@ function handleWsMessage(e) {
       sending = false
       document.getElementById('send').disabled = false
       const panelId = msg.panel || 'info'
-      const title = msg.title || '信息'
+      const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', recap: '故事回顾', help: '帮助' }
+      const title = msg.title || PANEL_TITLES[panelId] || '信息'
       let html = ''
       switch (panelId) {
         case 'status':   html = renderStatusPanel(msg.data || {}); break
@@ -1107,6 +1184,7 @@ function handleWsMessage(e) {
         case 'map':      html = renderMapPanel(msg.data || {}); break
         case 'npc':      html = renderNPCListPanel(msg.data || {}); break
         case 'inventory': html = renderInventoryPanel(msg.data || {}); break
+        case 'recap':    html = renderRecapPanel(msg.data || {}); break
         default:         html = `<div class="panel-card"><div style="white-space:pre-wrap;color:#ccc">${esc(msg.text || JSON.stringify(msg.data, null, 2))}</div></div>`
       }
       openPanel(panelId, title, html)

@@ -412,6 +412,28 @@ wss.on('connection', (ws: WebSocket, req) => {
         gameStarted = false
         return
       }
+      if (input === '/recap') {
+        const events = session.events
+        const critical = events.filter(e => e.importance === 'critical')
+        const recent = events.slice(-10)
+        const npcLogs: Array<{name: string; logs: string[]}> = []
+        for (const npc of session.npcs) {
+          if ((npc.interactionLog ?? []).length > 0) {
+            npcLogs.push({ name: npc.name, logs: npc.interactionLog! })
+          }
+        }
+        send('panel', { panel: 'recap', data: {
+          critical: critical.map(e => ({ turn: e.turn, fact: e.fact })),
+          recent: recent.map(e => ({ turn: e.turn, fact: e.fact })),
+          clues: session.player.clues,
+          npcDialogues: npcLogs,
+          quests: {
+            active: session.quests.filter(q => q.status === 'active').map(q => q.name),
+            completed: session.quests.filter(q => q.status === 'completed').map(q => q.name),
+          },
+        }})
+        return
+      }
       if (input === '/help') {
         send('panel', { panel: 'help', data: {
           commands: [
@@ -422,6 +444,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             { cmd: '/world', desc: '查看世界指南' },
             { cmd: '/map', desc: '查看地图' },
             { cmd: '/inventory', desc: '查看背包' },
+            { cmd: '/recap', desc: '故事回顾' },
             { cmd: '/save', desc: '保存游戏' },
             { cmd: '/saves', desc: '查看存档列表' },
             { cmd: '/load <名>', desc: '加载存档' },
