@@ -17,41 +17,50 @@ export interface ClassTemplate {
   spells: Spell[]
 }
 
+// 5 级冒险者模板——足够探索世界，不需要刷级
 export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
   fighter: {
     nameZh: '剑士',
-    abilities: { STR: 16, DEX: 12, CON: 14, INT: 8, WIS: 10, CHA: 10 },
+    abilities: { STR: 18, DEX: 14, CON: 16, INT: 8, WIS: 12, CHA: 10 },
     skills: ['athletics', 'intimidation'],
-    maxHp: 12,
-    spells: [],
+    maxHp: 38,
+    spells: [
+      { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 1, remaining: 1 },
+    ],
   },
   mage: {
     nameZh: '法师',
-    abilities: { STR: 8, DEX: 12, CON: 10, INT: 16, WIS: 14, CHA: 10 },
+    abilities: { STR: 8, DEX: 14, CON: 12, INT: 18, WIS: 14, CHA: 10 },
     skills: ['arcana', 'investigation'],
-    maxHp: 8,
+    maxHp: 26,
     spells: [
-      { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 1d10 fire damage on a ranged spell attack hit.', usesPerRest: 0, remaining: 0 },
-      { name: 'Magic Missile', description: '三枚魔法飞弹自动命中', effect: 'Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.', usesPerRest: 3, remaining: 3 },
-      { name: 'Shield', description: '魔法护盾', effect: 'Reaction: +5 AC until the start of your next turn.', usesPerRest: 3, remaining: 3 },
-      { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 3, remaining: 3 },
+      { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 2d10 fire damage on a ranged spell attack hit.', usesPerRest: 0, remaining: 0 },
+      { name: 'Magic Missile', description: '三枚魔法飞弹自动命中', effect: 'Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.', usesPerRest: 4, remaining: 4 },
+      { name: 'Shield', description: '魔法护盾', effect: 'Reaction: +5 AC until the start of your next turn.', usesPerRest: 4, remaining: 4 },
+      { name: 'Fireball', description: '火球术', effect: 'Deal 8d6 fire damage in 20ft radius. DEX save DC 14 for half.', usesPerRest: 2, remaining: 2 },
+      { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 4, remaining: 4 },
     ],
   },
   ranger: {
     nameZh: '游侠',
-    abilities: { STR: 12, DEX: 16, CON: 12, INT: 10, WIS: 14, CHA: 8 },
-    skills: ['stealth', 'perception'],
-    maxHp: 10,
-    spells: [],
+    abilities: { STR: 14, DEX: 18, CON: 14, INT: 10, WIS: 16, CHA: 8 },
+    skills: ['stealth', 'perception', 'sleight_of_hand'],
+    maxHp: 34,
+    spells: [
+      { name: "Hunter's Mark", description: '猎人印记', effect: '标记目标，对其攻击额外1d6伤害。持续1小时。', usesPerRest: 3, remaining: 3 },
+      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 2, remaining: 2 },
+    ],
   },
   cleric: {
     nameZh: '牧师',
-    abilities: { STR: 14, DEX: 10, CON: 14, INT: 10, WIS: 16, CHA: 12 },
-    skills: ['medicine', 'insight'],
-    maxHp: 10,
+    abilities: { STR: 16, DEX: 10, CON: 16, INT: 10, WIS: 18, CHA: 14 },
+    skills: ['medicine', 'insight', 'persuasion'],
+    maxHp: 36,
     spells: [
-      { name: 'Cure Wounds', description: '触摸治疗伤口', effect: 'Restore 1d8+WIS modifier HP to a creature you touch.', usesPerRest: 3, remaining: 3 },
-      { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 3, remaining: 3 },
+      { name: 'Cure Wounds', description: '触摸治疗伤口', effect: 'Restore 2d8+WIS modifier HP to a creature you touch.', usesPerRest: 4, remaining: 4 },
+      { name: 'Guiding Bolt', description: '指引之光', effect: 'Deal 4d6 radiant damage. Next attack on target has advantage.', usesPerRest: 3, remaining: 3 },
+      { name: 'Shield of Faith', description: '信仰之盾', effect: '+2 AC for 10 minutes.', usesPerRest: 2, remaining: 2 },
+      { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 4, remaining: 4 },
     ],
   },
 }
@@ -272,19 +281,21 @@ export function createGameSession(name: string, classId: string): GameSession {
 
   const player: PlayerCharacter = {
     name,
-    level: 1,
+    level: 5,
     abilities: { ...template.abilities },
     abilityModifiers: mods,
     skills: [...template.skills],
     hp: template.maxHp,
     maxHp: template.maxHp,
     xp: 0,
-    gold: 0,
-    inventory: [],
+    gold: 20,
+    inventory: [
+      { name: 'Healing Potion', type: 'potion', description: '红色治疗药水。恢复2d4+2生命值。', bonus: 2 },
+    ],
     spells: template.spells.map(s => ({ ...s })),
     clues: [],
     equipped: {
-      weapon: { name: '生锈的短剑', type: 'weapon', description: '一把锈迹斑斑的短剑，勉强能用。Deals 1d6 piercing damage.', bonus: 0 },
+      weapon: { name: 'Shortsword', type: 'weapon', description: '一把短剑，轻便趁手。Deals 1d6+1 piercing damage.', bonus: 1 },
     },
   }
 
