@@ -240,6 +240,8 @@ function renderTurnEvent(event: TurnEvent): void {
     case 'npc_update':
       console.log(event.text)
       break
+    case 'audio':
+      break // CLI 不播放音频
     case 'auto_save':
       console.log(chalk.dim('\n  [自动存档]'))
       break

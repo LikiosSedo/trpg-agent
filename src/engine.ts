@@ -21,6 +21,8 @@ import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
+import { resolveAudio, type AudioState } from './audio-config.js'
+import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 
 // ─── 命令结果类型 ──────────────────────────────
 
@@ -48,6 +50,7 @@ export type TurnEvent =
   | { type: 'npc_unlock'; npcName: string }
   | { type: 'npc_update'; text: string }
   | { type: 'auto_save'; path?: string }
+  | { type: 'audio'; bgm: string; ambient: string }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -510,6 +513,20 @@ export class GameEngine {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }
 
+    // 音频：DM 可能通过 SetAmbiance 覆盖，否则代码自动选择
+    const ambianceOverride = consumeAmbianceOverride()
+    const autoAudio = resolveAudio(
+      session.worldState.currentLocation,
+      session.worldState.currentSubLocation,
+      session.worldState.timeOfDay,
+      !!session.combat?.active,
+    )
+    yield {
+      type: 'audio',
+      bgm: ambianceOverride?.bgm ?? autoAudio.bgm,
+      ambient: autoAudio.ambient,
+    }
+
     // DM 结束 + 场景选项
     const dmActions = consumeActions()
     const actions = dmActions ?? buildFallbackActions(session)
@@ -621,6 +638,15 @@ export class GameEngine {
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }
+
+    // 开场音频
+    const openAudio = resolveAudio(
+      session.worldState.currentLocation,
+      session.worldState.currentSubLocation,
+      session.worldState.timeOfDay,
+      false,
+    )
+    yield { type: 'audio', bgm: openAudio.bgm, ambient: openAudio.ambient }
 
     const actions = consumeActions() ?? buildFallbackActions(session)
     yield { type: 'dm_end', combat: false, pendingMonster: false, actions }

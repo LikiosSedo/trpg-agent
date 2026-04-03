@@ -1342,6 +1342,11 @@ function handleWsMessage(e) {
       appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
       break
 
+    // ─── 音频 ───
+    case 'audio':
+      switchAudio(msg.bgm, msg.ambient)
+      break
+
     // ─── 存档同步 ───
     case 'sync':
       saveToLocal(msg.session, msg.dossier)
@@ -1458,6 +1463,52 @@ function showSceneActions(actions) {
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
 }
+
+// ─── 音频播放器 ───
+const AUDIO_BASE = 'audio/'
+let bgmAudio = null
+let ambientAudio = null
+let currentBgm = ''
+let currentAmbient = ''
+let audioUnlocked = false
+
+function unlockAudio() {
+  if (audioUnlocked) return
+  // iOS/Chrome require user gesture to play audio
+  bgmAudio = new Audio()
+  bgmAudio.loop = true
+  bgmAudio.volume = 0.3
+  ambientAudio = new Audio()
+  ambientAudio.loop = true
+  ambientAudio.volume = 0.2
+  audioUnlocked = true
+}
+
+function switchAudio(bgm, ambient) {
+  if (!audioUnlocked) return
+  // BGM
+  if (bgm && bgm !== currentBgm) {
+    currentBgm = bgm
+    const src = AUDIO_BASE + bgm + '.mp3'
+    bgmAudio.src = src
+    bgmAudio.play().catch(() => {})
+  }
+  // Ambient
+  if (ambient !== undefined && ambient !== currentAmbient) {
+    currentAmbient = ambient
+    if (!ambient || ambient === 'silence') {
+      ambientAudio.pause()
+      ambientAudio.src = ''
+    } else {
+      ambientAudio.src = AUDIO_BASE + 'amb-' + ambient + '.mp3'
+      ambientAudio.play().catch(() => {})
+    }
+  }
+}
+
+// Unlock audio on first user interaction
+document.addEventListener('click', unlockAudio, { once: true })
+document.addEventListener('touchstart', unlockAudio, { once: true })
 
 // ─── 输入 ───
 function sendInput() {
