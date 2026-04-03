@@ -10,6 +10,8 @@ import type { Tool } from 'open-claude-cli/engine'
 import type { Monster } from '../types.js'
 import { getSession } from '../game-state.js'
 import { startCombat, executePlayerTurn, getCombatSummary, attemptFlee } from '../combat-manager.js'
+import { changeTrust } from '../trust-system.js'
+import { getPersonality } from '../npc-relationships.js'
 
 export const AttackTool: Tool = {
   name: 'Attack',
@@ -60,12 +62,60 @@ export const AttackTool: Tool = {
       }
     }
 
-    // 位置检查：战斗只能在当前位置发生
+    // 加载怪物 + NPC 战斗数据库（统一格式）
+    const monstersJson = await import('../../data/monsters.json', { with: { type: 'json' } })
+    const npcCombatJson = await import('../../data/npc-combatants.json', { with: { type: 'json' } })
+    const monstersDb: Monster[] = monstersJson.default
+    const npcDb: Monster[] = npcCombatJson.default
+
+    // 检查目标是否是 NPC
+    const targetNpc = session.npcs.find(n => n.name === targetId)
+    const isNPCTarget = !!targetNpc && npcDb.some(n => n.name === targetId)
+
+    if (isNPCTarget && !session.combat?.active) {
+      // 攻击 NPC → 信任暴跌 + 关系网连坐
+      const personality = getPersonality(targetId)
+      const grudgeTag = targetId === '小莉' ? 'harm_小莉' : undefined
+
+      changeTrust(session, {
+        npcName: targetId,
+        channel: 'combat',
+        delta: -5,
+        reason: `玩家攻击了${targetId}`,
+        turn: session.turnCount,
+        grudgeTag,
+      })
+
+      // NPC 必须在同一位置
+      if (targetNpc!.location !== session.worldState.currentLocation) {
+        return { output: `${targetId}不在这里。`, isError: true }
+      }
+
+      // 用统一的战斗系统开战（NPC 数据和怪物格式相同）
+      const combatNames = encounterMonsters ?? [targetId]
+      const allDb = [...monstersDb, ...npcDb] // 合并数据库
+      try {
+        const combat = startCombat(session, combatNames, allDb)
+        const initLog = combat.log.join('\n')
+        const turnResult = executePlayerTurn(session, targetId, method, spellId, allDb)
+        return {
+          output: [
+            `⚠️ 你攻击了${targetId}！这将产生严重后果。`,
+            initLog, '', ...turnResult.log, '',
+            getCombatSummary(session) ?? '',
+          ].filter(Boolean).join('\n'),
+        }
+      } catch (e: any) {
+        return { output: e.message, isError: true }
+      }
+    }
+
+    // 位置检查：怪物战斗只能在对应区域
     const locationMonsters: Record<string, string[]> = {
       'twilight-woods': ['Wolf', 'Giant Spider', 'Goblin', 'Cockatrice'],
       'greyspine-mines': ['Skeleton', 'Shadow', 'Ghoul', 'Mimic'],
       'shatterstone-wastes': ['Orc Warrior', 'Ghoul', 'Eclipsed Beast'],
-      'dawnbreak-town': [],  // 镇上一般不战斗
+      'dawnbreak-town': [],
     }
     const allowedHere = locationMonsters[session.worldState.currentLocation] ?? []
     const targetName = targetId.toLowerCase()
@@ -73,15 +123,12 @@ export const AttackTool: Tool = {
       return { output: `这里没有${targetId}。当前位置不太可能遇到这种敌人。`, isError: true }
     }
 
-    // 加载怪物数据库
-    const monstersJson = await import('../../data/monsters.json', { with: { type: 'json' } })
-    const monstersDb: Monster[] = monstersJson.default
-
     // 如果没有进行中的战斗，开始新战斗
     if (!session.combat?.active) {
       const monsterNames: string[] = encounterMonsters ?? [targetId]
       try {
-        const combat = startCombat(session, monsterNames, monstersDb)
+        const allDb = [...monstersDb, ...npcDb]
+        const combat = startCombat(session, monsterNames, allDb)
         // 输出先攻结果
         const initLog = combat.log.join('\n')
 

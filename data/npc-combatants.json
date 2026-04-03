@@ -1,0 +1,101 @@
+[
+  {
+    "name": "格雷格",
+    "hp": 65,
+    "dc": 15,
+    "damageDice": "1d8+4",
+    "specialAbility": "Mercenary Instinct: first attack has advantage; all attacks have advantage when protecting 小莉",
+    "description": "退役佣兵，碎盾亭酒馆老板。六尺二，右眉旧疤。二十年前的战斗本能仍在。",
+    "loot": [],
+    "nonlethal": true,
+    "combatBehavior": "subdue"
+  },
+  {
+    "name": "艾琳娜",
+    "hp": 80,
+    "dc": 17,
+    "damageDice": "2d6+5",
+    "specialAbility": "Foresight: cannot be surprised; once per combat forces attacker to reroll a hit",
+    "description": "340岁高等精灵，冒险者公会会长。占卜魔法使她几乎无法被偷袭。",
+    "loot": [],
+    "nonlethal": false,
+    "combatBehavior": "call_reinforcements"
+  },
+  {
+    "name": "韩猛",
+    "hp": 45,
+    "dc": 14,
+    "damageDice": "1d10+3",
+    "specialAbility": "Iron Grip: grapple attacks have advantage; grappled targets take 1d4 crushing per round",
+    "description": "独臂战士，公会管理员。左手之力足以掰断桌腿。",
+    "loot": [],
+    "nonlethal": true,
+    "combatBehavior": "subdue"
+  },
+  {
+    "name": "格罗姆",
+    "hp": 40,
+    "dc": 13,
+    "damageDice": "1d10+3",
+    "specialAbility": "Forge-Hardened: fire resistance; below half HP attacks deal +2 extra damage",
+    "description": "矮人铁匠，脾气火爆。铁锤在手，力大无穷。",
+    "loot": [],
+    "nonlethal": false,
+    "combatBehavior": "kill"
+  },
+  {
+    "name": "卡恩",
+    "hp": 70,
+    "dc": 16,
+    "damageDice": "2d6+4",
+    "specialAbility": "Void Resonance: on hit, DC 14 WIS save or frightened 1 turn; once per combat can become invisible 1 round",
+    "description": "游吟诗人外表下的暗影教团执行者。黑木琴是虚空法器。",
+    "loot": ["Shadow Crystal"],
+    "nonlethal": false,
+    "combatBehavior": "hidden_power"
+  },
+  {
+    "name": "维克多",
+    "hp": 8,
+    "dc": 10,
+    "damageDice": "1d4",
+    "specialAbility": "Desperate Plea: below 4 HP cries out about kidnapped daughter, revealing critical plot info",
+    "description": "镇长，被暗影教团胁迫。憔悴无力，毫无战斗能力。",
+    "loot": [],
+    "nonlethal": false,
+    "combatBehavior": "flee"
+  },
+  {
+    "name": "陈妈",
+    "hp": 10,
+    "dc": 10,
+    "damageDice": "1d4+1",
+    "specialAbility": "Loud Alarm: immediately alerts all NPCs in town; 格雷格 arrives in 2 rounds",
+    "description": "旅店老板娘，消息灵通。虽无战斗力但嗓门大到能震醒半个镇。",
+    "loot": [],
+    "nonlethal": false,
+    "combatBehavior": "call_reinforcements"
+  },
+  {
+    "name": "叶绿",
+    "hp": 18,
+    "dc": 12,
+    "damageDice": "1d6+2",
+    "specialAbility": "Herbalist Defense: once per combat throw blinding powder (DC 12 DEX or blinded 1 round); carries 1 self-heal potion",
+    "description": "半精灵药剂师，知晓自然魔法。温柔但并非毫无自保之力。",
+    "loot": ["Healing Potion"],
+    "nonlethal": false,
+    "combatBehavior": "flee"
+  },
+  {
+    "name": "小莉",
+    "hp": 6,
+    "dc": 8,
+    "damageDice": "1d2",
+    "specialAbility": "Spirit Sight: senses hidden/invisible enemies; immune to mind control and fear; can reveal disguised creatures",
+    "description": "12岁灵视者。不会战斗，攻击她将触发格雷格永久仇恨。",
+    "loot": [],
+    "nonlethal": true,
+    "combatBehavior": "passive"
+  }
+]
