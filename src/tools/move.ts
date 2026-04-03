@@ -95,6 +95,26 @@ export const MoveTool: Tool = {
         .filter((p: any) => p.discovered && p.id !== session.worldState.currentSubLocation)
         .map((p: any) => p.nameZh)
 
+      // 区域遭遇检测：危险区域有概率触发战斗
+      let encounterWarning = ''
+      if (destArea.monsterPool.length > 0 && destArea.dangerLevel !== 'safe') {
+        // 30% 概率遭遇怪物（首次进入区域更高）
+        const roll = Math.random()
+        const threshold = 0.3
+        if (roll < threshold) {
+          // 从区域怪物池随机选 1-2 个
+          const pool = destArea.monsterPool
+          const count = Math.random() < 0.4 ? 2 : 1
+          const picked: string[] = []
+          for (let i = 0; i < count; i++) {
+            picked.push(pool[Math.floor(Math.random() * pool.length)])
+          }
+          encounterWarning = `[遭遇] 你在前进途中遭遇了${picked.join('和')}！系统将自动触发战斗。`
+          // 标记遭遇到 session flags，engine 会读取并触发战斗
+          session.worldState.flags['pending_encounter'] = picked.join(',')
+        }
+      }
+
       return {
         output: [
           `移动：${locations[current]?.nameZh ?? current} → ${destArea.nameZh}。${conn.description}`,
@@ -102,6 +122,7 @@ export const MoveTool: Tool = {
           remainingNpcs.length ? `你看到了：${remainingNpcs.join('、')}。` : '',
           avoidMsg,
           subLocs.length ? `可前往：${subLocs.join('、')}。` : '',
+          encounterWarning,
         ].filter(Boolean).join('\n'),
       }
     }

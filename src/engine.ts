@@ -664,6 +664,24 @@ export class GameEngine {
       actions,
     }
 
+    // 区域遭遇自动触发战斗（Move 工具设置了 pending_encounter flag）
+    const pendingEncounter = session.worldState.flags['pending_encounter'] as string | undefined
+    if (pendingEncounter && !session.combat?.active) {
+      delete session.worldState.flags['pending_encounter']
+      const monsterNames = pendingEncounter.split(',')
+      try {
+        const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
+        const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
+        const allDb = [...monstersJson, ...npcCombatJson]
+        const { startCombat } = await import('./combat-manager.js')
+        startCombat(session, monsterNames, allDb as any)
+        console.log(`[combat] 区域遭遇触发：${monsterNames.join(', ')}`)
+        yield { type: 'narrative_warning', text: `⚔️ 遭遇战斗！${monsterNames.join('和')}向你发起攻击！` }
+      } catch (err) {
+        console.error(`[combat] 遭遇触发失败:`, (err as Error).message)
+      }
+    }
+
     // 战斗立绘：战斗进行时发送怪物立绘数据
     if (session.combat?.active) {
       const monsterPortraits = session.combat.monsters

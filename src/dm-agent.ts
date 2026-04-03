@@ -63,9 +63,11 @@ export function initDMAgent(): void {
       headers: config.headers,
       streamUsage: config.streamUsage,
     },
+    // 注意：AttackTool 不在 DM 工具列表——战斗由代码入口控制
+    // （玩家攻击意图 / 区域遭遇 / 章节事件）
     tools: [
       DiceTool, MoveTool, LookTool, TalkTool,
-      AttackTool, UseItemTool, SearchTool, RestTool,
+      UseItemTool, SearchTool, RestTool,
       RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool, GameOverTool,
       ChangeTrustTool,
     ],
