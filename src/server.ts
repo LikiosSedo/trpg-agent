@@ -80,7 +80,28 @@ app.post('/api/auth', (req, res) => {
 
 // 健康检查 + 诊断
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, password: PASSWORD_ENABLED, env: !!process.env.TRPG_API_KEY })
+  res.json({ ok: true, password: PASSWORD_ENABLED, env: !!process.env.TRPG_API_KEY, clients: wss.clients.size })
+})
+
+// WebSocket 测试页面
+app.get('/api/ws-test', (_req, res) => {
+  res.send(`<html><body style="background:#111;color:#0f0;font-family:monospace;padding:20px">
+<h2>WebSocket 诊断</h2>
+<div id="log"></div>
+<script>
+function log(msg) { document.getElementById('log').innerHTML += msg + '<br>'; }
+log('连接中...');
+const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const url = proto + '//' + location.host;
+log('URL: ' + url);
+try {
+  const ws = new WebSocket(url);
+  ws.onopen = () => { log('✅ 连接成功'); ws.send(JSON.stringify({type:'ping'})); log('发送 ping...'); };
+  ws.onmessage = (e) => { log('收到: ' + e.data); };
+  ws.onclose = (e) => { log('❌ 关闭: code=' + e.code + ' reason=' + e.reason); };
+  ws.onerror = () => { log('❌ 错误'); };
+} catch(e) { log('❌ 异常: ' + e.message); }
+</script></body></html>`)
 })
 
 app.use(express.static(join(__dirname, '..', 'public')))
@@ -155,12 +176,19 @@ wss.on('connection', (ws: WebSocket, req) => {
       const template = CLASS_TEMPLATES[classId]
       if (!template) { send('error', { text: '无效职业' }); return }
 
-      connSession = createGameSession(name, classId)
-      setSession(connSession)
-      initDMAgent()
-      dossier = new DossierManager()
-      getFacts().save('autosave')
-      gameStarted = true
+      try {
+        connSession = createGameSession(name, classId)
+        setSession(connSession)
+        initDMAgent()
+        dossier = new DossierManager()
+        getFacts().save('autosave')
+        gameStarted = true
+        console.log(`[server] game started for ${name} (${classId})`)
+      } catch (err) {
+        console.error('[server] game init failed:', err)
+        send('error', { text: `游戏初始化失败: ${(err as Error).message.slice(0, 80)}` })
+        return
+      }
 
       // 发送说书人序幕
       send('prologue', { text: '破晓镇 · 蚀目之影\n\n' + renderPrologueText() })
