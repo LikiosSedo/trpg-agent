@@ -87,6 +87,33 @@
   .npc-portrait-bar .npc-speak-hint {
     font-size: 11px; color: #666; margin-top: 2px;
   }
+  /* 战斗怪物立绘面板 */
+  .combat-portraits {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 8px 0; margin: 4px 0;
+  }
+  .combat-monster-card {
+    background: #2a1a0e; border: 1px solid #ff8c42; border-radius: 8px;
+    padding: 8px; text-align: center; min-width: 80px;
+  }
+  .combat-monster-card.dead { opacity: 0.3; border-color: #444; }
+  .combat-monster-card img {
+    width: 48px; height: 48px; image-rendering: pixelated;
+    border-radius: 4px; background: #0a0a1e;
+  }
+  .combat-monster-card .monster-name {
+    font-size: 11px; color: #ff8c42; margin-top: 4px;
+  }
+  .combat-monster-card .monster-hp {
+    font-size: 10px; color: #888; margin-top: 2px;
+  }
+  .combat-monster-card .hp-bar-mini {
+    width: 100%; height: 4px; background: #333; border-radius: 2px; margin-top: 3px;
+  }
+  .combat-monster-card .hp-bar-mini .hp-fill {
+    height: 100%; border-radius: 2px; background: #f44336;
+    transition: width 0.3s;
+  }
   #input-area {
     background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
     display: flex; gap: 8px;
@@ -1381,6 +1408,11 @@ function handleWsMessage(e) {
       showNPCPortrait(msg.npcName, msg.portrait)
       break
 
+    // ─── 战斗怪物立绘 ───
+    case 'combat_portraits':
+      showCombatPortraits(msg.monsters || [])
+      break
+
     // ─── 音频 ───
     case 'audio':
       switchAudio(msg.bgm, msg.ambient)
@@ -1528,6 +1560,37 @@ function showNPCPortrait(npcName, portraitSrc) {
     `<div><div class="npc-speak-name">${esc(npcName)}</div>` +
     `<div class="npc-speak-hint">正在与你对话</div></div>`
   container.appendChild(bar)
+  container.scrollTop = container.scrollHeight
+}
+
+// ─── 战斗怪物立绘 ───
+function showCombatPortraits(monsters) {
+  const container = document.getElementById('messages')
+
+  // 移除旧的战斗面板
+  container.querySelectorAll('.combat-portraits').forEach(el => el.remove())
+
+  // 战斗结束（无怪物）→ 不显示
+  if (!monsters.length) return
+
+  const panel = document.createElement('div')
+  panel.className = 'combat-portraits'
+
+  for (const m of monsters) {
+    const dead = m.hp <= 0
+    const pct = m.maxHp > 0 ? Math.round(m.hp / m.maxHp * 100) : 0
+    const card = document.createElement('div')
+    card.className = 'combat-monster-card' + (dead ? ' dead' : '')
+    card.innerHTML = (m.portrait
+      ? `<img src="${esc(m.portrait)}" alt="${esc(m.name)}" onerror="this.style.display='none'">`
+      : `<div style="width:48px;height:48px;background:#1a0a0a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px">⚔</div>`) +
+      `<div class="monster-name">${esc(m.name)}</div>` +
+      `<div class="monster-hp">${dead ? '击杀' : m.hp + '/' + m.maxHp}</div>` +
+      (dead ? '' : `<div class="hp-bar-mini"><div class="hp-fill" style="width:${pct}%"></div></div>`)
+    panel.appendChild(card)
+  }
+
+  container.appendChild(panel)
   container.scrollTop = container.scrollHeight
 }
 

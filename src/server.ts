@@ -147,6 +147,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('system', { text: ev.text }); break
         case 'npc_speaking':
           send('npc_speaking', { npcName: ev.npcName, portrait: ev.portrait }); break
+        case 'combat_portraits':
+          send('combat_portraits', { monsters: ev.monsters }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
         case 'auto_save':

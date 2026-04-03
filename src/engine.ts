@@ -36,7 +36,14 @@ const NPC_PORTRAITS: Record<string, string> = {
   '陈妈': 'portraits/chen-ma.png',
   '格罗姆': 'portraits/grom.png',
   '叶绿': 'portraits/ye-lv.png',
-  // '韩猛': 'portraits/han-meng.png',  // 暂无立绘
+  '韩猛': 'portraits/han-meng.png',
+}
+
+const MONSTER_PORTRAITS: Record<string, string> = {
+  'Shadow': 'portraits/monster-shadow.png',
+  'Ghoul': 'portraits/monster-ghoul.png',
+  'Mimic': 'portraits/monster-mimic.png',
+  'Eclipsed Beast': 'portraits/monster-eclipsed-beast.png',
 }
 
 
@@ -68,6 +75,7 @@ export type TurnEvent =
   | { type: 'auto_save'; path?: string }
   | { type: 'audio'; bgm: string; ambient: string }
   | { type: 'npc_speaking'; npcName: string; portrait: string }
+  | { type: 'combat_portraits'; monsters: Array<{ id: string; name: string; portrait: string; hp: number; maxHp: number }> }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -595,6 +603,20 @@ export class GameEngine {
       combat: !!session.combat?.active,
       pendingMonster: !!session.combat?.pendingMonsterTurn,
       actions,
+    }
+
+    // 战斗立绘：战斗进行时发送怪物立绘数据
+    if (session.combat?.active) {
+      const monsterPortraits = session.combat.monsters
+        .filter(m => m.hp > 0)
+        .map(m => ({
+          id: m.id, name: m.name,
+          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+          hp: m.hp, maxHp: m.maxHp,
+        }))
+      if (monsterPortraits.length) {
+        yield { type: 'combat_portraits', monsters: monsterPortraits }
+      }
     }
 
     // 怪物回合

@@ -243,6 +243,12 @@ function renderTurnEvent(event: TurnEvent): void {
     case 'npc_speaking':
       console.log(chalk.cyan(`\n  [${event.npcName}]`))
       break
+    case 'combat_portraits':
+      for (const m of event.monsters) {
+        const bar = chalk.red('█'.repeat(Math.round(m.hp / m.maxHp * 10))) + chalk.dim('░'.repeat(10 - Math.round(m.hp / m.maxHp * 10)))
+        console.log(chalk.hex('#ff8c42')(`  ${m.name} ${bar} ${m.hp}/${m.maxHp}`))
+      }
+      break
     case 'audio':
       break // CLI 不播放音频
     case 'auto_save':
