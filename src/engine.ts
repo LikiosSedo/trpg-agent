@@ -24,6 +24,7 @@ import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
+import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 
 // ─── NPC 立绘映射 ──────────────────────────────
 
@@ -76,6 +77,8 @@ export type TurnEvent =
   | { type: 'audio'; bgm: string; ambient: string }
   | { type: 'npc_speaking'; npcName: string; portrait: string }
   | { type: 'combat_portraits'; monsters: Array<{ id: string; name: string; portrait: string; hp: number; maxHp: number }> }
+  | { type: 'game_over'; reason: string; canContinue: boolean; continueHint?: string }
+  | { type: 'narrative_warning'; text: string }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -548,6 +551,12 @@ export class GameEngine {
     if (guidance) parts.push(guidance)
     const idle = checkIdleEvent(input)
     if (idle) parts.push(idle)
+
+    // 每 5 轮重注入关键工具提醒（防止长上下文遗忘）
+    if (session.turnCount % 5 === 0) {
+      parts.push('[系统提醒] 回应结束前必须调用 SetActions 设置选项。伤害/物品变化必须通过工具（Attack/TransferItem），不要在文本中编造数值变化。')
+    }
+
     parts.push(input)
 
     // DM 流式响应
@@ -562,6 +571,18 @@ export class GameEngine {
       }
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
+    }
+
+    // 游戏终局检查（DM 调用了 GameOver 工具？）
+    const gameOver = consumeGameOver()
+    if (gameOver) {
+      yield { type: 'game_over', reason: gameOver.reason, canContinue: gameOver.canContinue, continueHint: gameOver.continueHint }
+    }
+
+    // 叙事伤害检测——DM 写了伤害文字但没走 Attack 工具
+    const dmgMatch = fullText.match(/造成\s*(\d+)\s*点伤害|受到\s*(\d+)\s*点伤害|HP[：:]\s*\d+\s*[→/]\s*(\d+)/i)
+    if (dmgMatch && !session.combat?.active) {
+      yield { type: 'narrative_warning', text: '[系统] DM 描述了伤害但未通过战斗工具执行，实际HP未变化。如需战斗请使用 Attack 工具。' }
     }
 
     // NPC 立绘：Talk 工具记录了本轮所有说话的 NPC

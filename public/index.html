@@ -1611,6 +1611,11 @@ function handleWsMessage(e) {
       appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
       break
 
+    // ─── 游戏终局 ───
+    case 'game_over':
+      showGameOver(msg)
+      break
+
     // ─── NPC 立绘 ───
     case 'npc_speaking':
       showNPCPortrait(msg.npcName, msg.portrait)
@@ -1811,6 +1816,29 @@ function showNPCPortrait(npcName, portraitSrc) {
     `<div class="npc-speak-hint">正在与你对话</div></div>`
   container.appendChild(bar)
   container.scrollTop = container.scrollHeight
+}
+
+// ─── 游戏终局弹窗 ───
+function showGameOver(data) {
+  const overlay = document.createElement('div')
+  overlay.className = 'npc-card-overlay open'
+  overlay.style.zIndex = '300'
+  const canContinue = data.canContinue
+  const hint = data.continueHint || ''
+  overlay.innerHTML = `
+    <div class="npc-card-popup" style="max-width:400px;text-align:center" onclick="event.stopPropagation()">
+      <div style="padding:40px 24px 20px">
+        <div style="font-size:48px;margin-bottom:16px">⚰️</div>
+        <div style="font-size:20px;font-weight:bold;color:#f44336;margin-bottom:12px">游戏终局</div>
+        <div style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:20px">${esc(data.reason)}</div>
+        ${hint ? '<div style="font-size:12px;color:#888;margin-bottom:20px;font-style:italic">' + esc(hint) + '</div>' : ''}
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button onclick="location.reload()" style="background:#533483;color:white;border:none;padding:12px;border-radius:8px;font-size:15px;cursor:pointer">重新开始新冒险</button>
+          ${canContinue ? '<button onclick="this.closest(\'.npc-card-overlay\').remove()" style="background:#0f3460;color:#888;border:1px solid #333;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">继续坚持...</button>' : ''}
+        </div>
+      </div>
+    </div>`
+  document.body.appendChild(overlay)
 }
 
 // ─── 战斗怪物立绘 ───

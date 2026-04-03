@@ -247,6 +247,15 @@ function renderTurnEvent(event: TurnEvent): void {
       }
       console.log(chalk.dim('    已收藏到人物档案\n'))
       break
+    case 'game_over':
+      console.log(chalk.red.bold(`\n  ═══ 游戏终局 ═══`))
+      console.log(chalk.red(`  ${event.reason}`))
+      if (event.continueHint) console.log(chalk.dim(`  ${event.continueHint}`))
+      console.log(chalk.dim(`  ${event.canContinue ? '你可以选择继续坚持或重新开始。' : '游戏结束。'}\n`))
+      break
+    case 'narrative_warning':
+      console.log(chalk.yellow(`  ${event.text}`))
+      break
     case 'npc_speaking':
       console.log(chalk.cyan(`\n  [${event.npcName}]`))
       break
