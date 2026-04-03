@@ -14,6 +14,12 @@ export function getSession(): GameSession {
   return session
 }
 
+/** Replace the active session (used by web server to swap per-connection state). */
+export function setSession(s: GameSession): void {
+  session = s
+  facts = new GameFactStore(s)
+}
+
 export function getFacts(): GameFactStore {
   if (!facts) throw new Error('Game not initialized — call initGameState first')
   return facts

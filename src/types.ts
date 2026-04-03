@@ -154,4 +154,5 @@ export interface GameSession {
   events: GameEvent[]
   turnCount: number
   combat: CombatState | null
+  dossierData?: Record<string, any>
 }

@@ -10,76 +10,27 @@ import { createServer } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import type { PlayerCharacter, GameSession, NPC, Spell, AbilityScores } from './types.js'
-import { initGameState, getSession, getFacts } from './game-state.js'
+import type { GameSession } from './types.js'
+import { initGameState, getSession, getFacts, setSession } from './game-state.js'
+import { CLASS_TEMPLATES, createGameSession } from './game-data.js'
 import { initDMAgent, dmRespond } from './dm-agent.js'
 import { DossierManager } from './dossier.js'
+import { GameFactStore } from './game-facts.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { QuestManager } from './quest-manager.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
+import { WORLD_OVERVIEW } from './data/maps.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// ─── Character Templates (same as main.ts) ───
-
-const CLASS_TEMPLATES: Record<string, { nameZh: string; abilities: AbilityScores; skills: string[]; maxHp: number; spells: Spell[] }> = {
-  fighter: {
-    nameZh: '剑士',
-    abilities: { STR: 16, DEX: 12, CON: 14, INT: 8, WIS: 10, CHA: 10 },
-    skills: ['athletics', 'intimidation'],
-    maxHp: 12,
-    spells: [],
-  },
-  mage: {
-    nameZh: '法师',
-    abilities: { STR: 8, DEX: 12, CON: 10, INT: 16, WIS: 14, CHA: 10 },
-    skills: ['arcana', 'investigation'],
-    maxHp: 8,
-    spells: [
-      { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 1d10 fire damage.', usesPerRest: 0, remaining: 0 },
-      { name: 'Magic Missile', description: '三枚魔法飞弹', effect: 'Deal 3d4+3 force damage, auto-hit.', usesPerRest: 3, remaining: 3 },
-      { name: 'Shield', description: '魔法护盾', effect: '+5 AC until next turn.', usesPerRest: 3, remaining: 3 },
-      { name: 'Detect Magic', description: '侦测魔法', effect: 'Reveal magical auras.', usesPerRest: 3, remaining: 3 },
-    ],
-  },
-  ranger: {
-    nameZh: '游侠',
-    abilities: { STR: 12, DEX: 16, CON: 12, INT: 10, WIS: 14, CHA: 8 },
-    skills: ['stealth', 'perception'],
-    maxHp: 10,
-    spells: [],
-  },
-  cleric: {
-    nameZh: '牧师',
-    abilities: { STR: 14, DEX: 10, CON: 14, INT: 10, WIS: 16, CHA: 12 },
-    skills: ['medicine', 'insight'],
-    maxHp: 10,
-    spells: [
-      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS HP.', usesPerRest: 3, remaining: 3 },
-      { name: 'Detect Magic', description: '侦测魔法', effect: 'Reveal magical auras.', usesPerRest: 3, remaining: 3 },
-    ],
-  },
+/** Strip ANSI escape codes for web output */
+function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*m/g, '')
 }
 
-function computeModifiers(a: AbilityScores): AbilityScores {
-  const m = (v: number) => Math.floor((v - 10) / 2)
-  return { STR: m(a.STR), DEX: m(a.DEX), CON: m(a.CON), INT: m(a.INT), WIS: m(a.WIS), CHA: m(a.CHA) }
-}
-
-function createNPCs(): NPC[] {
-  return [
-    { name: '格雷格', trust: 0, knownFacts: ['镇上矿洞最近不太平', '冒险者公会在招人'], playerPromises: [], location: 'dawnbreak-town', mood: '温和' },
-    { name: '小莉', trust: 0, knownFacts: ['能感知他人身上的异常气息'], playerPromises: [], location: 'dawnbreak-town', mood: '好奇' },
-    { name: '艾琳娜', trust: 0, knownFacts: ['矿道失踪事件的详细情报'], playerPromises: [], location: 'dawnbreak-town', mood: '冷静' },
-    { name: '维克多', trust: 0, knownFacts: ['女儿被暗影教团绑架'], playerPromises: [], location: 'dawnbreak-town', mood: '紧张' },
-    { name: '卡恩', trust: 0, knownFacts: ['暗影教团的全部计划'], playerPromises: [], location: 'dawnbreak-town', mood: '从容' },
-    { name: '陈妈', trust: 0, knownFacts: ['镇上来往旅客的动向'], playerPromises: [], location: 'dawnbreak-town', mood: '热情' },
-    { name: '格罗姆', trust: 0, knownFacts: ['矿石品质近期下降'], playerPromises: [], location: 'dawnbreak-town', mood: '暴躁' },
-    { name: '叶绿', trust: 0, knownFacts: ['助手近期行为古怪'], playerPromises: [], location: 'dawnbreak-town', mood: '温和' },
-    { name: '韩猛', trust: 0, knownFacts: ['调查矿道的小队接连失联'], playerPromises: [], location: 'dawnbreak-town', mood: '焦虑' },
-  ]
-}
+// CLASS_TEMPLATES and createGameSession imported from game-data.ts
 
 // ─── Express + WebSocket Server ───
 
@@ -93,6 +44,7 @@ app.use(express.static(join(__dirname, '..', 'public')))
 wss.on('connection', (ws: WebSocket) => {
   console.log('[server] new player connected')
   let dossier = new DossierManager()
+  let connSession: GameSession | null = null
   let gameStarted = false
 
   // 发消息给前端
@@ -127,34 +79,20 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('message', async (raw: Buffer) => {
     const msg = JSON.parse(raw.toString())
 
+    // 会话隔离：处理消息前，把全局 session 切换到当前连接的 session
+    if (connSession) setSession(connSession)
+
     // 角色创建
     if (msg.type === 'create') {
       const { name, classId } = msg
       const template = CLASS_TEMPLATES[classId]
       if (!template) { send('error', { text: '无效职业' }); return }
 
-      const mods = computeModifiers(template.abilities)
-      const session: GameSession = {
-        player: {
-          name, level: 1,
-          abilities: { ...template.abilities },
-          abilityModifiers: mods,
-          skills: [...template.skills],
-          hp: template.maxHp, maxHp: template.maxHp,
-          gold: 0, xp: 0,
-          inventory: [], spells: template.spells.map(s => ({ ...s })),
-          clues: [],
-          equipped: { weapon: { name: '生锈的短剑', type: 'weapon', description: '1d6 piercing', bonus: 0 } },
-        },
-        npcs: createNPCs(),
-        quests: [], worldState: { currentLocation: 'dawnbreak-town', timeOfDay: 'night', flags: {} },
-        events: [], turnCount: 0, combat: null,
-      }
-
-      initGameState(session)
-      getFacts().save('autosave')
+      connSession = createGameSession(name, classId)
+      setSession(connSession)
       initDMAgent()
       dossier = new DossierManager()
+      getFacts().save('autosave')
       gameStarted = true
 
       // 发送说书人序幕
@@ -165,7 +103,7 @@ wss.on('connection', (ws: WebSocket) => {
       const response = await sendToDM(opening)
 
       // 检测 NPC 解锁
-      for (const npc of session.npcs) {
+      for (const npc of connSession.npcs) {
         if (response.includes(npc.name)) {
           const notice = dossier.unlock(npc.name, 0)
           if (notice) sysMsg(`🔔 新角色档案解锁: ${npc.name}`)
@@ -197,8 +135,54 @@ wss.on('connection', (ws: WebSocket) => {
         sysMsg(`经验: ${session.player.xp} XP (Lv${session.player.level})`)
         return
       }
-      if (input === '/npc') {
-        sysMsg(dossier.listUnlocked().length > 0 ? dossier.listUnlocked().map(n => `📋 ${n}`).join('\n') : '暂无已知人物。')
+      if (input === '/save') {
+        session.dossierData = dossier.toJSON()
+        const savePath = facts.save('web-save')
+        sysMsg(`游戏已保存: ${savePath}`)
+        return
+      }
+      if (input.startsWith('/load')) {
+        const slotName = input.slice('/load'.length).trim()
+        if (!slotName) {
+          const saves = GameFactStore.listSaves()
+          if (saves.length === 0) { sysMsg('暂无存档。'); return }
+          let list = '── 存档列表 ──\n'
+          for (const s of saves) list += `  ${s.file} — ${s.name} (第${s.turn}轮) ${s.date}\n`
+          list += '用法: /load <存档名>'
+          sysMsg(list)
+        } else {
+          try {
+            const loaded = GameFactStore.load(slotName)
+            const loadedSession = (loaded as any).session as GameSession
+            connSession = loadedSession
+            setSession(connSession)
+            initDMAgent()
+            resetIdleTracking()
+            dossier = loadedSession.dossierData
+              ? DossierManager.fromJSON(loadedSession.dossierData)
+              : new DossierManager()
+            sysMsg(`存档已加载: ${slotName}`)
+          } catch (err) {
+            sysMsg(`加载失败: ${(err as Error).message}`)
+          }
+        }
+        return
+      }
+      if (input === '/map') {
+        sysMsg(WORLD_OVERVIEW.trim() + `\n\n当前位置: ${session.worldState.currentLocation}`)
+        return
+      }
+      if (input === '/npc' || input === '/npc ') {
+        if (dossier.listUnlocked().length > 0) {
+          sysMsg(stripAnsi(dossier.renderList()))
+        } else {
+          sysMsg('暂无已知人物。')
+        }
+        return
+      }
+      if (input.startsWith('/npc ') && input.length > 5) {
+        const npcName = input.slice(5).trim()
+        sysMsg(stripAnsi(dossier.renderProfile(npcName)))
         return
       }
       if (input === '/world') {
@@ -211,7 +195,7 @@ wss.on('connection', (ws: WebSocket) => {
         return
       }
       if (input === '/help') {
-        sysMsg('命令: /status /quest /npc /world /inventory /help'); return
+        sysMsg('命令: /status /quest /npc /npc <名> /world /map /inventory /save /load /help'); return
       }
 
       // 安全检查
@@ -254,7 +238,10 @@ wss.on('connection', (ws: WebSocket) => {
       }
 
       // 自动存档
-      if (session.turnCount % 5 === 0) facts.save('autosave')
+      if (session.turnCount % 5 === 0) {
+        session.dossierData = dossier.toJSON()
+        facts.save('autosave')
+      }
     }
   })
 
