@@ -122,6 +122,8 @@
     flex: 1; background: #0f3460; border: 1px solid #533483;
     color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
     font-family: inherit; font-size: 16px; outline: none;
+    resize: none; min-height: 40px; max-height: 120px;
+    line-height: 1.4; overflow-y: auto;
   }
   #input:focus { border-color: #e6b800; }
   #input::placeholder { color: #666; }
@@ -635,7 +637,7 @@
   </div>
 
   <div id="input-area">
-    <input id="input" placeholder="说点什么..." autocomplete="off">
+    <textarea id="input" placeholder="说点什么..." autocomplete="off" rows="1"></textarea>
     <button id="send" onclick="sendInput()">发送</button>
   </div>
 </div>
@@ -1907,13 +1909,22 @@ function sendInput() {
   saveMessage('player', text)
   ws.send(JSON.stringify({ type: 'input', text }))
   input.value = ''
+  input.style.height = 'auto'
   sending = true
   document.getElementById('send').disabled = true
   showThinking()
 }
 
+// textarea 自动调整高度
+document.getElementById('input').addEventListener('input', function() {
+  this.style.height = 'auto'
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+})
+
+// Enter 发送，Shift+Enter 换行
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
     if (document.getElementById('create-screen').style.display !== 'none') {
       startGame()
     } else {
