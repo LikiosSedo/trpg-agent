@@ -27,10 +27,26 @@
   }
   .msg { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #e0e0e0; }
   .msg.dm { color: #e0e0e0 !important; }
-  .msg.system { color: #e6b800 !important; font-size: 13px; }
-  .msg.error { color: #ff6b6b !important; }
+  .msg.system {
+    color: #e6b800 !important; font-size: 13px;
+    background: #1a1a3e; border-left: 3px solid #e6b800; padding: 8px 12px;
+    border-radius: 4px; cursor: pointer; max-height: 120px; overflow: hidden;
+    transition: max-height 0.3s;
+  }
+  .msg.system.expanded { max-height: none; }
+  .msg.system::after { content: ' ▼ 点击展开'; color: #666; font-size: 11px; }
+  .msg.system.expanded::after { content: ' ▲ 点击收起'; }
+  .msg.error { color: #ff6b6b !important; font-size: 12px; }
   .msg.player { color: #4ecdc4 !important; }
   .msg.prologue { color: #ccc !important; font-style: italic; }
+  /* 快速动作建议 */
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+  .action-btn {
+    background: #0f3460; color: #aaa; border: 1px solid #333; padding: 6px 12px;
+    border-radius: 16px; font-size: 13px; cursor: pointer;
+  }
+  .action-btn:hover { color: #e6b800; border-color: #e6b800; }
+  .msg.reconnect { color: #666 !important; font-size: 11px; }
   #input-area {
     background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
     display: flex; gap: 8px;
@@ -240,10 +256,10 @@ function startGame() {
         container.scrollTop = container.scrollHeight
         break
       case 'dm_end':
-        // DM finished responding
         currentDmDiv = null
         sending = false
         document.getElementById('send').disabled = false
+        showQuickActions()  // DM 说完后显示快速动作
         break
       case 'system':
         appendMsg(msg.text, 'system')
@@ -264,16 +280,20 @@ function startGame() {
   ws.onclose = () => {
     sending = false
     document.getElementById('send').disabled = false
-    appendMsg('连接断开。5秒后尝试重连...', 'error')
+    appendMsg('连接断开，5秒后重连...', 'reconnect')
     setTimeout(() => {
       if (ws?.readyState === WebSocket.CLOSED) {
-        appendMsg('重连中...', 'system')
-        startGame()  // 重新连接（token 在 localStorage）
+        // 静默重连：不显示大段文本，只重建连接
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
+        ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
+        ws.onopen = () => appendMsg('已重连', 'reconnect')
+        ws.onmessage = arguments.callee  // 复用同一个 handler（简化）
+        ws.onclose = arguments.callee
       }
     }, 5000)
   }
   ws.onerror = () => {
-    appendMsg('连接出错，请检查网络。', 'error')
     sending = false
     document.getElementById('send').disabled = false
   }
@@ -283,7 +303,35 @@ function appendMsg(text, cls) {
   const div = document.createElement('div')
   div.className = 'msg ' + cls
   div.textContent = text
+  // 系统消息可折叠
+  if (cls === 'system') {
+    div.addEventListener('click', () => div.classList.toggle('expanded'))
+  }
   const container = document.getElementById('messages')
+  container.appendChild(div)
+  container.scrollTop = container.scrollHeight
+}
+
+// DM 回复后显示快速动作建议
+function showQuickActions() {
+  const container = document.getElementById('messages')
+  const existing = container.querySelector('.actions')
+  if (existing) existing.remove()
+
+  const actions = ['看看四周', '和他交谈', '继续前进', '搜索附近', '查看背包']
+  const div = document.createElement('div')
+  div.className = 'actions'
+  for (const a of actions) {
+    const btn = document.createElement('span')
+    btn.className = 'action-btn'
+    btn.textContent = a
+    btn.onclick = () => {
+      div.remove()
+      document.getElementById('input').value = a
+      sendInput()
+    }
+    div.appendChild(btn)
+  }
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
 }

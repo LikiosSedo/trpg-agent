@@ -67,22 +67,22 @@ export class GameFactStore {
     ].filter(Boolean).join('\n')
   }
 
-  /** 一段话总结玩家状态 */
+  /** 一段话总结玩家状态（中文） */
   getPlayerSummary(): string {
     const { player } = this.session
-    const mods = player.abilityModifiers
-    const equip = [player.equipped.weapon?.name, player.equipped.armor?.name].filter(Boolean).join(', ')
-    const spellsLeft = player.spells.filter(s => s.remaining > 0 || s.usesPerRest === 0).map(s => s.name)
-    return (
-      `${player.name} is a level ${player.level} adventurer with ${player.hp}/${player.maxHp} HP and ${player.gold} gold. ` +
-      `Abilities: STR${mods.STR >= 0 ? '+' : ''}${mods.STR} DEX${mods.DEX >= 0 ? '+' : ''}${mods.DEX} CON${mods.CON >= 0 ? '+' : ''}${mods.CON} ` +
-      `INT${mods.INT >= 0 ? '+' : ''}${mods.INT} WIS${mods.WIS >= 0 ? '+' : ''}${mods.WIS} CHA${mods.CHA >= 0 ? '+' : ''}${mods.CHA}. ` +
-      (equip ? `Equipped: ${equip}. ` : '') +
-      `Skills: ${player.skills.join(', ')}. ` +
-      (spellsLeft.length ? `Available spells: ${spellsLeft.join(', ')}. ` : '') +
-      `XP: ${player.xp}. ` +
-      `Carrying ${player.inventory.length} items, knows ${player.clues.length} clues.`
-    )
+    const m = player.abilityModifiers
+    const fmt = (v: number) => v >= 0 ? `+${v}` : `${v}`
+    const equip = [player.equipped.weapon?.name, player.equipped.armor?.name].filter(Boolean).join('、')
+    const spells = player.spells.filter(s => s.remaining > 0 || s.usesPerRest === 0).map(s => s.name)
+    return [
+      `${player.name} — ${player.level}级冒险者`,
+      `生命: ${player.hp}/${player.maxHp} | 金币: ${player.gold} | 经验: ${player.xp}`,
+      `属性: 力${fmt(m.STR)} 敏${fmt(m.DEX)} 体${fmt(m.CON)} 智${fmt(m.INT)} 感${fmt(m.WIS)} 魅${fmt(m.CHA)}`,
+      equip ? `装备: ${equip}` : '',
+      player.skills.length ? `技能: ${player.skills.join('、')}` : '',
+      spells.length ? `法术: ${spells.join('、')}` : '',
+      `背包: ${player.inventory.length}件 | 线索: ${player.clues.length}条`,
+    ].filter(Boolean).join('\n')
   }
 
   /** 获取指定 NPC 的上下文（中文，注入 DM prompt） */
