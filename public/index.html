@@ -934,6 +934,33 @@ function renderChapterPanel(data) {
   return html
 }
 
+function renderShopPanel(data) {
+  let html = `<div class="panel-card"><div class="panel-card-title">🏪 ${esc(data.npcName || '商店')}</div>`
+  html += `<div style="color:#e6b800;font-size:13px;margin-bottom:8px">💰 你的金币: ${data.playerGold ?? 0}</div>`
+  const items = data.items || []
+  if (!items.length) {
+    html += `<div style="color:#888;padding:12px 0;">商店没有库存了。</div>`
+  }
+  const seen = new Map()
+  for (const it of items) {
+    const key = it.name + '|' + (it.price ?? 0)
+    seen.set(key, (seen.get(key) || { ...it, count: 0 }))
+    seen.get(key).count++
+  }
+  for (const [, it] of seen) {
+    const qty = it.count > 1 ? ` ×${it.count}` : ''
+    const bonusTxt = it.bonus ? ` (+${it.bonus})` : ''
+    html += `<div class="item-row">`
+    html += `<div><span class="item-name">${esc(it.name)}${qty}${bonusTxt}</span>`
+    html += `<div style="font-size:11px;color:#888">${esc(it.description || '')}</div></div>`
+    html += `<span class="item-detail" style="color:#e6b800;white-space:nowrap">${it.price ?? '?'} 金</span>`
+    html += `</div>`
+  }
+  html += `<div style="font-size:11px;color:#666;margin-top:8px">对DM说"我要买XX"即可购买。出售价为购入价的50%。</div>`
+  html += `</div>`
+  return html
+}
+
 function renderRecapPanel(data) {
   let html = ''
   const critical = data.critical || []
@@ -1229,7 +1256,7 @@ function handleWsMessage(e) {
       sending = false
       document.getElementById('send').disabled = false
       const panelId = msg.panel || 'info'
-      const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', recap: '故事回顾', chapter: '章节进度', help: '帮助' }
+      const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', shop: '商店', recap: '故事回顾', chapter: '章节进度', help: '帮助' }
       const title = msg.title || PANEL_TITLES[panelId] || '信息'
       let html = ''
       switch (panelId) {
@@ -1239,6 +1266,7 @@ function handleWsMessage(e) {
         case 'npc':      html = renderNPCListPanel(msg.data || {}); break
         case 'inventory': html = renderInventoryPanel(msg.data || {}); break
         case 'recap':    html = renderRecapPanel(msg.data || {}); break
+        case 'shop':     html = renderShopPanel(msg.data || {}); break
         case 'chapter':  window._exploreData = (msg.data || {}).exploration || {}; html = renderChapterPanel(msg.data || {}); break
         default:         html = `<div class="panel-card"><div style="white-space:pre-wrap;color:#ccc">${esc(msg.text || JSON.stringify(msg.data, null, 2))}</div></div>`
       }
