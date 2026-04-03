@@ -90,6 +90,7 @@ export interface NPC {
   trust: number // -10 ~ 10
   knownFacts: string[] // NPC 掌握的情报
   playerPromises: string[] // 玩家对该 NPC 做过的承诺
+  interactionLog: string[] // 交互摘要（最近10条，供不在场时回顾）
   location: string
   mood: string
 }

@@ -38,7 +38,8 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
         'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
       }
       const npcLoc = locationNames[npc.location] ?? npc.location
-      return { output: `${npc.name}不在这里。上次见到${npc.name}是在${npcLoc}。`, isError: true }
+      const recap = facts.getNPCRecap(npcId)
+      return { output: `${npc.name}不在这里（目前在${npcLoc}），无法直接对话。\n${recap}`, isError: true }
     }
 
     const npcContext = facts.getNPCContext(npcId)
@@ -71,6 +72,11 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
         ].join('\n'),
       }
     }
+
+    // 记录交互摘要（供后续不在场时回顾）
+    if (!npc.interactionLog) npc.interactionLog = []
+    npc.interactionLog.push(`第${session.turnCount}轮：玩家对${npc.name}说"${message.slice(0, 40)}"`)
+    if (npc.interactionLog.length > 10) npc.interactionLog.shift()
 
     // ── 任务自动完成 + 分配 ──
     const completionInfo = tryAutoComplete(session, npc.name)

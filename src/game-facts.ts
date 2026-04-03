@@ -85,20 +85,33 @@ export class GameFactStore {
     )
   }
 
-  /** 获取指定 NPC 视角下对玩家的了解 */
+  /** 获取指定 NPC 的上下文（中文，注入 DM prompt） */
   getNPCContext(name: string): string {
     const npc = this.session.npcs.find(n => n.name === name)
     if (!npc) throw new Error(`NPC not found: ${name}`)
-    const promises = npc.playerPromises.length
-      ? `Player promised: ${npc.playerPromises.join('; ')}.`
-      : 'Player has made no promises.'
-    const facts = npc.knownFacts.length
-      ? `Known facts: ${npc.knownFacts.join('; ')}.`
-      : 'Knows nothing special.'
-    return (
-      `${npc.name} (trust: ${npc.trust}/10, mood: ${npc.mood}, at: ${npc.location}). ` +
-      `${facts} ${promises}`
-    )
+    const promises = npc.playerPromises.length ? `玩家承诺: ${npc.playerPromises.join('；')}` : ''
+    const facts = npc.knownFacts.length ? `掌握情报: ${npc.knownFacts.join('；')}` : ''
+    const log = (npc.interactionLog ?? []).length
+      ? `最近交互: ${(npc.interactionLog ?? []).slice(-3).join('；')}`
+      : ''
+    return [
+      `${npc.name}（信任:${npc.trust}, 情绪:${npc.mood}, 位于:${npc.location}）`,
+      facts, promises, log,
+    ].filter(Boolean).join('。')
+  }
+
+  /** 不在场 NPC 的回顾摘要（玩家问起不在身边的人时用） */
+  getNPCRecap(name: string): string {
+    const npc = this.session.npcs.find(n => n.name === name)
+    if (!npc) return `不认识叫${name}的人。`
+    const locationNames: Record<string, string> = {
+      'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
+      'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
+    }
+    const loc = locationNames[npc.location] ?? npc.location
+    const log = npc.interactionLog ?? []
+    if (log.length === 0) return `你还没有和${npc.name}交谈过。${npc.name}目前在${loc}。`
+    return `你和${npc.name}的交互回顾（${npc.name}目前在${loc}）:\n${log.map(l => `  · ${l}`).join('\n')}`
   }
 
   /** 保存到 saves/ 目录，文件名含角色名和时间 */
