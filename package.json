@@ -10,7 +10,7 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "express": "^5.2.1",
-    "open-claude-cli": "^0.8.0",
+    "open-claude-cli": "^0.8.1",
     "tsx": "^4.21.0",
     "ws": "^8.20.0",
     "zod": "^3.25.76"

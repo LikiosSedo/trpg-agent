@@ -22,12 +22,20 @@ import { buildDMPrompt } from './dm-prompt.js'
 function loadConfig() {
   // 优先用环境变量（Render 等云平台），其次读本地配置文件
   if (process.env.TRPG_API_KEY) {
-    return {
+    const config: Record<string, unknown> = {
       apiKey: process.env.TRPG_API_KEY,
       baseUrl: process.env.TRPG_BASE_URL ?? 'https://your-llm-endpoint/v1',
       model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
       type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
     }
+    // Kimi coding API 需要伪装成 coding agent + 禁用 stream_options
+    if (process.env.TRPG_HEADERS) {
+      try { config.headers = JSON.parse(process.env.TRPG_HEADERS) } catch {}
+    }
+    if (process.env.TRPG_STREAM_USAGE === 'false') {
+      config.streamUsage = false
+    }
+    return config
   }
   const configPath = join(homedir(), '.occ', 'config.json')
   if (!existsSync(configPath)) {
