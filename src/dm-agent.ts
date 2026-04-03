@@ -80,6 +80,18 @@ export function getDMAgent(): Agent {
   return agent
 }
 
+/** 导出 DM 对话历史（用于持久化） */
+export function getDMMessages(): any[] {
+  return agent?.getMessages() ?? []
+}
+
+/** 恢复 DM 对话历史（重连时调用） */
+export function restoreDMMessages(messages: any[]): void {
+  if (agent && messages?.length) {
+    agent.messages = messages
+  }
+}
+
 /**
  * 向 DM 发送玩家输入，返回响应流。
  * 每次自动注入 GameFactStore 上下文。

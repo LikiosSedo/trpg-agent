@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url'
 import type { GameSession } from './types.js'
 import { initGameState, getSession, getFacts, setSession, initItemRegistry } from './game-state.js'
 import { CLASS_TEMPLATES, createGameSession, createInitialNPCs } from './game-data.js'
-import { initDMAgent, dmRespond } from './dm-agent.js'
+import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages } from './dm-agent.js'
 import { DossierManager } from './dossier.js'
 import { GameFactStore } from './game-facts.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
@@ -247,10 +247,14 @@ wss.on('connection', (ws: WebSocket, req) => {
         migrateSession(connSession)
         setSession(connSession)
         initDMAgent()
+        // 恢复 DM 对话历史（从 localStorage 传回的完整 messages）
+        if (connSession.dmMessages?.length) {
+          restoreDMMessages(connSession.dmMessages)
+        }
         dossier = msg.dossier ? DossierManager.fromJSON(msg.dossier) : new DossierManager()
         resetIdleTracking()
         gameStarted = true
-        justResumed = true
+        justResumed = !connSession.dmMessages?.length  // 有完整历史就不需要回顾
         console.log(`[server] resumed session for ${connSession.player.name}`)
         send('resumed', {})
       } catch (err) {
@@ -299,6 +303,9 @@ wss.on('connection', (ws: WebSocket, req) => {
           if (notice) sysMsg(`🔔 新角色档案解锁: ${npc.name}`)
         }
       }
+
+      // 保存 DM 对话历史
+      connSession.dmMessages = getDMMessages()
 
       // 同步初始存档到客户端
       send('sync', { session: connSession, dossier: dossier.toJSON() })
@@ -641,6 +648,9 @@ wss.on('connection', (ws: WebSocket, req) => {
       if (session.chapter) {
         new ChapterManager(session).advanceTurn()
       }
+
+      // 保存 DM 对话历史到 session（随 sync 持久化到 localStorage）
+      session.dmMessages = getDMMessages()
 
       // 同步存档到客户端 localStorage
       send('sync', { session: connSession, dossier: dossier.toJSON() })

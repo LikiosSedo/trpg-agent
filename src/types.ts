@@ -174,4 +174,5 @@ export interface GameSession {
   combat: CombatState | null
   dossierData?: Record<string, any>
   chapter?: ChapterState        // 章节系统（新游戏有，旧存档可能没有）
+  dmMessages?: any[]            // DM Agent 对话历史（持久化到 localStorage）
 }
