@@ -20,7 +20,7 @@ import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { QuestManager } from './quest-manager.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
-import { WORLD_OVERVIEW } from './data/maps.js'
+import { WORLD_OVERVIEW, locations } from './data/maps.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -225,46 +225,80 @@ wss.on('connection', (ws: WebSocket, req) => {
 
       // Slash 命令
       if (input === '/status') {
-        sysMsg(facts.getPlayerSummary()); return
+        const p = session.player
+        const m = p.abilityModifiers
+        const atkMod = p.equipped.weapon ? m.STR + 2 + (p.equipped.weapon.bonus ?? 0) : 0
+        const damageDice = p.equipped.weapon?.description.match(/\d+d\d+/)?.[0] ?? '?'
+        send('panel', { panel: 'status', data: {
+          name: p.name,
+          level: p.level,
+          hp: p.hp,
+          maxHp: p.maxHp,
+          gold: p.gold,
+          xp: p.xp,
+          nextLevelXp: p.level === 1 ? 100 : p.level === 2 ? 300 : null,
+          abilities: {
+            STR: { value: p.abilities.STR, mod: m.STR },
+            DEX: { value: p.abilities.DEX, mod: m.DEX },
+            CON: { value: p.abilities.CON, mod: m.CON },
+            INT: { value: p.abilities.INT, mod: m.INT },
+            WIS: { value: p.abilities.WIS, mod: m.WIS },
+            CHA: { value: p.abilities.CHA, mod: m.CHA },
+          },
+          equipped: {
+            weapon: p.equipped.weapon ? { name: p.equipped.weapon.name, attackMod: atkMod, damage: damageDice } : null,
+            armor: p.equipped.armor ? { name: p.equipped.armor.name, ac: p.equipped.armor.bonus ?? 0 } : null,
+          },
+          spells: p.spells.map(s => ({
+            name: s.name,
+            desc: s.description,
+            remaining: s.remaining,
+            max: s.usesPerRest,
+            isCantrip: s.usesPerRest === 0,
+          })),
+          skills: p.skills as string[],
+          actions: (() => {
+            const a = ['weapon(武器攻击)']
+            if (p.spells.some(s => s.remaining > 0 || s.usesPerRest === 0)) a.push('spell(施法)')
+            a.push('flee(逃跑)')
+            return a
+          })(),
+        }})
+        return
       }
       if (input === '/quest') {
         const qm = new QuestManager(session)
         const active = qm.getActiveQuests()
-        if (active.length === 0) { sysMsg('暂无任务。去找冒险者公会接任务。'); return }
-        for (const q of active) {
-          const lines: string[] = []
-          let nextHint: string | null = null
-          for (let i = 0; i < q.objectives.length; i++) {
-            const obj = q.objectives[i]
-            if (q.objectivesCompleted[i]) {
-              lines.push(`  ✅ ${obj}`)
-            } else {
-              // 击杀目标带进度条
-              const killMatch = obj.match(/击杀(\d+)只(.+?)(\s*\[.+\])?$/)
-              if (killMatch) {
-                const required = Number(killMatch[1])
-                const targetZh = killMatch[2]
-                const monsterEmoji = targetZh === '狼' ? '🐺' : targetZh === '哥布林' ? '👺' : '💀'
-                const monsterNameEn = ({ '狼': 'Wolf', '哥布林': 'Goblin', '骷髅': 'Skeleton', '巨型蜘蛛': 'Giant Spider', '暗影': 'Shadow', '食尸鬼': 'Ghoul', '兽人战士': 'Orc Warrior' } as Record<string, string>)[targetZh]
-                const kills = monsterNameEn ? Number(session.worldState.flags[`kills_${monsterNameEn}`] ?? 0) : 0
-                const bar = monsterEmoji.repeat(Math.min(kills, required)) + '⬜'.repeat(Math.max(0, required - kills))
-                lines.push(`  ➡️ ${obj}\n     ${bar} ${kills}/${required}`)
-              } else {
-                lines.push(`  ➡️ ${obj}`)
-              }
-              // 从第一个未完成目标提取下一步提示
-              if (!nextHint) {
-                const locMatch = obj.match(/\[(.+?)\]/)
-                nextHint = locMatch ? locMatch[1] : null
-              }
-            }
-          }
-          const done = q.objectivesCompleted.filter(Boolean).length
-          let msg = `⚔ ${q.name} (${done}/${q.objectives.length})\n${lines.join('\n')}\n  奖励: ${q.reward.gold}金 + ${q.reward.xp}XP`
-          if (nextHint) msg += `\n  💡 下一步: ${nextHint}`
-          sysMsg(msg)
+        const completed = session.quests.filter(q => q.status === 'completed').map(q => q.name)
+        const monsterMap: Record<string, string> = {
+          '狼': 'Wolf', '哥布林': 'Goblin', '骷髅': 'Skeleton',
+          '巨型蜘蛛': 'Giant Spider', '暗影': 'Shadow', '食尸鬼': 'Ghoul', '兽人战士': 'Orc Warrior',
         }
-        sysMsg(`经验: ${session.player.xp} XP (Lv${session.player.level})`)
+        send('panel', { panel: 'quest', data: {
+          active: active.map(q => ({
+            name: q.name,
+            desc: q.description,
+            objectives: q.objectives.map((obj, i) => {
+              const done = q.objectivesCompleted[i]
+              let progress: { current: number; required: number } | undefined
+              if (!done) {
+                const killMatch = obj.match(/击杀(\d+)只(.+?)(\s*\[.+\])?$/)
+                if (killMatch) {
+                  const required = Number(killMatch[1])
+                  const monsterNameEn = monsterMap[killMatch[2]]
+                  const kills = monsterNameEn ? Number(session.worldState.flags[`kills_${monsterNameEn}`] ?? 0) : 0
+                  progress = { current: kills, required }
+                }
+              }
+              return { text: obj, done, progress }
+            }),
+            reward: { gold: q.reward.gold, xp: q.reward.xp },
+          })),
+          completed,
+          xp: session.player.xp,
+          level: session.player.level,
+          nextLevelXp: session.player.level === 1 ? 100 : session.player.level === 2 ? 300 : null,
+        }})
         return
       }
       if (input === '/save') {
@@ -301,21 +335,34 @@ wss.on('connection', (ws: WebSocket, req) => {
         return
       }
       if (input === '/map') {
-        sysMsg(WORLD_OVERVIEW.trim() + `\n\n当前位置: ${session.worldState.currentLocation}`)
+        send('panel', { panel: 'map', data: {
+          currentLocation: session.worldState.currentLocation,
+          locations: Object.values(locations).map(loc => ({
+            id: loc.id,
+            nameZh: loc.nameZh,
+            danger: loc.dangerLevel,
+            description: loc.description,
+          })),
+        }})
         return
       }
       if (input === '/npc' || input === '/npc ') {
-        if (dossier.listUnlocked().length > 0) {
-          sysMsg(stripAnsi(dossier.renderList()))
-        } else {
-          sysMsg('暂无已知人物。')
-        }
+        const trustMap: Record<string, number> = {}
+        for (const npc of session.npcs) trustMap[npc.name] = npc.trust
+        send('panel', { panel: 'npc_list', data: {
+          npcs: dossier.toListData(trustMap),
+        }})
         return
       }
       if (input.startsWith('/npc ') && input.length > 5) {
         const npcName = input.slice(5).trim()
         const npcData = session.npcs.find(n => n.name.includes(npcName) || npcName.includes(n.name))
-        sysMsg(stripAnsi(dossier.renderProfile(npcName, npcData?.trust)))
+        const profileData = dossier.toProfileData(npcName, npcData?.trust)
+        if (profileData) {
+          send('panel', { panel: 'npc_detail', data: profileData })
+        } else {
+          sysMsg(`未找到 "${npcName}" 的档案。输入 /npc 查看已知角色。`)
+        }
         return
       }
       if (input === '/world') {
@@ -323,17 +370,18 @@ wss.on('connection', (ws: WebSocket, req) => {
       }
       if (input === '/inventory') {
         const p = session.player
-        const items = p.inventory.map(i => `  ${i.name}`).join('\n') || '  (空)'
-        sysMsg(`🎒 背包:\n${p.equipped.weapon ? `  [装备] ${p.equipped.weapon.name}\n` : ''}${p.equipped.armor ? `  [装备] ${p.equipped.armor.name}\n` : ''}${items}\n  💰 ${p.gold} 金币`)
+        send('panel', { panel: 'inventory', data: {
+          weapon: p.equipped.weapon ? { name: p.equipped.weapon.name, desc: p.equipped.weapon.description } : null,
+          armor: p.equipped.armor ? { name: p.equipped.armor.name, desc: p.equipped.armor.description } : null,
+          items: p.inventory.map(i => ({ name: i.name, type: i.type, desc: i.description })),
+          gold: p.gold,
+        }})
         return
       }
       if (input === '/saves') {
-        const saves = GameFactStore.listSaves()
-        if (saves.length === 0) { sysMsg('暂无存档。'); return }
-        let list = '── 存档列表 ──\n'
-        for (const s of saves) list += `  ${s.file} — ${s.name} (第${s.turn}轮)\n`
-        list += '用法: /load <存档名>'
-        sysMsg(list)
+        send('panel', { panel: 'saves', data: {
+          saves: GameFactStore.listSaves(),
+        }})
         return
       }
       if (input === '/quit') {
@@ -344,7 +392,22 @@ wss.on('connection', (ws: WebSocket, req) => {
         return
       }
       if (input === '/help') {
-        sysMsg('命令: /status /quest /npc /npc <名> /world /map /inventory /save /saves /load /quit /help'); return
+        send('panel', { panel: 'help', data: {
+          commands: [
+            { cmd: '/status', desc: '查看角色状态' },
+            { cmd: '/quest', desc: '查看任务进度' },
+            { cmd: '/npc', desc: '查看已知人物' },
+            { cmd: '/npc <名>', desc: '查看人物详情' },
+            { cmd: '/world', desc: '查看世界指南' },
+            { cmd: '/map', desc: '查看地图' },
+            { cmd: '/inventory', desc: '查看背包' },
+            { cmd: '/save', desc: '保存游戏' },
+            { cmd: '/saves', desc: '查看存档列表' },
+            { cmd: '/load <名>', desc: '加载存档' },
+            { cmd: '/quit', desc: '退出游戏' },
+          ],
+        }})
+        return
       }
 
       // 安全检查

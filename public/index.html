@@ -107,13 +107,190 @@
   #start-btn:hover { background: #ffd000; }
   #start-btn:disabled { background: #666; cursor: not-allowed; }
 
-  /* 快捷命令 */
-  #shortcuts { display: flex; gap: 6px; padding: 8px 16px; background: #16213e; flex-wrap: wrap; }
-  .shortcut {
-    background: #0f3460; color: #888; border: 1px solid #333; padding: 4px 10px;
-    border-radius: 12px; font-size: 12px; cursor: pointer;
+  /* ─── Bottom Sheet ─── */
+  .panel-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
   }
-  .shortcut:hover { color: #e6b800; border-color: #e6b800; }
+  .panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .panel-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    /* sit above tab-bar (52px) */
+    transform: translateY(100%);
+    z-index: 101;
+    background: #16213e;
+    border-radius: 16px 16px 0 0;
+    max-height: 70vh;
+    display: flex; flex-direction: column;
+    transition: transform 0.3s cubic-bezier(.32,.72,.37,1.02);
+    padding-bottom: 52px; /* room for tab bar */
+  }
+  .panel-sheet.open { transform: translateY(0); }
+
+  .panel-handle {
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px 16px 0; flex-shrink: 0;
+  }
+  .panel-handle::before {
+    content: ''; display: block; width: 36px; height: 4px;
+    background: #555; border-radius: 2px;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px 12px; border-bottom: 1px solid #0f3460; flex-shrink: 0;
+  }
+  .panel-title { font-size: 16px; font-weight: bold; color: #e6b800; }
+  .panel-close {
+    background: none; border: none; color: #888; font-size: 20px;
+    cursor: pointer; padding: 0 4px; line-height: 1;
+  }
+  .panel-close:hover { color: #e0e0e0; }
+  .panel-body {
+    flex: 1; overflow-y: auto; padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ─── Tab 栏 ─── */
+  #tab-bar {
+    display: none; /* shown after game starts */
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 52px; background: #16213e;
+    border-top: 1px solid #0f3460;
+    z-index: 102;
+    justify-content: space-around; align-items: center;
+  }
+  #tab-bar .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+    color: #888; font-size: 11px; cursor: pointer;
+    padding: 6px 0; transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #tab-bar .tab .tab-icon { font-size: 18px; }
+  #tab-bar .tab.active { color: #e6b800; }
+  #tab-bar .tab:hover { color: #e6b800; }
+
+  /* ─── 战斗快捷栏 ─── */
+  #combat-bar {
+    display: none;
+    background: #2a1a0e; border-top: 1px solid #ff8c42;
+    padding: 8px 12px; gap: 8px;
+    justify-content: space-around;
+  }
+  #combat-bar.show { display: flex; }
+  #combat-bar .combat-action {
+    flex: 1; text-align: center; padding: 8px 4px;
+    background: #3a2210; border: 1px solid #ff8c42; border-radius: 8px;
+    color: #ff8c42; font-size: 13px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #combat-bar .combat-action:hover { background: #4a2a10; color: #ffd000; border-color: #ffd000; }
+
+  /* ─── 面板内容样式 ─── */
+  .panel-card {
+    background: #1a1a2e; border: 1px solid #0f3460; border-radius: 8px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .panel-card-title {
+    font-size: 14px; font-weight: bold; color: #e6b800; margin-bottom: 8px;
+  }
+
+  /* HP / 信任度条 */
+  .bar-track {
+    width: 100%; height: 10px; background: #0f3460; border-radius: 5px;
+    overflow: hidden; margin: 4px 0;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 5px; transition: width 0.3s;
+  }
+  .bar-fill.hp { background: #4caf50; }
+  .bar-fill.hp.warn { background: #ff9800; }
+  .bar-fill.hp.danger { background: #f44336; }
+  .bar-fill.trust { background: #64b5f6; }
+  .bar-fill.xp { background: #bb86fc; }
+  .bar-label {
+    display: flex; justify-content: space-between; font-size: 12px; color: #aaa;
+  }
+
+  /* 属性网格 */
+  .attr-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-top: 8px;
+  }
+  .attr-item {
+    background: #0f3460; border-radius: 6px; padding: 8px;
+    text-align: center;
+  }
+  .attr-item .attr-name { font-size: 11px; color: #888; }
+  .attr-item .attr-val { font-size: 18px; font-weight: bold; color: #e0e0e0; }
+
+  /* 装备/物品列表 */
+  .item-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid #0f3460;
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-name { font-size: 14px; color: #e0e0e0; }
+  .item-detail { font-size: 12px; color: #888; }
+
+  /* 任务 */
+  .quest-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .quest-status.active { background: #1a3a1a; color: #4caf50; }
+  .quest-status.completed { background: #3a3a1a; color: #e6b800; }
+
+  .quest-objective {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 0; font-size: 13px; color: #ccc;
+  }
+  .quest-objective.done { color: #888; text-decoration: line-through; }
+  .quest-objective::before { content: '☐'; color: #555; }
+  .quest-objective.done::before { content: '☑'; color: #4caf50; }
+
+  /* 地图 */
+  .map-area {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; border-radius: 6px; margin-bottom: 6px;
+    background: #0f3460; cursor: default;
+  }
+  .map-area.current { border: 1px solid #e6b800; background: #1a1a4e; }
+  .map-area .area-marker { font-size: 18px; }
+  .map-area .area-name { font-size: 14px; color: #e0e0e0; }
+  .map-area .area-desc { font-size: 11px; color: #888; }
+  .map-area.current .area-name { color: #e6b800; font-weight: bold; }
+
+  /* "更多" 网格 */
+  .more-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .more-item {
+    background: #0f3460; border: 1px solid #333; border-radius: 12px;
+    padding: 20px 12px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .more-item:hover { border-color: #e6b800; }
+  .more-item .more-icon { font-size: 28px; margin-bottom: 6px; }
+  .more-item .more-label { font-size: 14px; color: #ccc; }
+
+  /* NPC 卡片 */
+  .npc-card {
+    display: flex; align-items: center; gap: 12px;
+    background: #1a1a2e; border: 1px solid #0f3460; border-radius: 8px;
+    padding: 12px; margin-bottom: 10px;
+  }
+  .npc-avatar { font-size: 32px; }
+  .npc-info { flex: 1; }
+  .npc-name { font-size: 14px; font-weight: bold; color: #e0e0e0; }
+  .npc-role { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* 进度条文字 */
+  .progress-text { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* 游戏界面底部留空给 tab bar */
+  #game-screen { padding-bottom: 52px; }
 </style>
 </head>
 <body>
@@ -161,19 +338,53 @@
     <div class="sub">AI TRPG · powered by open-claude-cli</div>
   </div>
   <div id="messages"></div>
-  <div id="shortcuts">
-    <span class="shortcut" onclick="quickCmd('/status')">状态</span>
-    <span class="shortcut" onclick="quickCmd('/quest')">任务</span>
-    <span class="shortcut" onclick="quickCmd('/npc')">人物</span>
-    <span class="shortcut" onclick="quickCmd('/inventory')">背包</span>
-    <span class="shortcut" onclick="quickCmd('/world')">世界</span>
-    <span class="shortcut" onclick="quickCmd('/map')">地图</span>
-    <span class="shortcut" onclick="quickCmd('/save')">存档</span>
-    <span class="shortcut" onclick="quickCmd('/help')">帮助</span>
+
+  <!-- 战斗快捷栏 -->
+  <div id="combat-bar">
+    <div class="combat-action" onclick="combatCmd('用武器攻击')">⚔ 攻击</div>
+    <div class="combat-action" onclick="combatCmd('施放法术攻击')">✨ 法术</div>
+    <div class="combat-action" onclick="combatCmd('使用物品')">🧪 物品</div>
+    <div class="combat-action" onclick="combatCmd('逃跑')">🏃 逃跑</div>
   </div>
+
   <div id="input-area">
     <input id="input" placeholder="说点什么..." autocomplete="off">
     <button id="send" onclick="sendInput()">发送</button>
+  </div>
+</div>
+
+<!-- Bottom Sheet -->
+<div class="panel-overlay" id="panel-overlay" onclick="closePanel()"></div>
+<div class="panel-sheet" id="panel-sheet">
+  <div class="panel-handle"></div>
+  <div class="panel-header">
+    <span class="panel-title" id="panel-title"></span>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+</div>
+
+<!-- Tab 栏 -->
+<div id="tab-bar">
+  <div class="tab active" data-tab="game" onclick="switchTab('game')">
+    <span class="tab-icon">🎮</span>
+    <span>游戏</span>
+  </div>
+  <div class="tab" data-tab="status" onclick="switchTab('status')">
+    <span class="tab-icon">👤</span>
+    <span>状态</span>
+  </div>
+  <div class="tab" data-tab="quest" onclick="switchTab('quest')">
+    <span class="tab-icon">⚔</span>
+    <span>任务</span>
+  </div>
+  <div class="tab" data-tab="map" onclick="switchTab('map')">
+    <span class="tab-icon">🗺</span>
+    <span>地图</span>
+  </div>
+  <div class="tab" data-tab="more" onclick="switchTab('more')">
+    <span class="tab-icon">⋯</span>
+    <span>更多</span>
   </div>
 </div>
 
@@ -184,9 +395,9 @@ let sending = false
 let currentDmDiv = null
 let authToken = null
 let combatMode = false
+let currentPanelId = null  // track which panel is open
 
 // ─── 密码认证 ───
-// 页面加载时检查 localStorage 的 token（免重新输密码）
 ;(function checkSavedToken() {
   const saved = localStorage.getItem('trpg_token')
   if (saved) {
@@ -210,7 +421,7 @@ async function authenticate() {
     const data = await res.json()
     if (data.ok) {
       authToken = data.token ?? ''
-      localStorage.setItem('trpg_token', authToken)  // 记住 token
+      localStorage.setItem('trpg_token', authToken)
       document.getElementById('auth-screen').style.display = 'none'
       document.getElementById('create-screen').style.display = 'flex'
       document.getElementById('player-name').focus()
@@ -239,6 +450,222 @@ document.getElementById('player-name').addEventListener('input', () => {
   document.getElementById('start-btn').disabled = !document.getElementById('player-name').value.trim() || !selectedClass
 })
 
+// ─── Bottom Sheet ───
+function openPanel(panelId, title, contentHtml) {
+  currentPanelId = panelId
+  document.getElementById('panel-title').textContent = title
+  document.getElementById('panel-body').innerHTML = contentHtml
+  document.getElementById('panel-overlay').classList.add('open')
+  document.getElementById('panel-sheet').classList.add('open')
+  // highlight active tab
+  document.querySelectorAll('#tab-bar .tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === panelId)
+  })
+}
+
+function closePanel() {
+  currentPanelId = null
+  document.getElementById('panel-overlay').classList.remove('open')
+  document.getElementById('panel-sheet').classList.remove('open')
+  // set game tab active
+  document.querySelectorAll('#tab-bar .tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === 'game')
+  })
+}
+
+// ─── Tab 切换 ───
+function switchTab(tab) {
+  if (tab === 'game') {
+    closePanel()
+    return
+  }
+  if (tab === 'more') {
+    openPanel('more', '更多', renderMorePanel())
+    return
+  }
+  // Send command to server; panel will open when server responds with panel data
+  const cmdMap = { status: '/status', quest: '/quest', map: '/map' }
+  const cmd = cmdMap[tab]
+  if (cmd && ws && !sending) {
+    ws.send(JSON.stringify({ type: 'input', text: cmd }))
+    sending = true
+    document.getElementById('send').disabled = true
+  }
+}
+
+// ─── 面板渲染器 ───
+function renderStatusPanel(data) {
+  const hp = data.hp ?? 0, maxHp = data.maxHp ?? 1
+  const hpPct = Math.round((hp / maxHp) * 100)
+  const hpClass = hpPct > 50 ? 'hp' : hpPct > 25 ? 'hp warn' : 'hp danger'
+
+  const xp = data.xp ?? 0, xpNext = data.xpNext ?? 100
+  const xpPct = Math.round((xp / xpNext) * 100)
+
+  let html = `<div class="panel-card">`
+  html += `<div class="panel-card-title">${esc(data.name || '冒险者')} · Lv.${data.level ?? 1} ${esc(data.className || '')}</div>`
+  // HP
+  html += `<div class="bar-label"><span>HP</span><span>${hp} / ${maxHp}</span></div>`
+  html += `<div class="bar-track"><div class="bar-fill ${hpClass}" style="width:${hpPct}%"></div></div>`
+  // XP
+  html += `<div class="bar-label"><span>经验</span><span>${xp} / ${xpNext}</span></div>`
+  html += `<div class="bar-track"><div class="bar-fill xp" style="width:${xpPct}%"></div></div>`
+  html += `</div>`
+
+  // 属性
+  const attrs = data.attributes || {}
+  const attrNames = { STR: '力量', DEX: '敏捷', CON: '体质', INT: '智力', WIS: '感知', CHA: '魅力' }
+  html += `<div class="panel-card"><div class="panel-card-title">属性</div><div class="attr-grid">`
+  for (const [key, label] of Object.entries(attrNames)) {
+    html += `<div class="attr-item"><div class="attr-name">${label}</div><div class="attr-val">${attrs[key] ?? '—'}</div></div>`
+  }
+  html += `</div></div>`
+
+  // 装备
+  if (data.equipment && data.equipment.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">装备</div>`
+    for (const eq of data.equipment) {
+      html += `<div class="item-row"><span class="item-name">${esc(eq.name)}</span><span class="item-detail">${esc(eq.slot || '')}</span></div>`
+    }
+    html += `</div>`
+  }
+
+  return html
+}
+
+function renderQuestPanel(data) {
+  const quests = data.quests || []
+  if (!quests.length) return `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">暂无任务</div></div>`
+
+  let html = ''
+  for (const q of quests) {
+    const isComplete = q.status === 'completed'
+    html += `<div class="panel-card">`
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;">`
+    html += `<div class="panel-card-title" style="margin-bottom:0">${esc(q.name)}</div>`
+    html += `<span class="quest-status ${isComplete ? 'completed' : 'active'}">${isComplete ? '已完成' : '进行中'}</span>`
+    html += `</div>`
+    if (q.description) html += `<div style="font-size:12px;color:#aaa;margin:6px 0">${esc(q.description)}</div>`
+    // progress bar
+    if (q.progress != null) {
+      const pct = Math.round(q.progress * 100)
+      html += `<div class="bar-track"><div class="bar-fill hp" style="width:${pct}%;background:#e6b800"></div></div>`
+      html += `<div class="progress-text">${pct}% 完成</div>`
+    }
+    // objectives
+    if (q.objectives && q.objectives.length) {
+      for (const obj of q.objectives) {
+        html += `<div class="quest-objective ${obj.done ? 'done' : ''}">${esc(obj.text)}</div>`
+      }
+    }
+    html += `</div>`
+  }
+  return html
+}
+
+function renderMapPanel(data) {
+  const areas = data.areas || []
+  const current = data.currentArea || ''
+
+  let html = ''
+  if (data.regionName) {
+    html += `<div class="panel-card"><div class="panel-card-title">${esc(data.regionName)}</div>`
+    if (data.regionDesc) html += `<div style="font-size:12px;color:#aaa">${esc(data.regionDesc)}</div>`
+    html += `</div>`
+  }
+
+  for (const area of areas) {
+    const isCurrent = area.id === current || area.name === current
+    html += `<div class="map-area ${isCurrent ? 'current' : ''}">`
+    html += `<span class="area-marker">${isCurrent ? '📍' : '📌'}</span>`
+    html += `<div><div class="area-name">${esc(area.name)}</div>`
+    if (area.description) html += `<div class="area-desc">${esc(area.description)}</div>`
+    html += `</div></div>`
+  }
+
+  if (!areas.length) {
+    html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">地图未知</div></div>`
+  }
+  return html
+}
+
+function renderMorePanel() {
+  return `<div class="more-grid">
+    <div class="more-item" onclick="moreCmd('/npc', '人物')">
+      <div class="more-icon">👥</div><div class="more-label">人物</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/inventory', '背包')">
+      <div class="more-icon">🎒</div><div class="more-label">背包</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/save', '存档')">
+      <div class="more-icon">💾</div><div class="more-label">存档</div>
+    </div>
+    <div class="more-item" onclick="moreCmd('/help', '帮助')">
+      <div class="more-icon">📋</div><div class="more-label">帮助</div>
+    </div>
+  </div>`
+}
+
+function renderNPCListPanel(data) {
+  const npcs = data.npcs || []
+  if (!npcs.length) return `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">尚未遇到任何人物</div></div>`
+
+  let html = ''
+  for (const npc of npcs) {
+    const trust = npc.trust ?? 50
+    html += `<div class="npc-card">`
+    html += `<div class="npc-avatar">${esc(npc.avatar || '👤')}</div>`
+    html += `<div class="npc-info">`
+    html += `<div class="npc-name">${esc(npc.name)}</div>`
+    if (npc.role) html += `<div class="npc-role">${esc(npc.role)}</div>`
+    html += `<div class="bar-label"><span>信任度</span><span>${trust}%</span></div>`
+    html += `<div class="bar-track"><div class="bar-fill trust" style="width:${trust}%"></div></div>`
+    html += `</div></div>`
+  }
+  return html
+}
+
+function renderInventoryPanel(data) {
+  let html = ''
+  // equipment section
+  const equip = data.equipment || []
+  if (equip.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">装备</div>`
+    for (const e of equip) {
+      html += `<div class="item-row"><span class="item-name">${esc(e.name)}</span><span class="item-detail">${esc(e.slot || e.type || '')}</span></div>`
+    }
+    html += `</div>`
+  }
+  // items section
+  const items = data.items || []
+  if (items.length) {
+    html += `<div class="panel-card"><div class="panel-card-title">物品</div>`
+    for (const it of items) {
+      const qty = it.quantity > 1 ? ` ×${it.quantity}` : ''
+      html += `<div class="item-row"><span class="item-name">${esc(it.name)}${qty}</span><span class="item-detail">${esc(it.description || '')}</span></div>`
+    }
+    html += `</div>`
+  }
+  if (!equip.length && !items.length) {
+    html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">背包空空如也</div></div>`
+  }
+  return html
+}
+
+function moreCmd(cmd, label) {
+  if (!ws || sending) return
+  ws.send(JSON.stringify({ type: 'input', text: cmd }))
+  sending = true
+  document.getElementById('send').disabled = true
+}
+
+function esc(str) {
+  const d = document.createElement('div')
+  d.textContent = str
+  return d.innerHTML
+}
+
+// ─── 游戏启动 ───
 function startGame() {
   const name = document.getElementById('player-name').value.trim()
   if (!name || !selectedClass) return
@@ -246,10 +673,9 @@ function startGame() {
   document.getElementById('create-screen').style.display = 'none'
   const gameScreen = document.getElementById('game-screen')
   gameScreen.style.display = 'flex'
+  document.getElementById('tab-bar').style.display = 'flex'
 
-  // 连接 WebSocket
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // 带 token 连接（密码验证后获得）
   const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
   ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
 
@@ -257,97 +683,121 @@ function startGame() {
     ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))
   }
 
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data)
-    const container = document.getElementById('messages')
-    switch (msg.type) {
-      case 'dm':
-        // Append streaming chunks to the same div
-        if (!currentDmDiv) {
-          currentDmDiv = document.createElement('div')
-          currentDmDiv.className = 'msg dm'
-          container.appendChild(currentDmDiv)
-        }
-        currentDmDiv.textContent += msg.text
-        container.scrollTop = container.scrollHeight
-        break
-      case 'dm_end':
-        currentDmDiv = null
-        if (msg.pendingMonster) {
-          // 等待怪物回合 — 保持输入禁用
-          combatMode = true
-        } else {
-          sending = false
-          document.getElementById('send').disabled = false
-          combatMode = !!msg.combat
-          if (combatMode) {
-            showCombatActions()
-          } else {
-            showQuickActions()
-          }
-        }
-        break
-      case 'combat_monster':
-        appendMsg(msg.text, 'combat-monster')
-        break
-      case 'combat_status':
-        appendMsg(msg.text, 'combat-status')
-        sending = false
-        document.getElementById('send').disabled = false
-        if (msg.ended) {
-          combatMode = false
-          showQuickActions()
-        } else {
-          combatMode = true
-          showCombatActions()
-        }
-        break
-      case 'system':
-        appendMsg(msg.text, 'system')
-        sending = false
-        document.getElementById('send').disabled = false
-        break
-      case 'error':
-        appendMsg('⚠️ ' + msg.text, 'error')
-        sending = false
-        document.getElementById('send').disabled = false
-        break
-      case 'prologue':
-        appendMsg(msg.text, 'prologue')
-        break
-      case 'quest_progress':
-        appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
-        break
-    }
-  }
-
-  ws.onclose = () => {
-    sending = false
-    document.getElementById('send').disabled = false
-    appendMsg('连接断开，5秒后重连...', 'reconnect')
-    setTimeout(() => {
-      if (ws?.readyState === WebSocket.CLOSED) {
-        // 静默重连：不显示大段文本，只重建连接
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
-        ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
-        ws.onopen = () => appendMsg('已重连', 'reconnect')
-        ws.onmessage = arguments.callee  // 复用同一个 handler（简化）
-        ws.onclose = arguments.callee
-      }
-    }, 5000)
-  }
+  ws.onmessage = handleWsMessage
+  ws.onclose = handleWsClose
   ws.onerror = () => {
     sending = false
     document.getElementById('send').disabled = false
   }
 }
 
+function handleWsMessage(e) {
+  const msg = JSON.parse(e.data)
+  const container = document.getElementById('messages')
+
+  switch (msg.type) {
+    case 'dm':
+      if (!currentDmDiv) {
+        currentDmDiv = document.createElement('div')
+        currentDmDiv.className = 'msg dm'
+        container.appendChild(currentDmDiv)
+      }
+      currentDmDiv.textContent += msg.text
+      container.scrollTop = container.scrollHeight
+      break
+
+    case 'dm_end':
+      currentDmDiv = null
+      if (msg.pendingMonster) {
+        combatMode = true
+      } else {
+        sending = false
+        document.getElementById('send').disabled = false
+        combatMode = !!msg.combat
+        updateCombatBar()
+        if (!combatMode) showQuickActions()
+      }
+      break
+
+    case 'combat_monster':
+      appendMsg(msg.text, 'combat-monster')
+      break
+
+    case 'combat_status':
+      appendMsg(msg.text, 'combat-status')
+      sending = false
+      document.getElementById('send').disabled = false
+      combatMode = !msg.ended
+      updateCombatBar()
+      if (!combatMode) showQuickActions()
+      break
+
+    case 'panel': {
+      // Server sends structured panel data → render in bottom sheet
+      sending = false
+      document.getElementById('send').disabled = false
+      const panelId = msg.panel || 'info'
+      const title = msg.title || '信息'
+      let html = ''
+      switch (panelId) {
+        case 'status':   html = renderStatusPanel(msg.data || {}); break
+        case 'quest':    html = renderQuestPanel(msg.data || {}); break
+        case 'map':      html = renderMapPanel(msg.data || {}); break
+        case 'npc':      html = renderNPCListPanel(msg.data || {}); break
+        case 'inventory': html = renderInventoryPanel(msg.data || {}); break
+        default:         html = `<div class="panel-card"><div style="white-space:pre-wrap;color:#ccc">${esc(msg.text || JSON.stringify(msg.data, null, 2))}</div></div>`
+      }
+      openPanel(panelId, title, html)
+      break
+    }
+
+    case 'system':
+      // System command text output → render as panel fallback
+      sending = false
+      document.getElementById('send').disabled = false
+      openPanel('info', '系统', `<div class="panel-card"><div style="white-space:pre-wrap;color:#e6b800">${esc(msg.text)}</div></div>`)
+      break
+
+    case 'error':
+      appendMsg('⚠️ ' + msg.text, 'error')
+      sending = false
+      document.getElementById('send').disabled = false
+      break
+
+    case 'prologue':
+      appendMsg(msg.text, 'prologue')
+      break
+
+    case 'quest_progress':
+      appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
+      break
+  }
+}
+
+function handleWsClose() {
+  sending = false
+  document.getElementById('send').disabled = false
+  appendMsg('连接断开，5秒后重连...', 'reconnect')
+  setTimeout(() => {
+    if (ws?.readyState === WebSocket.CLOSED) {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : ''
+      ws = new WebSocket(`${proto}//${location.host}${tokenParam}`)
+      ws.onopen = () => appendMsg('已重连', 'reconnect')
+      ws.onmessage = handleWsMessage
+      ws.onclose = handleWsClose
+      ws.onerror = () => {
+        sending = false
+        document.getElementById('send').disabled = false
+      }
+    }
+  }, 5000)
+}
+
 function appendMsg(text, cls) {
   const div = document.createElement('div')
   div.className = 'msg ' + cls
   div.textContent = text
-  // 系统消息可折叠
   if (cls === 'system') {
     div.addEventListener('click', () => div.classList.toggle('expanded'))
   }
@@ -356,7 +806,21 @@ function appendMsg(text, cls) {
   container.scrollTop = container.scrollHeight
 }
 
-// DM 回复后显示快速动作建议
+// ─── 战斗栏 ───
+function updateCombatBar() {
+  const bar = document.getElementById('combat-bar')
+  bar.classList.toggle('show', combatMode)
+}
+
+function combatCmd(text) {
+  if (!ws || sending) return
+  appendMsg('🗡️ ' + text, 'player')
+  ws.send(JSON.stringify({ type: 'input', text }))
+  sending = true
+  document.getElementById('send').disabled = true
+}
+
+// ─── 快速动作建议 (非战斗) ───
 function showQuickActions() {
   const container = document.getElementById('messages')
   const existing = container.querySelector('.actions')
@@ -380,35 +844,7 @@ function showQuickActions() {
   container.scrollTop = container.scrollHeight
 }
 
-// 战斗中显示战斗动作按钮
-function showCombatActions() {
-  const container = document.getElementById('messages')
-  const existing = container.querySelector('.actions')
-  if (existing) existing.remove()
-
-  const actions = [
-    { label: '⚔ 攻击', cmd: '用武器攻击' },
-    { label: '✨ 法术', cmd: '施放法术攻击' },
-    { label: '🧪 物品', cmd: '使用物品' },
-    { label: '🏃 逃跑', cmd: '逃跑' },
-  ]
-  const div = document.createElement('div')
-  div.className = 'actions'
-  for (const a of actions) {
-    const btn = document.createElement('span')
-    btn.className = 'action-btn combat'
-    btn.textContent = a.label
-    btn.onclick = () => {
-      div.remove()
-      document.getElementById('input').value = a.cmd
-      sendInput()
-    }
-    div.appendChild(btn)
-  }
-  container.appendChild(div)
-  container.scrollTop = container.scrollHeight
-}
-
+// ─── 输入 ───
 function sendInput() {
   const input = document.getElementById('input')
   const text = input.value.trim()
@@ -421,15 +857,6 @@ function sendInput() {
   document.getElementById('send').disabled = true
 }
 
-function quickCmd(cmd) {
-  if (!ws || sending) return
-  appendMsg(cmd, 'player')
-  ws.send(JSON.stringify({ type: 'input', text: cmd }))
-  sending = true
-  document.getElementById('send').disabled = true
-}
-
-// Enter 发送
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     if (document.getElementById('create-screen').style.display !== 'none') {

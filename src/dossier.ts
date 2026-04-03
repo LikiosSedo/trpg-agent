@@ -406,6 +406,45 @@ export class DossierManager {
     return out
   }
 
+  /** Structured list data for panel rendering */
+  toListData(trustMap: Record<string, number>): Array<{
+    name: string; title: string; trust: number;
+    totalLayers: number; knownLayers: number; unlocked: boolean
+  }> {
+    return Array.from(this.entries).map(([key, entry]) => ({
+      name: entry.name,
+      title: entry.title,
+      trust: trustMap[key] ?? 0,
+      totalLayers: (REVELATION_LAYERS[key] ?? []).length,
+      knownLayers: entry.discovered.length,
+      unlocked: true,
+    }))
+  }
+
+  /** Structured profile data for panel rendering */
+  toProfileData(name: string, trust?: number): {
+    name: string; title: string; appearance: string; trust: number;
+    discovered: Array<{ fact: string; category: string }>;
+    portrait: string[]; locked: number
+  } | null {
+    const key = Array.from(this.entries.keys()).find(k => k.includes(name) || name.includes(k))
+    const entry = key ? this.entries.get(key) : undefined
+    if (!entry) return null
+
+    const total = (REVELATION_LAYERS[key!] ?? []).length
+    const known = entry.discovered.length
+
+    return {
+      name: entry.name,
+      title: entry.title,
+      appearance: entry.appearance,
+      trust: trust ?? 0,
+      discovered: entry.discovered.map(d => ({ fact: d.fact, category: d.category })),
+      portrait: PORTRAITS[key!] ?? [],
+      locked: total - known,
+    }
+  }
+
   isUnlocked(name: string): boolean { return this.entries.has(name) }
   listUnlocked(): string[] { return Array.from(this.entries.keys()) }
 
