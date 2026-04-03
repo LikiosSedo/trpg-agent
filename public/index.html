@@ -886,12 +886,11 @@ function switchTab(tab) {
     openPanel('more', '更多', renderMorePanel())
     return
   }
+  // 查看面板不受 sending 阻塞（DM 思考时也能查看地图/状态/任务）
   const cmdMap = { status: '/status', quest: '/quest', map: '/map' }
   const cmd = cmdMap[tab]
-  if (cmd && ws && !sending) {
-    ws.send(JSON.stringify({ type: 'input', text: cmd }))
-    sending = true
-    document.getElementById('send').disabled = true
+  if (cmd && ws) {
+    ws.send(JSON.stringify({ type: 'view', text: cmd }))
   }
 }
 

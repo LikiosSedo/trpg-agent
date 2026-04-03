@@ -243,6 +243,17 @@ wss.on('connection', (ws: WebSocket, req) => {
       return
     }
 
+    // ── 只读面板查看（不阻塞 DM 响应）──
+    if (msg.type === 'view') {
+      if (!gameStarted || !engine) return
+      const cmd = msg.text?.trim()
+      if (cmd) {
+        const result = engine.executeCommand(cmd)
+        if (result) sendCommandResult(result)
+      }
+      return
+    }
+
     // ── 游戏输入 ──
     if (msg.type === 'input') {
       if (!gameStarted || !engine) {
