@@ -13,6 +13,7 @@ import {
   DiceTool, MoveTool, LookTool, TalkTool,
   AttackTool, UseItemTool, SearchTool, RestTool,
   RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool, GameOverTool,
+  ChangeTrustTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -66,6 +67,7 @@ export function initDMAgent(): void {
       DiceTool, MoveTool, LookTool, TalkTool,
       AttackTool, UseItemTool, SearchTool, RestTool,
       RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool, GameOverTool,
+      ChangeTrustTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,

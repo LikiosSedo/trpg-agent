@@ -17,6 +17,8 @@ import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
 import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages } from './dm-agent.js'
 import { consumeActions, type SceneActions } from './tools/set-actions.js'
+import { consumeTrustChanges } from './tools/change-trust.js'
+import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
 import { consumeSpeakingNPCs } from './tools/talk.js'
 import { executeMonsterPhase, getCombatSummary } from './combat-manager.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
@@ -552,21 +554,26 @@ export class GameEngine {
     const idle = checkIdleEvent(input)
     if (idle) parts.push(idle)
 
-    // 每 5 轮重注入关键工具提醒（防止长上下文遗忘）
-    if (session.turnCount % 5 === 0) {
-      parts.push('[系统提醒] 回应结束前必须调用 SetActions 设置选项。伤害/物品变化必须通过工具（Attack/TransferItem），不要在文本中编造数值变化。')
-    }
+    // Adaptive tool reminder
+    const reminders: string[] = []
+    if (session.turnCount % 5 === 0) reminders.push('回应结束前必须调用SetActions设置选项。')
+    if (session.turnCount % 3 === 0) reminders.push('NPC对话后请调用ChangeTrust更新信任（日常±1）。')
+    if (session.turnCount % 5 === 0) reminders.push('伤害/物品/金币变化必须通过工具，不要在文本中编造数值。')
+    if (reminders.length) parts.push(`[系统提醒] ${reminders.join(' ')}`)
 
     parts.push(input)
 
     // DM 流式响应
     let fullText = ''
+    const toolsCalled: ToolCallRecord[] = []
     try {
       for await (const event of dmRespond(parts.join('\n\n'))) {
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
           yield { type: 'dm_text_delta', text }
           fullText += text
+        } else if (event.type === 'tool_result' && event.name) {
+          toolsCalled.push({ toolName: event.name })
         }
       }
     } catch (err) {
@@ -579,10 +586,20 @@ export class GameEngine {
       yield { type: 'game_over', reason: gameOver.reason, canContinue: gameOver.canContinue, continueHint: gameOver.continueHint }
     }
 
-    // 叙事伤害检测——DM 写了伤害文字但没走 Attack 工具
-    const dmgMatch = fullText.match(/造成\s*(\d+)\s*点伤害|受到\s*(\d+)\s*点伤害|HP[：:]\s*\d+\s*[→/]\s*(\d+)/i)
-    if (dmgMatch && !session.combat?.active) {
-      yield { type: 'narrative_warning', text: '[系统] DM 描述了伤害但未通过战斗工具执行，实际HP未变化。如需战斗请使用 Attack 工具。' }
+    // Consume trust changes from ChangeTrust tool
+    const trustChanges = consumeTrustChanges()
+    if (trustChanges.length > 0) {
+      toolsCalled.push({ toolName: 'ChangeTrust' })
+    }
+
+    // Unified narrative validation
+    const narrativeWarnings = validateNarrative(fullText, toolsCalled, session)
+    for (const w of narrativeWarnings) {
+      if (w.autoApplied) {
+        yield { type: 'npc_update', text: `[信任修正] ${w.description}` }
+      } else {
+        yield { type: 'narrative_warning', text: `[系统] ${w.description}` }
+      }
     }
 
     // NPC 立绘：Talk 工具记录了本轮所有说话的 NPC
