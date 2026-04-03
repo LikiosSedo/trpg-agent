@@ -70,7 +70,7 @@ export type TurnEvent =
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
   | { type: 'quest_completed'; questName: string; text: string }
   | { type: 'quest_progress'; questName: string; text: string; current?: number; required?: number }
-  | { type: 'npc_unlock'; npcName: string }
+  | { type: 'npc_unlock'; npcName: string; portrait: string; firstFacts: string[] }
   | { type: 'npc_update'; text: string }
   | { type: 'auto_save'; path?: string }
   | { type: 'audio'; bgm: string; ambient: string }
@@ -657,7 +657,7 @@ export class GameEngine {
     for (const npc of session.npcs) {
       if (input.includes(npc.name) || fullText.includes(npc.name)) {
         const unlock = this.dossier.unlock(npc.name, session.turnCount)
-        if (unlock) yield { type: 'npc_unlock', npcName: npc.name }
+        if (unlock) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
         const update = this.dossier.onInteraction(npc.name, npc.trust, session.turnCount)
         if (update) yield { type: 'npc_update', text: update }
       }

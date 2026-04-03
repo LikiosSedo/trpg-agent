@@ -240,6 +240,13 @@ function renderTurnEvent(event: TurnEvent): void {
     case 'npc_update':
       console.log(event.text)
       break
+    case 'npc_unlock':
+      console.log(chalk.yellow.bold(`\n  🔔 新角色档案解锁：${event.npcName}`))
+      if (event.firstFacts.length) {
+        for (const f of event.firstFacts) console.log(chalk.dim(`    · ${f}`))
+      }
+      console.log(chalk.dim('    已收藏到人物档案\n'))
+      break
     case 'npc_speaking':
       console.log(chalk.cyan(`\n  [${event.npcName}]`))
       break

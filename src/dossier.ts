@@ -406,6 +406,22 @@ export class DossierManager {
     return out
   }
 
+  /** 获取 NPC 的初始展示信息（首次解锁时用） */
+  getFirstFacts(name: string): string[] {
+    const base = BASE_INFO[name]
+    if (!base) return []
+    const layers = REVELATION_LAYERS[name] ?? []
+    // 返回信任度0就能看到的事实
+    return layers.filter(l => l.trustRequired === 0).map(l => l.fact)
+  }
+
+  /** 获取 NPC 的基本信息（标题、外貌描述） */
+  getBaseInfo(name: string): { title: string; appearance: string } | null {
+    const base = BASE_INFO[name]
+    if (!base) return null
+    return { title: base.title, appearance: base.appearance }
+  }
+
   /** Structured list data for panel rendering */
   toListData(trustMap: Record<string, number>): Array<{
     name: string; title: string; trust: number;

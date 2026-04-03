@@ -486,6 +486,88 @@
     0%, 100% { opacity: 0; }
     50% { opacity: 1; }
   }
+
+  /* ─── NPC Character Card Popup ─── */
+  .npc-card-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.75); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .npc-card-overlay.open { opacity: 1; pointer-events: auto; }
+  .npc-card-popup {
+    width: 90vw; max-width: 400px;
+    height: 85vh; max-height: 700px;
+    background: #12122a;
+    border: 1px solid #e6b800;
+    border-radius: 14px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(230,184,0,0.15), 0 20px 60px rgba(0,0,0,0.6);
+    transform: scale(0.92) translateY(20px);
+    transition: transform 0.4s cubic-bezier(.32,.72,.37,1.02);
+    position: relative;
+  }
+  .npc-card-overlay.open .npc-card-popup {
+    transform: scale(1) translateY(0);
+  }
+  .npc-card-close {
+    position: absolute; top: 10px; right: 14px;
+    background: rgba(0,0,0,0.5); border: none;
+    color: #aaa; font-size: 22px; cursor: pointer;
+    z-index: 2; width: 32px; height: 32px;
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    line-height: 1; transition: color 0.2s;
+  }
+  .npc-card-close:hover { color: #e0e0e0; }
+  .npc-card-portrait {
+    flex: 0 0 58%;
+    background: linear-gradient(180deg, #0a0a1e 0%, #1a1a3e 100%);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative;
+  }
+  .npc-card-portrait img {
+    width: 100%; height: 100%; object-fit: contain;
+    image-rendering: pixelated;
+  }
+  .npc-card-portrait::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, #12122a);
+  }
+  .npc-card-info {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 14px 18px 10px; overflow: hidden;
+  }
+  .npc-card-name {
+    font-size: 22px; font-weight: bold; color: #e6b800;
+    margin-bottom: 2px;
+  }
+  .npc-card-title {
+    font-size: 13px; color: #888; margin-bottom: 10px;
+  }
+  .npc-card-divider {
+    height: 1px; background: #333; margin-bottom: 10px; flex-shrink: 0;
+  }
+  .npc-card-facts {
+    flex: 1; overflow-y: auto; padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .npc-card-facts li {
+    color: #ccc; font-size: 13px; line-height: 1.6;
+    list-style: none; padding-left: 14px; position: relative;
+    margin-bottom: 4px;
+  }
+  .npc-card-facts li::before {
+    content: '◆'; position: absolute; left: 0; color: #e6b800;
+    font-size: 8px; top: 5px;
+  }
+  .npc-card-footer {
+    text-align: center; font-size: 11px; color: #555;
+    padding: 8px 0 4px; flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -567,6 +649,21 @@
     <button class="panel-close" onclick="closePanel()">✕</button>
   </div>
   <div class="panel-body" id="panel-body"></div>
+</div>
+
+<!-- NPC Character Card Popup -->
+<div class="npc-card-overlay" id="npc-card-overlay" onclick="closeNPCCard()">
+  <div class="npc-card-popup" onclick="event.stopPropagation()">
+    <button class="npc-card-close" onclick="closeNPCCard()">✕</button>
+    <div class="npc-card-portrait" id="npc-card-portrait"></div>
+    <div class="npc-card-info">
+      <div class="npc-card-name" id="npc-card-name"></div>
+      <div class="npc-card-title" id="npc-card-title"></div>
+      <div class="npc-card-divider"></div>
+      <ul class="npc-card-facts" id="npc-card-facts"></ul>
+      <div class="npc-card-footer">已收藏到人物档案</div>
+    </div>
+  </div>
 </div>
 
 <!-- Tab 栏 -->
@@ -1440,6 +1537,11 @@ function handleWsMessage(e) {
       showCombatPortraits(msg.monsters || [])
       break
 
+    // ─── NPC 角色卡 ───
+    case 'npc_card':
+      showNPCCard(msg)
+      break
+
     // ─── 音频 ───
     case 'audio':
       switchAudio(msg.bgm, msg.ambient)
@@ -1560,6 +1662,43 @@ function showSceneActions(actions) {
 
   container.appendChild(div)
   container.scrollTop = container.scrollHeight
+}
+
+// ─── NPC 角色卡弹窗 ───
+function showNPCCard(data) {
+  const overlay = document.getElementById('npc-card-overlay')
+  const portraitEl = document.getElementById('npc-card-portrait')
+  const nameEl = document.getElementById('npc-card-name')
+  const titleEl = document.getElementById('npc-card-title')
+  const factsEl = document.getElementById('npc-card-facts')
+
+  nameEl.textContent = data.npcName || ''
+  titleEl.textContent = data.title || ''
+
+  // Portrait
+  portraitEl.innerHTML = ''
+  if (data.portrait) {
+    const img = document.createElement('img')
+    img.src = data.portrait
+    img.alt = data.npcName || ''
+    img.onerror = function() { this.style.display = 'none' }
+    portraitEl.appendChild(img)
+  }
+
+  // Facts
+  factsEl.innerHTML = ''
+  const facts = data.firstFacts || []
+  for (const fact of facts) {
+    const li = document.createElement('li')
+    li.textContent = fact
+    factsEl.appendChild(li)
+  }
+
+  overlay.classList.add('open')
+}
+
+function closeNPCCard() {
+  document.getElementById('npc-card-overlay').classList.remove('open')
 }
 
 // ─── NPC 立绘显示 ───

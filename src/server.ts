@@ -142,7 +142,13 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'quest_progress':
           send('quest_progress', { quest: ev.questName, text: ev.text, current: ev.current, required: ev.required }); break
         case 'npc_unlock':
-          send('system', { text: `🔔 档案解锁: ${ev.npcName}` }); break
+          send('npc_card', {
+            npcName: ev.npcName,
+            portrait: ev.portrait,
+            firstFacts: ev.firstFacts,
+            title: engine!.dossier.getBaseInfo(ev.npcName)?.title ?? '',
+            appearance: engine!.dossier.getBaseInfo(ev.npcName)?.appearance ?? '',
+          }); break
         case 'npc_update':
           send('system', { text: ev.text }); break
         case 'npc_speaking':
