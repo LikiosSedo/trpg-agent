@@ -111,7 +111,9 @@ export const UseItemTool: Tool = {
         if (npc.location !== session.worldState.currentLocation) {
           return { output: `${npc.name}不在这里，无法给予物品。`, isError: true }
         }
-        player.inventory.splice(itemIdx, 1)
+        const givenItem = player.inventory.splice(itemIdx, 1)[0]
+        if (!npc.inventory) npc.inventory = []
+        npc.inventory.push(givenItem)  // 物品守恒：加入 NPC 背包
         facts.addEvent(`将${item!.name}交给${npc.name}`)
         result = { output: `将${item!.name}交给${npc.name}。` }
         break

@@ -70,6 +70,24 @@ export const TransferItemTool: Tool = {
       }
     }
 
+    // 买卖必须指定来源 NPC
+    if ((transferType === 'buy' || transferType === 'sell') && !sourceId) {
+      return { output: '买卖必须指定商人（sourceId）。', isError: true }
+    }
+
+    // 买：金币充足检查（防止绕过 validator）
+    if (transferType === 'buy' && goldAmount != null && session.player.gold < goldAmount) {
+      return { output: `金币不足（需要${goldAmount}，拥有${session.player.gold}）。`, isError: true }
+    }
+
+    // 卖：价格上限检查（防止 DM 编造天价）
+    if (transferType === 'sell' && goldAmount != null) {
+      const maxSellPrice = 200 // 单次卖出金额上限
+      if (goldAmount > maxSellPrice) {
+        return { output: `卖出金额${goldAmount}超过上限${maxSellPrice}金币。`, isError: true }
+      }
+    }
+
     // 构建转移请求
     const request: TransferRequest = {
       item,
@@ -149,13 +167,14 @@ function executeTransferAction(
     })
   }
 
-  // 金币交换
+  // 金币交换（二次检查防溢出）
   if (transferType === 'buy' && goldAmount != null) {
-    session.player.gold -= goldAmount
+    session.player.gold = Math.max(0, session.player.gold - goldAmount)
     lines.push(`支付${goldAmount}金币（剩余${session.player.gold}）`)
   } else if (transferType === 'sell' && goldAmount != null) {
-    session.player.gold += goldAmount
-    lines.push(`获得${goldAmount}金币（现有${session.player.gold}）`)
+    const capped = Math.min(goldAmount, 200) // 硬上限
+    session.player.gold += capped
+    lines.push(`获得${capped}金币（现有${session.player.gold}）`)
   }
 
   // 注册动态物品

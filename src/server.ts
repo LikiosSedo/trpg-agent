@@ -112,6 +112,7 @@ wss.on('connection', (ws: WebSocket, req) => {
   console.log('[server] new player connected (authenticated)')
   let engine: GameEngine | null = null
   let gameStarted = false
+  let processing = false  // 并发锁：防止同时处理两条消息
 
   function send(type: string, data: any) {
     if (ws.readyState === WebSocket.OPEN) {
@@ -264,6 +265,11 @@ wss.on('connection', (ws: WebSocket, req) => {
         send('error', { text: '游戏未开始。请先创建角色（刷新页面）。' })
         return
       }
+      if (processing) {
+        send('error', { text: '上一轮还在处理中，请稍候。' })
+        return
+      }
+      processing = true
       const input = msg.text?.trim()
       if (!input) return
 
@@ -273,7 +279,11 @@ wss.on('connection', (ws: WebSocket, req) => {
         return
       }
 
-      await streamEvents(engine.processTurn(input))
+      try {
+        await streamEvents(engine.processTurn(input))
+      } finally {
+        processing = false
+      }
     }
   })
 
