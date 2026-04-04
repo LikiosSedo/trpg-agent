@@ -1694,15 +1694,22 @@ function renderNPCCard(npc, npcLocs, isHere) {
   html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
   html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
   html += `</div>`
-  // 右侧：交谈按钮（仅在场且非昏迷/恢复中的 NPC）
+  // 右侧：交谈 + 攻击按钮（仅在场 NPC）
   if (isHere) {
-    const canTalk = !cond || cond === 'wounded'  // 负伤可以对话，昏迷/恢复中不行
-    html += `<div style="flex-shrink:0;margin-left:8px">`
+    const canTalk = cond !== 'unconscious'  // 昏迷不能对话，负伤/恢复中可以
+    const canAttack = cond !== 'unconscious' && cond !== 'recovering'  // 昏迷/恢复中不能攻击
+    html += `<div style="flex-shrink:0;margin-left:8px;display:flex;flex-direction:column;gap:4px">`
     if (canTalk) {
       html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
-      html += `style="background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
+      html += `style="background:#533483;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
     } else {
-      html += `<button disabled style="background:#333;color:#666;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:not-allowed;white-space:nowrap">💬 交谈</button>`
+      html += `<button disabled style="background:#333;color:#666;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap">💬 交谈</button>`
+    }
+    if (canAttack) {
+      html += `<button onclick="event.stopPropagation();npcAttack('${esc(shortName)}')" `
+      html += `style="background:#5a1a1a;color:#c05050;border:1px solid #702020;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">⚔ 攻击</button>`
+    } else {
+      html += `<button disabled style="background:#222;color:#555;border:1px solid #333;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap">⚔ 攻击</button>`
     }
     html += `</div>`
   }
@@ -1715,8 +1722,17 @@ function npcTalk(name) {
   const input = document.getElementById('input')
   input.value = `和${name}交谈：`
   input.focus()
-  // 切回游戏 tab
   switchTab('game')
+}
+
+/** 攻击按钮：确认后发送攻击指令 */
+function npcAttack(name) {
+  if (!confirm(`确定要攻击${name}吗？这会产生严重后果（信任暴跌、可能被追捕）。`)) return
+  const input = document.getElementById('input')
+  input.value = `攻击${name}`
+  switchTab('game')
+  // 自动发送
+  setTimeout(() => sendInput(), 100)
 }
 
 function renderInventoryPanel(data) {
