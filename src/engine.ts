@@ -1031,12 +1031,16 @@ export class GameEngine {
 
         if (existingAlert && !existingAlert.responded) {
           // 已有未响应的警报 → 缩短剩余延迟（每次额外暴力减 2 轮，最少 1 轮后响应）
-          const elapsed = session.turnCount - existingAlert.triggerTurn
-          const remaining = existingAlert.delay - elapsed
-          // 重复暴力：直接设为下一轮响应（不能比当前更慢）
-          existingAlert.delay = elapsed + 1
-          session.worldState.flags['violence_alert'] = JSON.stringify(existingAlert)
-          console.log(`[consequence] 重复暴力！加速响应: 剩余${remaining}→1轮`)
+          // 如果响应者已到达（阶段1完成），不干预——下轮就开打
+          if (existingAlert.arrivedResponder) {
+            console.log(`[consequence] 重复暴力但${existingAlert.arrivedResponder}已在场，不重置`)
+          } else {
+            const elapsed = session.turnCount - existingAlert.triggerTurn
+            const remaining = existingAlert.delay - elapsed
+            existingAlert.delay = elapsed + 1
+            session.worldState.flags['violence_alert'] = JSON.stringify(existingAlert)
+            console.log(`[consequence] 重复暴力！加速响应: 剩余${remaining}→1轮`)
+          }
         } else {
           // 新的暴力警报
           let delay = 5

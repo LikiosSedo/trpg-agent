@@ -104,6 +104,7 @@ export const AttackTool: Tool = {
       const NPC_GUARDS: Record<string, { shields: string[]; canFightSelf: boolean }> = {
         '维克多': { shields: ['镇长府卫兵', '韩猛'], canFightSelf: false },  // 镇长 8HP，不参战
         '艾琳娜': { shields: ['韩猛'], canFightSelf: true },  // 公会长自己也能打
+        '小莉': { shields: ['格雷格'], canFightSelf: false },  // 格雷格保护小莉（bond 2.0），小莉不参战
       }
       const guardConfig = NPC_GUARDS[targetId]
       let combatNames: string[]
