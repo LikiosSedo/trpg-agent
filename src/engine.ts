@@ -971,7 +971,14 @@ export class GameEngine {
     } else if ((action.type === 'BUY' || action.type === 'SELL') && action.npc) {
       session.interactionNpc = action.npc
     } else if (action.type === 'MOVE' && actionResult?.success) {
-      session.interactionNpc = undefined  // 移动后清除
+      // 移动后自动绑定目标地点的 NPC（如果只有一个，直接绑定；多个时绑定第一个）
+      const npcsAtDest = session.npcs.filter(n =>
+        n.location === session.worldState.currentLocation &&
+        (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation &&
+        n.condition !== 'unconscious'
+      )
+      session.interactionNpc = npcsAtDest.length > 0 ? npcsAtDest[0].name : undefined
+      if (session.interactionNpc) console.log(`[interaction] 移动后自动绑定: ${session.interactionNpc}`)
     }
 
     // Set violence alert for consequence system (NPC attacks only)
