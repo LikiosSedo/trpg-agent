@@ -26,6 +26,7 @@ import {
   executeMonsterPhase, getCombatSummary, executePlayerTurn,
   attemptFlee, checkCombatEnd, awardLoot, endCombat,
 } from './combat-manager.js'
+import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations } from './data/maps.js'
@@ -35,6 +36,71 @@ import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 import { consumeTradeProposal } from './tools/propose-trade.js'
 import { readFileSync } from 'fs'
+
+// ─── <think> 标签流式解析器 ─────────────────────────
+// DM 用 <think>...</think> 包裹内部推理，引擎分离为 dm_thinking 事件
+
+class ThinkTagParser {
+  private inThink = false
+  private buffer = ''
+
+  /** 处理一个 text chunk，返回 { narrative, thinking } */
+  process(chunk: string): { narrative: string; thinking: string } {
+    let narrative = ''
+    let thinking = ''
+    const input = this.buffer + chunk
+    this.buffer = ''
+
+    let i = 0
+    while (i < input.length) {
+      if (!this.inThink) {
+        const openIdx = input.indexOf('<think>', i)
+        if (openIdx === -1) {
+          // 检查末尾是否可能是不完整的 <think 标签
+          const tail = input.slice(Math.max(i, input.length - 7))
+          if (tail.length < 7 && '<think>'.startsWith(tail)) {
+            this.buffer = tail
+            narrative += input.slice(i, input.length - tail.length)
+          } else {
+            narrative += input.slice(i)
+          }
+          break
+        }
+        narrative += input.slice(i, openIdx)
+        this.inThink = true
+        i = openIdx + 7 // skip '<think>'
+      } else {
+        const closeIdx = input.indexOf('</think>', i)
+        if (closeIdx === -1) {
+          // 检查末尾是否可能是不完整的 </think 标签
+          const tail = input.slice(Math.max(i, input.length - 8))
+          if (tail.length < 8 && '</think>'.startsWith(tail)) {
+            this.buffer = tail
+            thinking += input.slice(i, input.length - tail.length)
+          } else {
+            thinking += input.slice(i)
+          }
+          break
+        }
+        thinking += input.slice(i, closeIdx)
+        this.inThink = false
+        i = closeIdx + 8 // skip '</think>'
+      }
+    }
+    return { narrative, thinking }
+  }
+
+  /** 刷新剩余 buffer */
+  flush(): { narrative: string; thinking: string } {
+    const buf = this.buffer
+    this.buffer = ''
+    if (this.inThink) {
+      this.inThink = false
+      return { narrative: '', thinking: buf }
+    }
+    return { narrative: buf, thinking: '' }
+  }
+}
 
 // ─── NPC 战斗数据缓存（用于状态恢复系统） ─────────
 
@@ -142,11 +208,12 @@ export type TurnEvent =
   | { type: 'combat_portraits'; monsters: Array<{ id: string; name: string; portrait: string; hp: number; maxHp: number }> }
   | { type: 'game_over'; reason: string; canContinue: boolean; continueHint?: string }
   | { type: 'narrative_warning'; text: string }
-  | { type: 'trade_confirm'; gold: number; npcName: string; itemHint?: string }
   | { type: 'item_acquired'; text: string }
   | { type: 'trade_proposal'; npc: string; items: any[]; totalPrice: number; canBargain: boolean }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
+  | { type: 'combat_narrative'; text: string }
+  | { type: 'dm_thinking'; text: string }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -171,7 +238,55 @@ function buildFallbackActions(session: GameSession): SceneActions {
 
 // ─── 存档迁移 ──────────────────────────────────
 
+// 旧存档物品名迁移（英文→中文）
+const ITEM_NAME_MIGRATION: Record<string, string> = {
+  'Shortsword': '短剑',
+  'Shortsword +1': '短剑 +1',
+  'Longsword': '长剑',
+  'Shortbow': '短弓',
+  'Leather Armor': '皮甲',
+  'Chain Shirt': '锁子甲',
+  'Healing Potion': '治疗药水',
+  'Antidote': '解毒剂',
+  'Shadow Ward Potion': '暗影防护药水',
+  'Mine Key': '矿道钥匙',
+  "Darian's Journal": '达里安的日志',
+  'Hempen Rope': '麻绳',
+  'Torch': '火把',
+}
+
+function migrateItemNames(session: GameSession): void {
+  const migrate = (name: string) => ITEM_NAME_MIGRATION[name] ?? name
+
+  // 玩家背包
+  for (const item of session.player.inventory) {
+    item.name = migrate(item.name)
+  }
+  // 装备槽
+  if (session.player.equipped.weapon) {
+    session.player.equipped.weapon.name = migrate(session.player.equipped.weapon.name)
+  }
+  if (session.player.equipped.armor) {
+    session.player.equipped.armor.name = migrate(session.player.equipped.armor.name)
+  }
+  // NPC 背包
+  for (const npc of session.npcs) {
+    for (const item of npc.inventory ?? []) {
+      item.name = migrate(item.name)
+    }
+    // shopPricing 键迁移
+    if (npc.shopPricing) {
+      const newPricing: Record<string, number> = {}
+      for (const [key, val] of Object.entries(npc.shopPricing)) {
+        newPricing[migrate(key)] = val
+      }
+      npc.shopPricing = newPricing
+    }
+  }
+}
+
 export function migrateSession(session: GameSession): void {
+  migrateItemNames(session)
   const defaults = createInitialNPCs()
   for (const npc of session.npcs) {
     if (npc.role === undefined) {
@@ -248,6 +363,14 @@ export class GameEngine {
   dossier: DossierManager
   private turnsSinceLastSave = 0
   private justResumed = false
+  // TODO: bargainState 目前不持久化——刷新页面会丢失砍价状态。
+  // 如需持久化，需要将此字段移入 session 并在 sync 时序列化到 localStorage。
+  private bargainState: {
+    npc: string
+    items: Array<{ name: string; price: number; quantity: number }>
+    lastPrice: number
+    round: number
+  } | null = null
 
   constructor(session: GameSession, dossier?: DossierManager) {
     this.session = session
@@ -610,6 +733,7 @@ export class GameEngine {
         const alert = JSON.parse(alertJson)
         if (!alert.responded) {
           const elapsed = session.turnCount - alert.triggerTurn
+          console.log(`[consequence] 暴力后果检查: turn=${session.turnCount}, trigger=${alert.triggerTurn}, elapsed=${elapsed}/${alert.delay}, victim=${alert.victimName}, arrived=${alert.arrivedResponder || '无'}`)
 
           // Player fled the area — discovery happens but no combat
           if (session.worldState.currentLocation !== alert.location) {
@@ -624,18 +748,33 @@ export class GameEngine {
           // 阶段 1：响应者到达（注入 DM 叙事上下文，不直接战斗）
           else if (elapsed === alert.delay && !alert.arrivedResponder) {
             const { getPersonality: getP } = await import('./npc-relationships.js')
+            // 暴力事件：任何能战斗的 NPC 都会来响应（不需要达到敌对信任度）
+            // 谋杀是公共事件，不是个人恩怨
             const candidates = session.npcs.filter(n =>
               n.name !== alert.victimName &&
               n.condition !== 'unconscious' &&
-              getP(n.name).canFight &&
-              n.trust <= getP(n.name).thresholds.hostile
+              n.condition !== 'recovering' &&
+              getP(n.name).canFight
             )
+            // 排序：同子地点 > 与受害者有 bond > 守卫韩猛 > 其他
             const responder = candidates.sort((a, b) => {
-              if (a.name === '韩猛') return -1
-              if (b.name === '韩猛') return 1
-              return 0
+              let scoreA = 0, scoreB = 0
+              // 同一子地点距离近
+              const subLoc = alert.subLocation
+              if ((a.subLocation ?? a.homeBase) === subLoc) scoreA += 10
+              if ((b.subLocation ?? b.homeBase) === subLoc) scoreB += 10
+              // 与受害者有 bond 关系
+              const bondsA = getP(a.name).bonds ?? []
+              const bondsB = getP(b.name).bonds ?? []
+              if (bondsA.some((bd: any) => bd.npcName === alert.victimName)) scoreA += 5
+              if (bondsB.some((bd: any) => bd.npcName === alert.victimName)) scoreB += 5
+              // 守卫优先
+              if (a.role === 'guard') scoreA += 3
+              if (b.role === 'guard') scoreB += 3
+              return scoreB - scoreA
             })[0] ?? null
 
+            console.log(`[consequence] 阶段1: 候选响应者=${candidates.map(c => c.name).join(',') || '无'}`)
             if (responder) {
               // 移动响应者到现场
               const { moveNPC } = await import('./npc-mobility.js')
@@ -643,16 +782,17 @@ export class GameEngine {
               alert.arrivedResponder = responder.name
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
               console.log(`[consequence] ${responder.name} 到达现场，下一轮将发起战斗`)
-              // 这一轮只叙事到达，不触发战斗
             } else {
               alert.responded = true
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] 无人响应（所有能战斗的NPC都不可用）`)
               yield { type: 'narrative_warning', text: '镇民发现了你的暴行，消息正在传开...' }
             }
           }
           // 阶段 2：下一轮自动触发战斗（DM 已经叙事了到达过程）
           else if (elapsed > alert.delay && alert.arrivedResponder && !alert.responded) {
             alert.responded = true
+            alert.combatJustStarted = alert.arrivedResponder
             session.worldState.flags['violence_alert'] = JSON.stringify(alert)
 
             const responderNpc = session.npcs.find(n => n.name === alert.arrivedResponder)
@@ -666,7 +806,8 @@ export class GameEngine {
                 startCombat(session, [alert.arrivedResponder], allDb as any)
                 console.log(`[consequence] ${alert.arrivedResponder} 发起战斗！`)
                 yield { type: 'narrative_warning', text: `⚔️ ${alert.arrivedResponder}向你发起了攻击！` }
-                yield* this.emitCombatStart()
+                yield* this.emitCombatStart(`${alert.arrivedResponder}怒声呵斥，向你冲来！`)
+                yield* this.combatDMNarrative(`${alert.arrivedResponder}因为你对${alert.victimName}的暴行而冲上来与你战斗。场景在${getSubLocationName(alert.subLocation)}。请描写战斗开场的紧张氛围。`)
               } catch (err) {
                 console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
               }
@@ -710,10 +851,25 @@ export class GameEngine {
           if (remaining > 0 && remaining <= 3) {
             parts.push(`[世界事件：${alert.victimName}的遭遇即将被发现，约${remaining}轮后有人赶到]`)
           }
-          // 响应者已到达但还没战斗 → 让 DM 叙事到达过程
+          // 阶段 1：响应者已到达但还没战斗 → 让 DM 叙事到达过程（含角色细节）
           if (alert.arrivedResponder && !alert.responded) {
-            parts.push(`[世界事件：${alert.arrivedResponder}已经赶到了${alert.victimName}所在的地方！请描写${alert.arrivedResponder}到达的场景——他的愤怒、他的气势、他对玩家的质问或警告。下一轮将自动触发战斗。]`)
+            const { getPersonality: getPForDm } = await import('./npc-relationships.js')
+            const victimNpc = session.npcs.find((n: any) => n.name === alert.victimName)
+            const victimCondition = victimNpc?.condition ?? 'unknown'
+            const responderPersonality = getPForDm(alert.arrivedResponder)
+            const bondNote = responderPersonality.bonds?.some((b: any) => b.npcName === alert.victimName)
+              ? `（${alert.arrivedResponder}与${alert.victimName}有亲近关系，情绪格外激动）`
+              : ''
+            parts.push(`[世界事件：${alert.arrivedResponder}已经赶到了${alert.victimName}所在的地方！${alert.victimName}目前状态：${victimCondition}。${bondNote}请描写${alert.arrivedResponder}到达的场景——他的愤怒、他的气势、他对玩家的质问或警告。这一轮只描写到达，不要描写攻击动作，下一轮战斗才开始。]`)
           }
+        }
+        // 阶段 2：战斗刚刚触发，DM 需要描写战斗开场
+        if (alert.combatJustStarted) {
+          const responderName = alert.combatJustStarted
+          parts.push(`[战斗触发：${responderName}因你对${alert.victimName}的暴行而向你发起攻击！请用1-2句描写战斗开场——${responderName}的愤怒和第一个动作。战斗数值由系统处理，不要编造数字。]`)
+          // 清除标志，只注入一次
+          delete alert.combatJustStarted
+          session.worldState.flags['violence_alert'] = JSON.stringify(alert)
         }
       } catch { /* ignore malformed */ }
     }
@@ -739,38 +895,63 @@ export class GameEngine {
       console.log(`[rules-agent] 跳过预执行: ${action.type} (TALK/NARRATIVE 交给 DM)`)
     }
 
+    // 交互上下文绑定：记录当前正在和谁交互
+    if (action.type === 'TALK' && action.npc) {
+      session.interactionNpc = action.npc
+    } else if ((action.type === 'BUY' || action.type === 'SELL') && action.npc) {
+      session.interactionNpc = action.npc
+    } else if (action.type === 'MOVE' && actionResult?.success) {
+      session.interactionNpc = undefined  // 移动后清除
+    }
+
     // Set violence alert for consequence system (NPC attacks only)
     if (action.type === 'ATTACK' && actionResult?.success) {
       const targetNpc = session.npcs.find(n => n.name === action.target)
       if (targetNpc) {
-        let delay = 5
-        const time = session.worldState.timeOfDay
-        if (time === 'night') delay += 4
-        else if (time === 'evening') delay += 2
+        // 检查是否已有暴力警报（重复暴力 → 加速响应，不重置）
+        const existingAlert = session.worldState.flags['violence_alert']
+          ? JSON.parse(session.worldState.flags['violence_alert'] as string)
+          : null
 
-        // Check witnesses at same sub-location
-        const witnesses = session.npcs.filter(n =>
-          n.name !== action.target &&
-          n.location === session.worldState.currentLocation &&
-          (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation &&
-          n.condition !== 'unconscious'
-        )
-        if (witnesses.length > 0) delay -= 3
-        // Civilian witness reports faster
-        const { getPersonality } = await import('./npc-relationships.js')
-        if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
+        if (existingAlert && !existingAlert.responded) {
+          // 已有未响应的警报 → 缩短剩余延迟（每次额外暴力减 2 轮，最少 1 轮后响应）
+          const elapsed = session.turnCount - existingAlert.triggerTurn
+          const remaining = existingAlert.delay - elapsed
+          // 重复暴力：直接设为下一轮响应（不能比当前更慢）
+          existingAlert.delay = elapsed + 1
+          session.worldState.flags['violence_alert'] = JSON.stringify(existingAlert)
+          console.log(`[consequence] 重复暴力！加速响应: 剩余${remaining}→1轮`)
+        } else {
+          // 新的暴力警报
+          let delay = 5
+          const time = session.worldState.timeOfDay
+          if (time === 'night') delay += 4
+          else if (time === 'evening') delay += 2
 
-        delay = Math.max(1, delay)
+          // Check witnesses at same sub-location
+          const witnesses = session.npcs.filter(n =>
+            n.name !== action.target &&
+            n.location === session.worldState.currentLocation &&
+            (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation &&
+            n.condition !== 'unconscious'
+          )
+          if (witnesses.length > 0) delay -= 3
+          // Civilian witness reports faster
+          const { getPersonality } = await import('./npc-relationships.js')
+          if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
 
-        session.worldState.flags['violence_alert'] = JSON.stringify({
-          triggerTurn: session.turnCount,
-          victimName: action.target,
-          location: session.worldState.currentLocation,
-          subLocation: session.worldState.currentSubLocation,
-          delay,
-          responded: false,
-        })
-        console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应`)
+          delay = Math.max(1, delay)
+
+          session.worldState.flags['violence_alert'] = JSON.stringify({
+            triggerTurn: session.turnCount,
+            victimName: action.target,
+            location: session.worldState.currentLocation,
+            subLocation: session.worldState.currentSubLocation,
+            delay,
+            responded: false,
+          })
+          console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应`)
+        }
       }
     }
 
@@ -789,6 +970,7 @@ export class GameEngine {
     const toolsCalled: ToolCallRecord[] = actionResult
       ? actionResult.toolsCalled.map(t => ({ toolName: t }))
       : []
+    const thinkParser = new ThinkTagParser()
     try {
       const timeoutMs = 60000 // 60 秒超时
       let timedOut = false
@@ -800,14 +982,23 @@ export class GameEngine {
           yield { type: 'dm_error', message: 'DM 响应超时，请重试。' }
           break
         }
-        if (event.type === 'text_delta') {
+        if (event.type === 'thinking_delta') {
+          const thinking = (event as any).thinking ?? ''
+          if (thinking) yield { type: 'dm_thinking', text: thinking }
+        } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
-          // 过滤 SDK bug：thinking-only 响应的原始 JSON 被当文本输出
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
-          yield { type: 'dm_text_delta', text }
-          fullText += text
+          // <think> 标签分离：思考→dm_thinking，叙事→dm_text_delta
+          const parsed = thinkParser.process(text)
+          if (parsed.thinking) yield { type: 'dm_thinking', text: parsed.thinking }
+          if (parsed.narrative) {
+            yield { type: 'dm_text_delta', text: parsed.narrative }
+            fullText += parsed.narrative
+          }
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
+          // DM Talk 工具不在这里更新 interactionNpc（输入参数不可见）
+          // interactionNpc 由 npc_speaking 检测更新（见下方）
           // 物品/金币变化时发送专门的物品通知事件
           if (event.name === 'TransferItem' && event.output && !event.isError) {
             const out = String(event.output)
@@ -818,6 +1009,13 @@ export class GameEngine {
         }
       }
       clearTimeout(timer)
+      // Flush think parser 残留 buffer
+      const flushed = thinkParser.flush()
+      if (flushed.thinking) yield { type: 'dm_thinking', text: flushed.thinking }
+      if (flushed.narrative) { fullText += flushed.narrative }
+      // Post-hoc 清理：streaming 分片可能绕过逐 chunk 过滤
+      const emptyIdx = fullText.indexOf('(Empty response:')
+      if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
       console.log(`[dm] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[dm] DM 错误:`, (err as Error).message)
@@ -833,6 +1031,17 @@ export class GameEngine {
     // 交易提案检查（DM 调用了 ProposeTradeAction？）
     const trade = consumeTradeProposal()
     if (trade) {
+      if (trade.canBargain !== false) {
+        this.bargainState = {
+          npc: trade.npc,
+          items: trade.items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity ?? 1 })),
+          lastPrice: trade.totalPrice,
+          round: 0,
+        }
+      } else {
+        // 最终价格，清空砍价状态
+        this.bargainState = null
+      }
       yield { type: 'trade_proposal', npc: trade.npc, items: trade.items, totalPrice: trade.totalPrice, canBargain: trade.canBargain }
     }
 
@@ -848,13 +1057,6 @@ export class GameEngine {
     const narrativeWarnings = validateNarrative(fullText, toolsCalled, session)
     if (narrativeWarnings.length) console.log(`[validator] 警告: ${narrativeWarnings.map(w => `${w.category}:${w.autoApplied ? '自动修正' : '仅警告'}`).join(', ')}`)
     for (const w of narrativeWarnings) {
-      if (w.category === 'trade') {
-        try {
-          const data = JSON.parse(w.description)
-          yield { type: 'trade_confirm', gold: data.gold, npcName: data.npcName || '', itemHint: '' }
-        } catch { /* skip malformed trade data */ }
-        continue
-      }
       if (w.autoApplied) {
         yield { type: 'npc_update', text: `[信任修正] ${w.description}` }
       } else {
@@ -878,6 +1080,10 @@ export class GameEngine {
         yield { type: 'npc_speaking', npcName: name, portrait: NPC_PORTRAITS[name] }
       }
     }
+    // 最后一个说话的 NPC 成为当前交互对象
+    if (speakers.length > 0) {
+      session.interactionNpc = speakers[speakers.length - 1]
+    }
 
     // 音频：DM 可能通过 SetAmbiance 覆盖，否则代码自动选择
     const ambianceOverride = consumeAmbianceOverride()
@@ -895,7 +1101,16 @@ export class GameEngine {
 
     // DM 结束 + 场景选项
     const dmActions = consumeActions()
-    const actions = dmActions ?? buildFallbackActions(session)
+    const actions = dmActions ?? { details: [], suggestions: [] }
+    // 过滤无效选项：不能和昏迷/死亡 NPC 交互
+    if (actions.suggestions) {
+      const invalidNpcs = session.npcs
+        .filter(n => n.condition === 'unconscious' || n.condition === 'recovering')
+        .map(n => n.name)
+      actions.suggestions = actions.suggestions.filter(s =>
+        !invalidNpcs.some(name => s.includes(name) && (s.includes('交谈') || s.includes('对话') || s.includes('聊') || s.includes('问') || s.includes('说')))
+      )
+    }
     yield {
       type: 'dm_end',
       combat: !!session.combat?.active,
@@ -918,6 +1133,8 @@ export class GameEngine {
         yield { type: 'narrative_warning', text: `⚔️ 遭遇战斗！${monsterNames.join('和')}向你发起攻击！` }
         // Emit combat_init + combat_action_req for structured combat UI
         yield* this.emitCombatStart(`${monsterNames.join('和')}向你发起攻击！`)
+        const loc = session.worldState.currentLocation === 'twilight-woods' ? '暮色森林' : session.worldState.currentLocation === 'greyspine-mines' ? '灰脊矿道' : '碎石荒原'
+        yield* this.combatDMNarrative(`在${loc}中，${monsterNames.join('和')}突然出现并向玩家发起攻击。请描写战斗开场的紧张氛围。`)
       } catch (err) {
         console.error(`[combat] 遭遇触发失败:`, (err as Error).message)
       }
@@ -1025,6 +1242,153 @@ export class GameEngine {
     }
   }
 
+  // ─── 砍价状态管理 ────────────────────────────
+
+  /** 清空砍价状态（交易成功或玩家取消后调用） */
+  clearBargain(): void {
+    this.bargainState = null
+  }
+
+  /** 处理砍价回合：跳过 Rules Agent，直接注入砍价上下文给 DM */
+  async *processBargain(playerText: string): AsyncGenerator<TurnEvent> {
+    if (!this.bargainState) {
+      yield* this.processTurn(playerText)
+      return
+    }
+
+    // 硬限制：最多 2 轮砍价，防止 DM 不遵守规则
+    if (this.bargainState.round >= 2) {
+      this.bargainState = null
+      yield* this.processTurn(playerText)
+      return
+    }
+
+    this.activate()
+    const session = this.session
+    const facts = getFacts()
+
+    this.bargainState.round++
+    const { npc, items, lastPrice, round } = this.bargainState
+
+    session.turnCount++
+    checkNPCConditionRecovery(session)
+
+    const itemList = items.map(i => `${i.name} x${i.quantity} @${i.price}金`).join('、')
+    const bargainContext = `[砍价进行中] 玩家正在与${npc}砍价。上次报价：${itemList}，总价${lastPrice}金。这是第${round}轮砍价。玩家说："${playerText}"。请根据NPC性格决定是否让价。如果同意降价，调用ProposeTradeAction给出新价格。如果拒绝，也调用ProposeTradeAction但设canBargain=false表示最终价格。最多允许2轮砍价。`
+
+    const parts: string[] = [bargainContext, playerText]
+
+    console.log(`[bargain] 第${round}轮砍价，${npc}，上次总价${lastPrice}金`)
+
+    // DM 流式响应
+    const dmStart = Date.now()
+    let fullText = ''
+    const toolsCalled: ToolCallRecord[] = []
+    try {
+      for await (const event of dmRespond(parts.join('\n\n'))) {
+        if (event.type === 'thinking_delta') {
+          const thinking = (event as any).thinking ?? ''
+          if (thinking) yield { type: 'dm_thinking', text: thinking }
+        } else if (event.type === 'text_delta') {
+          const text = event.text ?? ''
+          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          yield { type: 'dm_text_delta', text }
+          fullText += text
+        } else if (event.type === 'tool_result' && event.name) {
+          toolsCalled.push({ toolName: event.name })
+          if (event.name === 'TransferItem' && event.output && !event.isError) {
+            const out = String(event.output)
+            if (out.includes('获得物品') || out.includes('获得') || out.includes('支付')) {
+              yield { type: 'item_acquired', text: out }
+            }
+          }
+        }
+      }
+      const bargainEmptyIdx = fullText.indexOf('(Empty response:')
+      if (bargainEmptyIdx !== -1) fullText = fullText.substring(0, bargainEmptyIdx)
+      console.log(`[bargain] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
+    } catch (err) {
+      console.error(`[bargain] DM 错误:`, (err as Error).message)
+      yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
+    }
+
+    // 检查新的交易提案
+    const newTrade = consumeTradeProposal()
+    if (newTrade) {
+      if (newTrade.canBargain !== false) {
+        this.bargainState = {
+          npc: newTrade.npc,
+          items: newTrade.items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity ?? 1 })),
+          lastPrice: newTrade.totalPrice,
+          round,
+        }
+      } else {
+        this.bargainState = null
+      }
+      yield { type: 'trade_proposal', npc: newTrade.npc, items: newTrade.items, totalPrice: newTrade.totalPrice, canBargain: newTrade.canBargain }
+    } else {
+      // DM 没有发新报价，清空砍价状态
+      this.bargainState = null
+    }
+
+    // NPC 立绘
+    const speakers = consumeSpeakingNPCs()
+    for (const name of speakers) {
+      if (NPC_PORTRAITS[name]) {
+        yield { type: 'npc_speaking', npcName: name, portrait: NPC_PORTRAITS[name] }
+      }
+    }
+
+    // 场景选项
+    const dmActions = consumeActions()
+    const actions = dmActions ?? { details: [], suggestions: [] }
+    yield {
+      type: 'dm_end',
+      combat: false,
+      pendingMonster: false,
+      actions,
+    }
+
+    // 同步
+    session.dmMessages = getDMMessages()
+    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+
+    this.turnsSinceLastSave++
+    if (this.turnsSinceLastSave >= 5) {
+      session.dossierData = this.dossier.toJSON()
+      facts.save('autosave')
+      this.turnsSinceLastSave = 0
+      yield { type: 'auto_save' }
+    }
+  }
+
+  // ─── 战斗 DM 叙事 ────────────────────────────
+
+  /** 调用 DM 生成 2-3 句战斗场景叙事（开场/结束/逃跑） */
+  private async *combatDMNarrative(scene: string): AsyncGenerator<TurnEvent> {
+    let fullText = ''
+    try {
+      for await (const event of dmRespond(
+        `[战斗叙事请求] ${scene}\n用2-3句话描写这个场景。不要调用任何工具，不要提及HP/AC/骰子等数值。只输出叙事文字。`
+      )) {
+        if (event.type === 'text_delta') {
+          const text = event.text ?? ''
+          if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          fullText += text
+        }
+      }
+      const emptyIdx = fullText.indexOf('(Empty response:')
+      if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
+      if (fullText.trim()) {
+        yield { type: 'combat_narrative', text: fullText.trim() }
+      }
+    } catch (err) {
+      console.error('[combat-dm] 战斗叙事失败:', (err as Error).message?.slice(0, 80))
+    } finally {
+      consumeActions() // 清空战斗叙事期间 DM 可能残留的 SetActions
+    }
+  }
+
   // ─── 战斗初始化事件辅助 ────────────────────
 
   /** 生成 combat_init + combat_action_req 事件对 */
@@ -1033,6 +1397,15 @@ export class GameEngine {
     if (!combat?.active) return
 
     combat.phase = 'player_turn'
+
+    // 切换战斗 BGM
+    const combatAudio = resolveAudio(
+      this.session.worldState.currentLocation,
+      this.session.worldState.currentSubLocation,
+      this.session.worldState.timeOfDay,
+      true,
+    )
+    yield { type: 'audio', bgm: combatAudio.bgm, ambient: combatAudio.ambient }
 
     const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
     yield {
@@ -1070,6 +1443,7 @@ export class GameEngine {
   }): AsyncGenerator<TurnEvent> {
     this.activate()
     const session = this.session
+    session.interactionNpc = undefined  // 战斗中清除对话绑定
     const combat = session.combat
     if (!combat?.active) {
       yield { type: 'dm_error', message: '当前没有战斗。' }
@@ -1077,27 +1451,88 @@ export class GameEngine {
     }
 
     // 保留 combat.monsters 引用，战后用于 NPC 状态同步
-    // （endCombat 只是把 session.combat 设为 null，不清空 monsters 数组）
     const combatMonsters = combat.monsters
+    const enemyNames = combatMonsters.map(m => m.id).join('、')
+
+    // 先攻顺序：敌方先攻 > 玩家 → 每轮怪物先出手
+    const playerInit = combat.initiativeOrder.find(e => e.isPlayer)?.initiative ?? 0
+    const firstEnemyInit = combat.initiativeOrder.find(e => !e.isPlayer)?.initiative ?? 0
+    const enemyGoesFirst = firstEnemyInit > playerInit
+
+    if (enemyGoesFirst) {
+      skipMonsterPhase = true  // 怪物已在本轮开头行动，末尾不再重复
+      combat.phase = 'monster_turn'
+      const monsterResult = executeMonsterPhase(session)
+
+        // 怪物先手叙事
+        for (const mhit of monsterResult.hits ?? []) {
+          const isNpcAttacker = session.npcs.some(n => n.name === mhit.monsterName)
+          const prefix = isNpcAttacker ? 'npc' : 'monster'
+          const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
+          const mNarrative = pickNarrative(outcome as any, { monster: mhit.monsterName })
+          if (mNarrative) yield { type: 'combat_narrative', text: mNarrative }
+        }
+        if (monsterResult.log.length > 0) {
+          yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+        }
+
+        // 怪物先手打死玩家
+        if (monsterResult.ended && monsterResult.result === 'defeat') {
+          combat.phase = 'ended'
+          syncNPCConditionAfterCombat(session, combatMonsters)
+          yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
+          yield* this.combatDMNarrative(`玩家在与${enemyNames}的战斗中倒下了。描写最后的时刻。`)
+          yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+          if (session.player.hp <= 0) {
+            session.dossierData = this.dossier.toJSON()
+            getFacts().save('death-save')
+            yield { type: 'death' }
+          }
+          return
+        }
+        // 怪物打完，轮到玩家——不 return，继续往下走到 player action
+        combat.phase = 'player_turn'
+      }
+    }
 
     // Execute player action
     let skipMonsterPhase = false
     if (action.action === 'flee') {
-      // attemptFlee already executes monster turns on failure, so skip the monster phase below
-      skipMonsterPhase = true
       const result = attemptFlee(session)
       yield {
         type: 'combat_status',
         text: result.log.join('\n'),
         ended: result.ended,
-        result: result.ended ? (result.result === 'defeat' ? 'defeat' : 'fled') : undefined,
+        result: result.ended ? 'fled' : undefined,
       }
       if (result.ended) {
+        // 逃跑成功 → 结束战斗
         combat.phase = 'ended'
+        skipMonsterPhase = true
         syncNPCConditionAfterCombat(session, combatMonsters)
+
+        // 逃跑不等于脱罪：重置暴力警报，2 轮后另一个 NPC 来追
+        const alertJson = session.worldState.flags['violence_alert'] as string | undefined
+        if (alertJson) {
+          try {
+            const alert = JSON.parse(alertJson)
+            if (alert.responded && alert.arrivedResponder) {
+              alert.responded = false
+              alert.arrivedResponder = null
+              alert.triggerTurn = session.turnCount
+              alert.delay = 2  // 2 轮后下一个追兵到
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] 逃跑成功但暴力警报重置：2轮后新追兵`)
+              yield { type: 'narrative_warning', text: '你暂时甩掉了追兵，但镇子不会忘记你的所作所为...' }
+            }
+          } catch { /* ignore */ }
+        }
+
+        yield* this.combatDMNarrative(`玩家从与${enemyNames}的战斗中成功逃脱。描写逃跑的紧迫感和脱离战斗后的喘息。`)
         yield { type: 'sync', session, dossier: this.dossier.toJSON() }
         return
       }
+      // 逃跑失败 → 浪费回合，怪物正常回合继续（skipMonsterPhase=false）
     } else if (action.action === 'defend') {
       combat.playerDefending = true
       yield { type: 'combat_status', text: '你摆出防御姿态，AC临时+2。', ended: false }
@@ -1111,6 +1546,19 @@ export class GameEngine {
       const targetId = action.action === 'spell' ? (action.targetId ?? combat.monsters.find(m => m.hp > 0)?.id ?? '') : (action.targetId ?? '')
       const turnResult = executePlayerTurn(session, targetId, method, action.spellId)
 
+      // 玩家行动叙事
+      if (turnResult.hit !== undefined) {
+        const isNpcTarget = session.npcs.some(n => n.name === turnResult.targetName)
+        let narrativeOutcome: string
+        if (turnResult.killed) narrativeOutcome = isNpcTarget ? 'player_kill_npc' : 'player_kill'
+        else if (turnResult.isCritical) narrativeOutcome = 'player_critical'
+        else if (turnResult.hit) narrativeOutcome = 'player_hit'
+        else narrativeOutcome = 'player_miss'
+        const weaponName = session.player.equipped.weapon?.name ?? '武器'
+        const narrative = pickNarrative(narrativeOutcome as any, { target: turnResult.targetName ?? '敌人', weapon: weaponName })
+        if (narrative) yield { type: 'combat_narrative', text: narrative }
+      }
+
       // executePlayerTurn already handles victory (endCombat + loot)
       if (turnResult.ended) {
         syncNPCConditionAfterCombat(session, combatMonsters)
@@ -1121,6 +1569,12 @@ export class GameEngine {
           if (items.length || gold) lines.push(`获得: ${items.join(', ')}${gold ? ` + ${gold}金币` : ''}`)
         }
         yield { type: 'combat_status', text: lines.join('\n'), ended: true, result: turnResult.result }
+        const isNpcFight = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
+        yield* this.combatDMNarrative(
+          turnResult.result === 'victory'
+            ? `玩家${isNpcFight ? '击倒' : '击败'}了${enemyNames}。${isNpcFight ? '对方失去意识倒在地上。' : ''}描写战斗胜利后的场景。`
+            : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
+        )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON() }
         return
@@ -1141,8 +1595,18 @@ export class GameEngine {
       }
       syncNPCConditionAfterCombat(session, combatMonsters)
       endCombat(session)
+      yield* this.combatDMNarrative(
+        endCheck.result === 'victory'
+          ? `玩家击败了${enemyNames}。描写战斗胜利后的场景。`
+          : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
+      )
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
       yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+      if (session.player.hp <= 0) {
+        session.dossierData = this.dossier.toJSON()
+        getFacts().save('death-save')
+        yield { type: 'death' }
+      }
       return
     }
 
@@ -1151,6 +1615,19 @@ export class GameEngine {
       combat.phase = 'monster_turn'
       combat.pendingMonsterTurn = false
       const monsterResult = executeMonsterPhase(session)
+
+      // 怪物/NPC 行动叙事
+      for (const mhit of monsterResult.hits ?? []) {
+        const isNpcAttacker = session.npcs.some(n => n.name === mhit.monsterName)
+        const prefix = isNpcAttacker ? 'npc' : 'monster'
+        let monsterNarrativeOutcome: string
+        if (mhit.isCritical) monsterNarrativeOutcome = `${prefix}_critical`
+        else if (mhit.hit) monsterNarrativeOutcome = `${prefix}_hit`
+        else monsterNarrativeOutcome = `${prefix}_miss`
+        const mNarrative = pickNarrative(monsterNarrativeOutcome as any, { monster: mhit.monsterName })
+        if (mNarrative) yield { type: 'combat_narrative', text: mNarrative }
+      }
+
       if (monsterResult.log.length > 0) {
         yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
       }
@@ -1164,6 +1641,11 @@ export class GameEngine {
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
           ended: true, result: monsterResult.result,
         }
+        yield* this.combatDMNarrative(
+          monsterResult.result === 'victory'
+            ? `玩家击败了${enemyNames}。描写战斗胜利后的场景。`
+            : `玩家在与${enemyNames}的战斗中倒下了。描写最后的时刻。`
+        )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         // endCombat already called by executeMonsterPhase for defeat
         yield { type: 'sync', session, dossier: this.dossier.toJSON() }
@@ -1232,7 +1714,10 @@ export class GameEngine {
     let fullText = ''
     try {
       for await (const event of dmRespond(prompt)) {
-        if (event.type === 'text_delta') {
+        if (event.type === 'thinking_delta') {
+          const thinking = (event as any).thinking ?? ''
+          if (thinking) yield { type: 'dm_thinking', text: thinking }
+        } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
           // 过滤 SDK bug：thinking-only 响应
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
@@ -1240,6 +1725,8 @@ export class GameEngine {
           fullText += text
         }
       }
+      const openEmptyIdx = fullText.indexOf('(Empty response:')
+      if (openEmptyIdx !== -1) fullText = fullText.substring(0, openEmptyIdx)
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }

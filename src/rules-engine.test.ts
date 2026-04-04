@@ -38,10 +38,10 @@ function makeTestSession(): GameSession {
       maxHp: 12,
       gold: 50,
       inventory: [
-        { name: 'Healing Potion', type: 'potion', description: 'Restores 2d4+2 HP.', bonus: 2 },
-        { name: 'Longsword', type: 'weapon', description: 'Deals 1d8 slashing damage.', bonus: 0 },
-        { name: 'Leather Armor', type: 'armor', description: 'AC 11 + DEX modifier.', bonus: 1 },
-        { name: 'Mine Key', type: 'quest', description: 'Opens sealed mine gate.' },
+        { name: '治疗药水', type: 'potion', description: '恢复2d4+2生命值。', bonus: 2 },
+        { name: '长剑', type: 'weapon', description: '造成1d8劈砍伤害。', bonus: 0 },
+        { name: '皮甲', type: 'armor', description: 'AC 11 + 敏捷调整值。', bonus: 1 },
+        { name: '矿道钥匙', type: 'quest', description: '开启封闭的矿道铁门。' },
       ],
       spells: [
         { name: 'Fire Bolt', description: '', effect: 'Deal 1d10 fire damage.', usesPerRest: 0, remaining: 0 },
@@ -50,7 +50,7 @@ function makeTestSession(): GameSession {
       ],
       clues: [],
       equipped: {
-        weapon: { name: 'Shortsword', type: 'weapon', description: 'Deals 1d6 piercing damage.', bonus: 0 },
+        weapon: { name: '短剑', type: 'weapon', description: '造成1d6穿刺伤害。', bonus: 0 },
       },
     },
     npcs: [
@@ -199,15 +199,15 @@ console.log(`  RestTool(long): ${longResult.output}`)
 
 // UseItemTool - equip weapon
 initGameState(makeTestSession())
-const equipResult = await UseItemTool.execute({ itemId: 'Longsword', action: 'equip' }, {} as any)
+const equipResult = await UseItemTool.execute({ itemId: '长剑', action: 'equip' }, {} as any)
 assert(equipResult.output.includes('装备武器'), `UseItemTool equip: ${equipResult.output}`)
-assert(getSession().player.equipped.weapon?.name === 'Longsword', 'UseItemTool equipped longsword')
+assert(getSession().player.equipped.weapon?.name === '长剑', 'UseItemTool equipped 长剑')
 console.log(`  UseItemTool(equip): ${equipResult.output}`)
 
 // UseItemTool - use potion
 initGameState(makeTestSession())
 getSession().player.hp = 5
-const potionResult = await UseItemTool.execute({ itemId: 'Healing Potion', action: 'use' }, {} as any)
+const potionResult = await UseItemTool.execute({ itemId: '治疗药水', action: 'use' }, {} as any)
 assert(potionResult.output.includes('恢复'), `UseItemTool potion: ${potionResult.output}`)
 assert(getSession().player.hp > 5, 'UseItemTool healed')
 console.log(`  UseItemTool(potion): ${potionResult.output}`)

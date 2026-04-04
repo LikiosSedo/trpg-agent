@@ -34,7 +34,7 @@ export const ProposeTradeActionTool: Tool = {
 示例：玩家和叶绿谈好以5金币买2瓶治疗药水
 ProposeTradeAction({
   npc: "叶绿",
-  items: [{ name: "Healing Potion", type: "potion", price: 5, quantity: 2 }],
+  items: [{ name: "治疗药水", type: "potion", price: 5, quantity: 2 }],
   totalPrice: 10,
   canBargain: true
 })`,

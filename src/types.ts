@@ -190,6 +190,7 @@ export interface ChapterState {
   discoveries: string[]         // 已发现的 discovery ids
   idleTurns: number             // 自上次触发 beat 以来的空闲轮数
   nudgeIndex: number            // 当前 nudge 提示索引
+  pendingFacts?: string[]       // auto beat 触发后暂存的 facts，下轮注入 DM prompt 后清空
 }
 
 // ─── 游戏会话 ──────────────────────────────────
@@ -205,4 +206,5 @@ export interface GameSession {
   dossierData?: Record<string, any>
   chapter?: ChapterState        // 章节系统（新游戏有，旧存档可能没有）
   dmMessages?: any[]            // DM Agent 对话历史（持久化到 localStorage）
+  interactionNpc?: string       // 当前正在交互的 NPC（对话/交易状态绑定）
 }

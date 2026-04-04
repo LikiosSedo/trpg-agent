@@ -129,9 +129,9 @@ export const UseItemTool: Tool = {
 
     // 战斗中使用物品后，怪物获得反击回合
     if (session.combat?.active && !result!.isError) {
-      const monsterLog = executeMonsterTurns(session)
-      if (monsterLog.length > 0) {
-        result!.output += '\n\n[怪物回合]\n' + monsterLog.join('\n')
+      const monsterResult = executeMonsterTurns(session)
+      if (monsterResult.log.length > 0) {
+        result!.output += '\n\n[怪物回合]\n' + monsterResult.log.join('\n')
       }
       const check = checkCombatEnd(session)
       if (check.ended && check.result === 'defeat') {

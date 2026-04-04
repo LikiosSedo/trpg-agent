@@ -58,6 +58,13 @@
     border-radius: 4px;
     animation: combatFadeIn 0.4s ease-out;
   }
+  .msg.combat-narrative {
+    color: #c8a96e;
+    font-style: italic;
+    font-size: 13px;
+    padding: 4px 12px 4px 16px;
+    opacity: 0.88;
+  }
   .msg.combat-divider {
     color: #ff8c42 !important; font-size: 11px; text-align: center;
     padding: 4px 0; opacity: 0.6;
@@ -138,29 +145,116 @@
   .item-notif-text { color: #4caf50; font-size: 13px; line-height: 1.4; }
 
   /* ─── Trade proposal card ─── */
-  .trade-proposal-card {
-    background: #1a2a3e; border: 2px solid #e6b800; border-radius: 12px;
-    padding: 16px; margin: 8px 0; animation: combatFadeIn 0.4s ease-out;
+  @keyframes tradeSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  .trade-proposal-header { color: #e6b800; font-size: 15px; font-weight: bold; margin-bottom: 10px; }
-  .trade-item-row { display: flex; justify-content: space-between; padding: 4px 0; color: #ccc; font-size: 13px; border-bottom: 1px solid #0f3460; }
-  .trade-item-price { color: #e6b800; }
-  .trade-proposal-total { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #ccc; font-weight: bold; }
-  .trade-proposal-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
-  /* ─── Trade confirmation card ─── */
-  .trade-card {
-    background: #1a2a3e; border: 1px solid #e6b800; border-radius: 10px;
-    padding: 12px 16px; margin: 6px 0; display: inline-block;
+  .trade-proposal-card {
+    background: rgba(20, 15, 10, 0.95);
+    border: 1px solid #b8860b;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    box-shadow: 0 0 20px rgba(184, 134, 11, 0.15), inset 0 0 30px rgba(0,0,0,0.3);
+    animation: tradeSlideIn 0.3s ease-out;
   }
-  .trade-card .trade-title { color: #e6b800; font-size: 13px; font-weight: bold; margin-bottom: 8px; }
-  .trade-card .trade-info { color: #ccc; font-size: 13px; line-height: 1.6; }
-  .trade-card .trade-btns { display: flex; gap: 8px; margin-top: 10px; }
-  .trade-card .trade-btn {
-    padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; border: none;
+
+  .trade-proposal-header {
+    color: #daa520;
+    font-size: 15px;
+    font-weight: 600;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(184, 134, 11, 0.3);
+    margin-bottom: 12px;
   }
-  .trade-card .trade-btn.confirm { background: #4caf50; color: white; }
-  .trade-card .trade-btn.cancel { background: #333; color: #888; border: 1px solid #555; }
+
+  .trade-item-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    color: #c0b090;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .trade-item-price { color: #daa520; font-weight: 500; }
+
+  .trade-proposal-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0 8px;
+    border-top: 1px solid rgba(184, 134, 11, 0.3);
+    margin-top: 8px;
+    font-weight: 600;
+    color: #e8d5a0;
+    font-size: 14px;
+  }
+
+  .trade-proposal-balance {
+    text-align: right;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 14px;
+  }
+  .trade-proposal-balance.affordable   { color: #5a8a5a; }
+  .trade-proposal-balance.unaffordable { color: #c05050; }
+
+  .trade-proposal-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .trade-btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    font-family: inherit;
+  }
+  .trade-btn:active { transform: scale(0.96); }
+
+  .trade-btn-confirm {
+    background: linear-gradient(135deg, #b8860b, #daa520);
+    color: #1a1000;
+    font-weight: 600;
+  }
+  .trade-btn-confirm:hover:not(:disabled) {
+    filter: brightness(1.15);
+    box-shadow: 0 0 12px rgba(218, 165, 32, 0.35);
+  }
+  .trade-btn-confirm:disabled {
+    background: #3a3a3a;
+    color: #666;
+    cursor: not-allowed;
+    box-shadow: none;
+    filter: none;
+  }
+
+  .trade-btn-bargain {
+    background: transparent;
+    border: 1px solid #556;
+    color: #8899aa;
+    padding: 8px 18px;
+  }
+  .trade-btn-bargain:hover { border-color: #7799bb; color: #aabbcc; }
+
+  .trade-btn-cancel {
+    background: transparent;
+    border: none;
+    color: #666;
+    padding: 8px 12px;
+  }
+  .trade-btn-cancel:hover { color: #999; }
+
+  @media (max-width: 480px) {
+    .trade-proposal-btns { justify-content: stretch; }
+    .trade-btn, .trade-btn-bargain, .trade-btn-cancel { flex: 1; text-align: center; }
+  }
 
   #input-area {
     background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
@@ -638,6 +732,53 @@
     text-align: center; font-size: 11px; color: #555;
     padding: 8px 0 4px; flex-shrink: 0;
   }
+
+  /* ─── DM 思考日志面板 ─── */
+  .thinking-panel {
+    position: fixed;
+    bottom: 60px;
+    right: 12px;
+    width: 350px;
+    max-height: 400px;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    z-index: 100;
+    font-size: 12px;
+    overflow: hidden;
+  }
+  .thinking-panel.collapsed .thinking-content { display: none; }
+  .thinking-header {
+    padding: 8px 12px;
+    background: #16213e;
+    cursor: pointer;
+    color: #8888aa;
+    font-size: 11px;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .thinking-content {
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    color: #7a7a9a;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .thinking-entry {
+    border-bottom: 1px solid #222;
+    padding: 6px 0;
+    margin-bottom: 4px;
+  }
+  .thinking-entry .turn-label {
+    color: #5a5a8a;
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
 </style>
 </head>
 <body>
@@ -721,6 +862,15 @@
   </div>
 </div>
 
+<!-- DM 思考日志面板 -->
+<div id="dm-thinking-panel" class="thinking-panel collapsed" style="display:none">
+  <div class="thinking-header" onclick="toggleThinking()">
+    <span>DM 思考日志</span>
+    <span id="thinking-toggle">▶</span>
+  </div>
+  <div id="thinking-content" class="thinking-content"></div>
+</div>
+
 <!-- Bottom Sheet -->
 <div class="panel-overlay" id="panel-overlay" onclick="closePanel()"></div>
 <div class="panel-sheet" id="panel-sheet">
@@ -784,6 +934,8 @@ let combatItems = []       // available items (potions)
 let combatRound = 1        // current combat round
 let currentPanelId = null  // track which panel is open
 let isResuming = false     // true when reconnecting with saved session
+let currentThinkingEntry = null  // current turn's thinking DOM element
+let thinkingTurnCount = 0        // local turn counter for thinking labels
 
 // ─── localStorage 存档 ───
 const SAVE_KEYS = { session: 'trpg_session', messages: 'trpg_messages', dossier: 'trpg_dossier' }
@@ -833,6 +985,15 @@ function clearSave() {
   localStorage.removeItem(SAVE_KEYS.dossier)
 }
 
+// ─── DM 思考面板 ───
+function toggleThinking() {
+  const panel = document.getElementById('dm-thinking-panel')
+  const toggle = document.getElementById('thinking-toggle')
+  if (!panel) return
+  panel.classList.toggle('collapsed')
+  toggle.textContent = panel.classList.contains('collapsed') ? '▶' : '▼'
+}
+
 // ─── 密码认证 + 存档检查 ───
 ;(async function checkAuth() {
   // 先检查是否需要密码
@@ -853,6 +1014,14 @@ function clearSave() {
     authToken = saved
     document.getElementById('auth-screen').style.display = 'none'
     showEntryScreen()
+  }
+})()
+
+// 初始化思考面板可见性
+;(function initThinkingPanel() {
+  const panel = document.getElementById('dm-thinking-panel')
+  if (panel && localStorage.getItem('trpg_dev_thinking') === '1') {
+    panel.style.display = 'block'
   }
 })()
 
@@ -982,6 +1151,9 @@ function switchTab(tab) {
   }
   if (tab === 'more') {
     openPanel('more', '更多', renderMorePanel())
+    // 同步 checkbox 到 localStorage 状态
+    const cb = document.getElementById('dev-thinking-toggle')
+    if (cb) cb.checked = localStorage.getItem('trpg_dev_thinking') === '1'
     return
   }
   // 查看面板不受 sending 阻塞（DM 思考时也能查看）
@@ -1355,7 +1527,20 @@ function renderMorePanel() {
       <div class="more-icon">📋</div><div class="more-label">帮助</div>
     </div>
   </div>
+  <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">开发者</div>
+  <div style="padding:4px 0">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 4px;color:#8888aa;font-size:13px">
+      <input type="checkbox" id="dev-thinking-toggle" onchange="setThinkingVisible(this.checked)" style="width:16px;height:16px;cursor:pointer">
+      显示 DM 思考日志
+    </label>
+  </div>
   <input type="file" id="save-upload" accept=".json" style="display:none" onchange="uploadSave(this)">`
+}
+
+function setThinkingVisible(enabled) {
+  localStorage.setItem('trpg_dev_thinking', enabled ? '1' : '0')
+  const panel = document.getElementById('dm-thinking-panel')
+  if (panel) panel.style.display = enabled ? 'block' : 'none'
 }
 
 // ─── 下载/上传存档 ───
@@ -1626,6 +1811,9 @@ function handleWsMessage(e) {
       if (currentDmDiv) {
         // 清理 markdown 符号和重复的选项文本
         let cleanText = currentDmDiv._fullText || currentDmDiv.textContent
+        // 截断 SDK thinking-only 响应泄漏（streaming 分片可能绕过 engine 逐 chunk 过滤）
+        const emptyIdx = cleanText.indexOf('(Empty response:')
+        if (emptyIdx !== -1) cleanText = cleanText.substring(0, emptyIdx)
         cleanText = cleanText
           .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → bold
           .replace(/\*([^*]+)\*/g, '$1')         // *italic* → italic
@@ -1637,6 +1825,8 @@ function handleWsMessage(e) {
         saveMessage('dm', cleanText)
       }
       currentDmDiv = null
+      currentThinkingEntry = null
+      thinkingTurnCount++
       if (msg.pendingMonster) {
         combatMode = true
       } else {
@@ -1666,6 +1856,10 @@ function handleWsMessage(e) {
       setCombatButtonsEnabled(true)
       hideCombatSelector()
       updateCombatPanel()
+      break
+
+    case 'combat_narrative':
+      appendMsg(msg.text, 'combat-narrative')
       break
 
     case 'combat_monster':
@@ -1801,11 +1995,6 @@ function handleWsMessage(e) {
       showItemNotification(msg.text)
       break
 
-    // ─── 交易确认卡片 ───
-    case 'trade_confirm':
-      showTradeCard(msg)
-      break
-
     // ─── 交易提案（DM 驱动的完整交易卡片） ───
     case 'trade_proposal':
       showTradeProposal(msg)
@@ -1815,6 +2004,24 @@ function handleWsMessage(e) {
     case 'audio':
       switchAudio(msg.bgm, msg.ambient)
       break
+
+    // ─── DM 思考日志 ───
+    case 'dm_thinking': {
+      const thinkingPanel = document.getElementById('dm-thinking-panel')
+      if (!thinkingPanel || thinkingPanel.style.display === 'none') break
+      const thinkingContent = document.getElementById('thinking-content')
+      if (!currentThinkingEntry) {
+        currentThinkingEntry = document.createElement('div')
+        currentThinkingEntry.className = 'thinking-entry'
+        const label = document.createElement('div')
+        label.className = 'turn-label'
+        label.textContent = 'Turn ' + (thinkingTurnCount + 1)
+        currentThinkingEntry.appendChild(label)
+        thinkingContent.prepend(currentThinkingEntry)
+      }
+      currentThinkingEntry.appendChild(document.createTextNode(msg.text))
+      break
+    }
 
     // ─── 存档同步 ───
     case 'sync':
@@ -2146,56 +2353,41 @@ function showTradeProposal(data) {
 
   const card = document.createElement('div')
   card.className = 'trade-proposal-card'
+  // Store trade data on DOM (avoids JSON-in-HTML-attribute escaping bug)
+  card._tradeData = { npc: data.npc || '商人', items, totalPrice }
+  const balanceAfter = playerGold - totalPrice
+  const balanceClass = canAfford ? 'affordable' : 'unaffordable'
   card.innerHTML = `
-    <div class="trade-proposal-header">💰 交易 — ${esc(data.npc || '商人')}</div>
+    <div class="trade-proposal-header">🪙 交易 — ${esc(data.npc || '商人')}</div>
     <div class="trade-proposal-items">${itemsHtml}</div>
     <div class="trade-proposal-total">
-      <span>总计：${totalPrice} 金币</span>
-      <span style="color:${canAfford ? '#4caf50' : '#f44336'}">余额：${playerGold} → ${playerGold - totalPrice}</span>
+      <span>总计</span>
+      <span class="trade-item-price">${totalPrice} 金</span>
     </div>
+    <div class="trade-proposal-balance ${balanceClass}">余额：${playerGold} → ${balanceAfter} 金</div>
     <div class="trade-proposal-btns">
-      ${data.canBargain ? `<button class="trade-btn" style="background:#0f3460;color:#e6b800;border:1px solid #e6b800" onclick="tradeBargain(this)">💬 砍价</button>` : ''}
-      <button class="trade-btn confirm" ${canAfford ? '' : 'disabled style="opacity:0.4"'} onclick="tradeConfirm(this, '${esc(data.npc)}', ${JSON.stringify(items).replace(/'/g, "\\'")}  , ${totalPrice})">✅ 确认交易</button>
-      <button class="trade-btn cancel" onclick="this.closest('.trade-proposal-card').remove()">❌ 取消</button>
+      ${data.canBargain ? `<button class="trade-btn trade-btn-bargain" onclick="tradeBargain(this)">💬 砍价</button>` : ''}
+      <button class="trade-btn trade-btn-confirm" ${canAfford ? '' : 'disabled'} onclick="tradeConfirm(this)">确认交易</button>
+      <button class="trade-btn trade-btn-cancel" onclick="this.closest('.trade-proposal-card').remove()">取消</button>
     </div>`
   container.appendChild(card)
   container.scrollTop = container.scrollHeight
 }
 
-function tradeConfirm(btn, npc, items, totalPrice) {
+function tradeConfirm(btn) {
+  const card = btn.closest('.trade-proposal-card')
+  const { npc, items, totalPrice } = card._tradeData
   ws.send(JSON.stringify({ type: 'trade_execute', npc, items, totalPrice }))
-  btn.closest('.trade-proposal-card').innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px">✅ 交易完成</div>'
+  card.innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px">✅ 交易完成</div>'
 }
 
 function tradeBargain(btn) {
   btn.closest('.trade-proposal-card').remove()
+  window._bargainMode = true
   const input = document.getElementById('input')
-  input.value = '能再便宜点吗？'
+  input.value = ''
+  input.placeholder = '砍价：你想怎么说？（发送后自动结束砍价模式）'
   input.focus()
-}
-
-function showTradeCard(data) {
-  const container = document.getElementById('messages')
-  const card = document.createElement('div')
-  card.className = 'trade-card'
-  card.innerHTML = `
-    <div class="trade-title">📦 交易确认</div>
-    <div class="trade-info">
-      卖家: ${esc(data.npcName || '未知')}<br>
-      价格: ${data.gold} 金币
-    </div>
-    <div class="trade-btns">
-      <button class="trade-btn confirm" onclick="executeTrade(this, ${data.gold}, '${esc(data.npcName || '')}')">✅ 确认交易</button>
-      <button class="trade-btn cancel" onclick="this.closest('.trade-card').remove()">❌ 取消</button>
-    </div>`
-  container.appendChild(card)
-  container.scrollTop = container.scrollHeight
-}
-
-function executeTrade(btn, gold, npc) {
-  const item = prompt('确认购买的物品名称：') || 'unknown'
-  ws.send(JSON.stringify({ type: 'trade_execute', gold, npc, item }))
-  btn.closest('.trade-card').innerHTML = '<div style="color:#4caf50;font-size:13px">✅ 交易已执行</div>'
 }
 
 // ─── NPC 立绘显示 ───
@@ -2364,7 +2556,15 @@ function sendInput() {
 
   appendMsg('🗡️ ' + text, 'player')
   saveMessage('player', text)
-  ws.send(JSON.stringify({ type: 'input', text }))
+
+  if (window._bargainMode) {
+    window._bargainMode = false
+    input.placeholder = ''
+    ws.send(JSON.stringify({ type: 'bargain', text }))
+  } else {
+    ws.send(JSON.stringify({ type: 'input', text }))
+  }
+
   input.value = ''
   input.style.height = 'auto'
   sending = true

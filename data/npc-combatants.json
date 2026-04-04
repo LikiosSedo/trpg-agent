@@ -59,7 +59,7 @@
     "damageDice": "2d6+4",
     "specialAbility": "Void Resonance: on hit, DC 14 WIS save or frightened 1 turn; once per combat can become invisible 1 round",
     "description": "游吟诗人外表下的暗影教团执行者。黑木琴是虚空法器。",
-    "loot": ["Shadow Crystal"],
+    "loot": ["暗影水晶"],
     "nonlethal": false,
     "combatBehavior": "hidden_power",
     "recoveryTurns": 5
@@ -98,7 +98,7 @@
     "damageDice": "1d6+2",
     "specialAbility": "Herbalist Defense: once per combat throw blinding powder (DC 12 DEX or blinded 1 round); carries 1 self-heal potion",
     "description": "半精灵药剂师，知晓自然魔法。温柔但并非毫无自保之力。",
-    "loot": ["Healing Potion"],
+    "loot": ["治疗药水"],
     "nonlethal": false,
     "combatBehavior": "flee",
     "recoveryTurns": 10
@@ -115,5 +115,18 @@
     "nonlethal": true,
     "combatBehavior": "passive",
     "recoveryTurns": 20
+  },
+  {
+    "name": "镇长府卫兵",
+    "hp": 28,
+    "dc": 14,
+    "socialDC": 15,
+    "damageDice": "1d8+2",
+    "specialAbility": "Guardian Stance: 保护维克多时AC+2",
+    "description": "镇长府的守卫，穿着轻甲，手持长矛。忠诚且训练有素。",
+    "loot": [],
+    "nonlethal": true,
+    "combatBehavior": "subdue",
+    "recoveryTurns": 8
   }
 ]

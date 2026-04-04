@@ -1,86 +1,86 @@
 [
   {
-    "name": "Rusty Dagger",
+    "name": "锈蚀匕首",
     "nameEn": "Rusty Dagger",
     "type": "weapon",
-    "description": "A corroded goblin dagger, barely holding together. Deals 1d4 piercing damage.",
+    "description": "一把锈迹斑斑的哥布林匕首，勉强还能用。造成1d4穿刺伤害。",
     "basePrice": 2
   },
   {
-    "name": "Wolf Pelt",
+    "name": "狼皮",
     "nameEn": "Wolf Pelt",
     "type": "misc",
-    "description": "A rough grey wolf pelt, valuable to tanners and merchants.",
+    "description": "一张粗糙的灰狼皮，对制皮匠和商人颇有价值。",
     "basePrice": 5
   },
   {
-    "name": "Cockatrice Feather",
+    "name": "鸡蛇羽毛",
     "nameEn": "Cockatrice Feather",
     "type": "misc",
-    "description": "An iridescent feather from a cockatrice. Sought by alchemists for petrification remedies.",
+    "description": "来自鸡蛇的彩虹色羽毛。炼金师视之为配制石化解药的珍贵原料。",
     "basePrice": 12
   },
   {
-    "name": "Bone Fragment",
+    "name": "骨骼碎片",
     "nameEn": "Bone Fragment",
     "type": "misc",
-    "description": "A shard of enchanted bone, faintly humming with residual necromantic energy.",
+    "description": "一块附魔骨骸碎片，隐约散发着残余的死灵能量。",
     "basePrice": 3
   },
   {
-    "name": "Shadow Essence",
+    "name": "暗影精华",
     "nameEn": "Shadow Essence",
     "type": "misc",
-    "description": "A wisp of condensed shadow trapped in a glass vial. Used in dark alchemy.",
+    "description": "封存于玻璃小瓶内的凝缩暗影。用于黑暗炼金术。",
     "basePrice": 15
   },
   {
-    "name": "Spider Silk",
+    "name": "蜘蛛丝",
     "nameEn": "Spider Silk",
     "type": "misc",
-    "description": "A bundle of incredibly strong silk harvested from a giant spider's web.",
+    "description": "从巨型蜘蛛网上采集的一束极为坚韧的蛛丝。",
     "basePrice": 8
   },
   {
-    "name": "Venom Sac",
+    "name": "毒腺囊",
     "nameEn": "Venom Sac",
     "type": "misc",
-    "description": "A giant spider's venom gland, still dripping with potent toxin. Useful for coating weapons or brewing antidotes.",
+    "description": "巨型蜘蛛的毒腺，仍在滴落剧毒液体。可用于淬毒或炼制解毒剂。",
     "basePrice": 10
   },
   {
-    "name": "Ghoul Claw",
+    "name": "食尸鬼爪",
     "nameEn": "Ghoul Claw",
     "type": "misc",
-    "description": "A severed ghoul claw coated in paralyzing residue. Herbalists prize it for medicinal extracts.",
+    "description": "一只涂有麻痹残留物的食尸鬼断爪。草药师视其医用提取物为珍品。",
     "basePrice": 7
   },
   {
-    "name": "Crude Greataxe",
+    "name": "粗制巨斧",
     "nameEn": "Crude Greataxe",
     "type": "weapon",
-    "description": "A heavy, poorly balanced greataxe of orcish make. Deals 1d10 slashing damage.",
+    "description": "一把重型兽人制巨斧，平衡感很差。造成1d10劈砍伤害。",
     "basePrice": 8
   },
   {
-    "name": "Mimic Adhesive",
+    "name": "拟形怪黏液",
     "nameEn": "Mimic Adhesive",
     "type": "misc",
-    "description": "A jar of incredibly sticky substance scraped from a dead mimic. Has many creative uses.",
+    "description": "一罐从死亡拟形怪身上刮下的极黏物质，用途极为广泛。",
     "basePrice": 18
   },
   {
-    "name": "Void Shard",
+    "name": "虚空碎片",
     "nameEn": "Void Shard",
     "type": "quest",
-    "description": "A fragment of crystallized void energy from the Eclipsed Beast. Pulses with dark power.",
+    "description": "来自蚀月兽的结晶虚空能量碎片。散发着黑暗力量的脉动。",
     "basePrice": 50
   },
   {
-    "name": "Shadow Crystal",
+    "name": "暗影水晶",
     "nameEn": "Shadow Crystal",
     "type": "misc",
-    "description": "A dark crystal that absorbs nearby light. Radiates an unsettling chill.",
+    "description": "一块吸收周围光线的暗色水晶。散发出令人不安的寒意。",
     "basePrice": 30
   }
 ]

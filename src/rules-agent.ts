@@ -46,9 +46,12 @@ const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, inpu
   { pattern: /^(?:我(?:要)?去)\s*(.+)/,
     build: (m) => ({ type: 'MOVE', destination: m[1].trim() }) },
 
-  // 看
-  { pattern: /^(?:看看|观察|查看)\s*(四周|周围|环境)?$/,
-    build: (m) => ({ type: 'LOOK', target: m[1] }) },
+  // 泛化观察（四处看看/看看周围）→ 交给 DM 叙事，不走 Look 工具
+  { pattern: /^(?:四处看看|看看(?:四周|周围|环境)|观察(?:四周|周围|环境))$/,
+    build: () => ({ type: 'NARRATIVE' }) },
+  // 具体目标观察（看看叶绿/观察柜台）→ Look 工具
+  { pattern: /^(?:看看|观察|查看)\s*(.+)/,
+    build: (m) => ({ type: 'LOOK', target: m[1].trim() }) },
   { pattern: /^(?:打量|仔细看)\s*(.+)/,
     build: (m) => ({ type: 'LOOK', target: m[1].trim() }) },
 
@@ -89,6 +92,7 @@ const RULES_AGENT_PROMPT = `你是TRPG规则解析器。分析玩家输入，输
 1. 只输出一个JSON对象，不要任何其他文字
 2. 根据玩家意图选择最匹配的type
 3. 不确定时用 {"type":"NARRATIVE"}
+4. 如果有"当前对话:NPC名"，玩家的TALK/BUY/SELL默认指向该NPC（除非明确提到了其他NPC）
 
 动作类型和字段：
 {"type":"ATTACK","target":"NPC/怪物名","method":"weapon|spell|sneak"}
@@ -136,6 +140,7 @@ async function llmClassify(input: string, session: GameSession): Promise<PlayerA
   const context = [
     `位置:${session.worldState.currentLocation}`,
     `附近NPC:${npcsHere.join(',') || '无'}`,
+    session.interactionNpc ? `当前对话:${session.interactionNpc}` : '',
     `背包:${inventory.join(',') || '空'}`,
     session.combat?.active ? '状态:战斗中' : '',
   ].filter(Boolean).join(' | ')

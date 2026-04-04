@@ -38,14 +38,21 @@ export const MoveTool: Tool = {
       return { output: `战斗移动：玩家移至坐标(${input.combatPosition?.x ?? '?'},${input.combatPosition?.y ?? '?'})。` }
     }
 
-    // Check if destination is an area
-    const destArea = locations[destination]
+    // Check if destination is an area (精确 → 模糊匹配中文名)
+    let destKey = destination
+    let destArea = locations[destination]
+    if (!destArea) {
+      const entry = Object.entries(locations).find(
+        ([, v]: [string, any]) => v.nameZh === destination || destination.includes(v.nameZh) || v.nameZh.includes(destination)
+      )
+      if (entry) { destKey = entry[0]; destArea = entry[1] }
+    }
 
     if (destArea) {
       // ── Inter-area movement ──
       const conn = connections.find(
-        c => (c.from === current && c.to === destination) ||
-             (c.to === current && c.from === destination),
+        c => (c.from === current && c.to === destKey) ||
+             (c.to === current && c.from === destKey),
       )
       if (!conn) {
         const loc = locations[current]
@@ -53,12 +60,12 @@ export const MoveTool: Tool = {
           .filter(c => c.from === current || c.to === current)
           .map(c => c.from === current ? c.to : c.from)
         return {
-          output: `无法从${loc?.nameZh ?? current}到达${destination}。可前往：${available.join(', ') || '无'}。`,
+          output: `无法从${loc?.nameZh ?? current}到达${destArea.nameZh}。可前往：${available.join(', ') || '无'}。`,
           isError: true,
         }
       }
 
-      session.worldState.currentLocation = destination
+      session.worldState.currentLocation = destKey
       // Set sub-location to area's default entrance
       const defaultPoi = destArea.pointsOfInterest.find((p: any) => p.isDefault)
       session.worldState.currentSubLocation = defaultPoi?.id ?? destArea.pointsOfInterest[0]?.id
@@ -68,10 +75,10 @@ export const MoveTool: Tool = {
 
       // 通知章节系统
       if (session.chapter) {
-        new ChapterManager(session).onEvent('arrive', destination)
+        new ChapterManager(session).onEvent('arrive', destKey)
       }
 
-      const npcsHere = session.npcs.filter(n => n.location === destination &&
+      const npcsHere = session.npcs.filter(n => n.location === destKey &&
         (!n.subLocation || n.subLocation === session.worldState.currentSubLocation))
         .map(n => n.name)
 
@@ -131,9 +138,12 @@ export const MoveTool: Tool = {
     const currentArea = locations[current]
     if (!currentArea) return { output: `当前位置未知`, isError: true }
 
-    // Find the POI in current area
+    // Find the POI in current area (精确匹配 → 模糊匹配)
+    const dest = destination.toLowerCase()
     const targetPoi = currentArea.pointsOfInterest.find(
       (p: any) => p.id === destination || p.nameZh === destination || p.name === destination
+    ) ?? currentArea.pointsOfInterest.find(
+      (p: any) => dest.includes(p.nameZh) || dest.includes(p.id) || p.nameZh.includes(dest)
     )
 
     if (targetPoi) {

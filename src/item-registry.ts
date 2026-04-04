@@ -16,17 +16,21 @@ export class ItemRegistry {
   private aliases = new Map<string, string>()
 
   private registerAliases(name: string): void {
+    // 英文别名 → 中文主键（支持玩家用英文输入时仍能找到物品）
     const ALIASES: Record<string, string[]> = {
-      'Shortsword': ['短剑', '短刀'],
-      'Longsword': ['长剑', '大剑'],
-      'Shortbow': ['短弓', '弓'],
-      'Leather Armor': ['皮甲', '皮革甲'],
-      'Chain Shirt': ['链甲', '锁子甲', '锁甲'],
-      'Healing Potion': ['治疗药水', '血瓶', '红药水'],
-      'Antidote': ['解毒剂', '解毒药'],
-      'Shadow Ward Potion': ['暗影防护药水', '防护药水'],
-      'Hempen Rope': ['麻绳', '绳子'],
-      'Torch': ['火把', '火炬'],
+      '短剑': ['Shortsword', '短刀'],
+      '短剑 +1': ['Shortsword +1'],
+      '长剑': ['Longsword', '大剑'],
+      '短弓': ['Shortbow', '弓'],
+      '皮甲': ['Leather Armor', '皮革甲'],
+      '锁子甲': ['Chain Shirt', '链甲', '锁甲'],
+      '治疗药水': ['Healing Potion', '血瓶', '红药水'],
+      '解毒剂': ['Antidote', '解毒药'],
+      '暗影防护药水': ['Shadow Ward Potion', '防护药水'],
+      '麻绳': ['Hempen Rope', '绳子'],
+      '火把': ['Torch', '火炬'],
+      '矿道钥匙': ['Mine Key'],
+      '达里安的日志': ["Darian's Journal"],
     }
     const aliasList = ALIASES[name]
     if (aliasList) {

@@ -112,8 +112,12 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'BUY': {
-        // 如果 Rules Agent 没识别出商人，自动匹配当前位置的商店 NPC
-        let shopNpc = action.npc
+        // NPC 优先级：有效的 Rules Agent 识别 > 当前交互对象 > 同位置商店
+        let shopNpc = action.npc && session.npcs.some(n => n.name === action.npc) ? action.npc : ''
+        if (!shopNpc && session.interactionNpc) {
+          const interNpc = session.npcs.find(n => n.name === session.interactionNpc && n.shopPricing)
+          if (interNpc) shopNpc = interNpc.name
+        }
         if (!shopNpc) {
           const loc = session.worldState.currentLocation
           const shop = session.npcs.find(n =>
@@ -133,7 +137,11 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'SELL': {
-        let sellNpc = action.npc
+        let sellNpc = action.npc && session.npcs.some(n => n.name === action.npc) ? action.npc : ''
+        if (!sellNpc && session.interactionNpc) {
+          const interNpc = session.npcs.find(n => n.name === session.interactionNpc && n.shopPricing)
+          if (interNpc) sellNpc = interNpc.name
+        }
         if (!sellNpc) {
           const loc = session.worldState.currentLocation
           const shop = session.npcs.find(n =>
@@ -153,8 +161,11 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'TALK': {
+        // 验证 npc 名是否是真实 NPC，否则 fallback 到 interactionNpc
+        const validNpc = action.npc && session.npcs.some(n => n.name === action.npc)
+        const npcId = (validNpc ? action.npc : session.interactionNpc) || ''
         const result = await TalkTool.execute({
-          npcId: action.npc,
+          npcId,
           message: action.message || '',
           approach: action.approach,
         })

@@ -109,7 +109,7 @@ export function executePlayerAttack(
   targetId: string,
   method: 'weapon' | 'spell',
   spellId?: string,
-): { log: string[]; killed: boolean } {
+): { log: string[]; killed: boolean; hit: boolean; isCritical: boolean } {
   const combat = session.combat
   if (!combat?.active) throw new Error('当前没有进行中的战斗')
 
@@ -123,7 +123,7 @@ export function executePlayerAttack(
     m.name.toLowerCase() === targetId.toLowerCase(),
   )
   if (!monster) throw new Error(`目标 "${targetId}" 不在战斗中`)
-  if (monster.hp <= 0) throw new Error(`${monster.id} 已经被击杀`)
+  if (monster.hp <= 0) throw new Error(`${monster.id} 已经倒下了`)
 
   if (method === 'spell') {
     if (!spellId) throw new Error('法术攻击需指定 spellId')
@@ -136,7 +136,7 @@ export function executePlayerAttack(
 
     if (!atk.hits) {
       log.push(`${player.name} 施放${spellId}: d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
-      return { log, killed: false }
+      return { log, killed: false, hit: false, isCritical: false }
     }
 
     const dmgMatch = spell.effect.match(/(\d+d\d+(?:[+-]\d+)?)/i)
@@ -152,12 +152,13 @@ export function executePlayerAttack(
       `伤害: ${dmgDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
     )
     if (killed) {
-      log.push(`☠ ${monster.id} 被击杀！`)
-      getFacts().addEvent(`${monster.id}被击杀`, 'critical')
+      const isNpc = session.npcs.some(n => n.name === monster.name)
+      log.push(isNpc ? `💫 ${monster.id} 失去了意识！` : `☠ ${monster.id} 被击杀！`)
+      getFacts().addEvent(isNpc ? `${monster.id}被击倒` : `${monster.id}被击杀`, 'critical')
       const killKey = `kills_${monster.name}`
       session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
     }
-    return { log, killed }
+    return { log, killed, hit: true, isCritical: atk.isCritical }
   }
 
   // 武器攻击
@@ -169,7 +170,7 @@ export function executePlayerAttack(
 
   if (!atk.hits) {
     log.push(`${player.name} 攻击(${weapon.name}): d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
-    return { log, killed: false }
+    return { log, killed: false, hit: false, isCritical: false }
   }
 
   const dmgMatch = weapon.description.match(/(\d+d\d+)/i)
@@ -186,25 +187,38 @@ export function executePlayerAttack(
     `伤害: ${dmgDice}+${player.abilityModifiers.STR}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
   )
   if (killed) {
-    log.push(`☠ ${monster.id} 被击杀！`)
-    getFacts().addEvent(`${monster.id}被击杀`, 'critical')
+    const isNpc = session.npcs.some(n => n.name === monster.name)
+    log.push(isNpc ? `💫 ${monster.id} 失去了意识！` : `☠ ${monster.id} 被击杀！`)
+    getFacts().addEvent(isNpc ? `${monster.id}被击倒` : `${monster.id}被击杀`, 'critical')
     const killKey = `kills_${monster.name}`
     session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
   }
-  return { log, killed }
+  return { log, killed, hit: true, isCritical: atk.isCritical }
 }
 
 // ─── 怪物回合 ───────────────────────────────────
 
-export function executeMonsterTurns(session: GameSession): string[] {
+export type MonsterHitRecord = {
+  monsterName: string
+  hit: boolean
+  isCritical: boolean
+  damage: number
+  playerKilled: boolean
+}
+
+export function executeMonsterTurns(session: GameSession): {
+  log: string[]
+  hits: MonsterHitRecord[]
+} {
   const combat = session.combat
-  if (!combat?.active) return []
+  if (!combat?.active) return { log: [], hits: [] }
 
   const player = session.player
   let playerAC = calculatePlayerAC(player)
   // 防御姿态 AC+2
   if (combat.playerDefending) playerAC += 2
   const log: string[] = []
+  const hits: MonsterHitRecord[] = []
 
   for (const entry of combat.initiativeOrder) {
     if (entry.isPlayer) continue
@@ -216,6 +230,7 @@ export function executeMonsterTurns(session: GameSession): string[] {
 
     if (!atk.hits) {
       log.push(`${monster.id} 攻击${player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → 未命中`)
+      hits.push({ monsterName: monster.name, hit: false, isCritical: false, damage: 0, playerKilled: false })
       continue
     }
 
@@ -228,20 +243,22 @@ export function executeMonsterTurns(session: GameSession): string[] {
     damage = Math.max(1, damage)
 
     player.hp = Math.max(0, player.hp - damage)
+    const playerKilled = player.hp <= 0
 
     log.push(
       `${monster.id} 攻击${player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → ${atk.isCritical ? '暴击！' : '命中'}`,
       `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${player.name} HP: ${player.hp}/${player.maxHp}`,
     )
+    hits.push({ monsterName: monster.name, hit: true, isCritical: atk.isCritical, damage, playerKilled })
 
-    if (player.hp <= 0) {
+    if (playerKilled) {
       log.push(`${player.name} 倒下了！`)
       getFacts().addEvent(`${player.name}在战斗中倒下`, 'critical')
       break
     }
   }
 
-  return log
+  return { log, hits }
 }
 
 // ─── 逃跑 ─────────────────────────────────────────
@@ -274,17 +291,10 @@ export function attemptFlee(session: GameSession): {
     return { success, log, ended: true, result: 'ongoing' }
   }
 
-  log.push('逃跑失败！怪物趁机攻击！')
-  const monsterLog = executeMonsterTurns(session)
-  log.push(...monsterLog)
-
-  const check = checkCombatEnd(session)
-  if (check.ended && check.result === 'defeat') {
-    log.push('\n=== 战斗失败 ===')
-    endCombat(session)
-  }
-
-  return { success, log, ended: check.ended, result: check.result }
+  log.push('逃跑失败！你浪费了这个回合。')
+  // 逃跑失败 = 浪费一个行动回合，不触发怪物额外反击
+  // 怪物的正常回合由 processCombatAction 的 monster phase 处理
+  return { success, log, ended: false, result: 'ongoing' }
 }
 
 // ─── 战斗结束检查 ────────────────────────────────
@@ -357,6 +367,10 @@ export function executePlayerTurn(
   ended: boolean
   result: CombatResult
   loot?: { items: string[]; gold: number }
+  hit?: boolean
+  isCritical?: boolean
+  killed?: boolean
+  targetName?: string
 } {
   const combat = session.combat!
   const roundLog: string[] = []
@@ -377,7 +391,11 @@ export function executePlayerTurn(
     getFacts().addEvent('战斗胜利，获得战利品', 'critical')
     session.worldState.flags['combat_victories'] = (Number(session.worldState.flags['combat_victories'] ?? 0)) + 1
     endCombat(session)
-    return { roundLog, ended: true, result: 'victory', loot }
+    return {
+      roundLog, ended: true, result: 'victory', loot,
+      hit: attackResult.hit, isCritical: attackResult.isCritical,
+      killed: attackResult.killed, targetName: targetId,
+    }
   }
 
   // 怪物仍存活 → 标记待执行怪物回合
@@ -385,7 +403,11 @@ export function executePlayerTurn(
     combat.pendingMonsterTurn = true
   }
 
-  return { roundLog, ended: check.ended, result: check.result }
+  return {
+    roundLog, ended: check.ended, result: check.result,
+    hit: attackResult.hit, isCritical: attackResult.isCritical,
+    killed: attackResult.killed, targetName: targetId,
+  }
 }
 
 // ─── 怪物回合阶段 ────────────────────────────────
@@ -396,14 +418,16 @@ export function executePlayerTurn(
  */
 export function executeMonsterPhase(session: GameSession): {
   log: string[]
+  hits: MonsterHitRecord[]
   ended: boolean
   result: CombatResult
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], ended: true, result: 'ongoing' }
+  if (!combat?.active) return { log: [], hits: [], ended: true, result: 'ongoing' }
 
   combat.pendingMonsterTurn = false
-  const log = executeMonsterTurns(session)
+  const monsterResult = executeMonsterTurns(session)
+  const log = monsterResult.log
 
   const check = checkCombatEnd(session)
   if (check.ended && check.result === 'defeat') {
@@ -414,7 +438,7 @@ export function executeMonsterPhase(session: GameSession): {
     combat.round++
   }
 
-  return { log, ...check }
+  return { log, hits: monsterResult.hits, ...check }
 }
 
 // ─── 战斗状态摘要 ────────────────────────────────
@@ -430,7 +454,7 @@ export function getCombatSummary(session: GameSession): string | null {
   ]
 
   for (const m of combat.monsters) {
-    const status = m.hp <= 0 ? '已击杀' : `HP ${m.hp}/${m.maxHp}`
+    const status = m.hp <= 0 ? '已倒下' : `HP ${m.hp}/${m.maxHp}`
     lines.push(`  ${m.id}: ${status}${m.conditions.length ? ' [' + m.conditions.join(',') + ']' : ''}`)
   }
 

@@ -99,18 +99,61 @@ export const AttackTool: Tool = {
         return { output: `${targetId}不在这里。`, isError: true }
       }
 
-      // 用统一的战斗系统开战（NPC 数据和怪物格式相同）
-      const combatNames = encounterMonsters ?? [targetId]
-      const allDb = [...monstersDb, ...npcDb] // 合并数据库
+      // 护卫机制：攻击重要 NPC 时，护卫挡在前面
+      // 层级防护：卫兵+韩猛 → 只有全倒了才能碰到本体
+      const NPC_GUARDS: Record<string, { shields: string[]; canFightSelf: boolean }> = {
+        '维克多': { shields: ['镇长府卫兵', '韩猛'], canFightSelf: false },  // 镇长 8HP，不参战
+        '艾琳娜': { shields: ['韩猛'], canFightSelf: true },  // 公会长自己也能打
+      }
+      const guardConfig = NPC_GUARDS[targetId]
+      let combatNames: string[]
+
+      if (guardConfig) {
+        // 筛选可用护卫（未昏迷/恢复中，有战斗数据）
+        const availableShields = guardConfig.shields.filter(name => {
+          // NPC 护卫检查 condition
+          const npc = session.npcs.find(n => n.name === name)
+          if (npc) return npc.condition !== 'unconscious' && npc.condition !== 'recovering'
+          // 非 NPC 护卫（如卫兵 monster）直接可用
+          return npcDb.some(n => n.name === name) || monstersDb.some(n => n.name === name)
+        })
+
+        if (availableShields.length > 0) {
+          // 护卫挡在前面，本体不参战
+          for (const name of availableShields) {
+            const npc = session.npcs.find(n => n.name === name)
+            if (npc) changeTrust(session, { npcName: name, channel: 'combat', delta: -5, reason: `玩家攻击了${targetId}`, turn: session.turnCount })
+          }
+          combatNames = guardConfig.canFightSelf ? [targetId, ...availableShields] : availableShields
+          if (!guardConfig.canFightSelf) {
+            // 信任暴跌但本体不参战
+            return {
+              output: (() => {
+                const allDb = [...monstersDb, ...npcDb]
+                const combat = startCombat(session, combatNames, allDb)
+                return [
+                  `⚠️ 你对${targetId}拔出了武器！${availableShields.join('和')}挡在了前面！`,
+                  combat.log.join('\n'),
+                ].filter(Boolean).join('\n')
+              })(),
+            }
+          }
+        } else {
+          // 所有护卫都倒了，可以直接打本体
+          combatNames = [targetId]
+        }
+      } else {
+        combatNames = encounterMonsters ?? [targetId]
+      }
+
+      // 进入对峙状态
+      const allDb = [...monstersDb, ...npcDb]
       try {
         const combat = startCombat(session, combatNames, allDb)
-        const initLog = combat.log.join('\n')
-        const turnResult = executePlayerTurn(session, targetId, method, spellId, allDb)
         return {
           output: [
-            `⚠️ 你攻击了${targetId}！这将产生严重后果。`,
-            initLog, '', ...turnResult.log, '',
-            getCombatSummary(session) ?? '',
+            `⚠️ 你对${targetId}拔出了武器！这将产生严重后果。`,
+            combat.log.join('\n'),
           ].filter(Boolean).join('\n'),
         }
       } catch (e: any) {
@@ -131,24 +174,16 @@ export const AttackTool: Tool = {
       return { output: `这里没有${targetId}。当前位置不太可能遇到这种敌人。`, isError: true }
     }
 
-    // 如果没有进行中的战斗，开始新战斗
+    // 如果没有进行中的战斗，进入战斗状态（不执行第一击）
     if (!session.combat?.active) {
       const monsterNames: string[] = encounterMonsters ?? [targetId]
       try {
         const allDb = [...monstersDb, ...npcDb]
         const combat = startCombat(session, monsterNames, allDb)
-        // 输出先攻结果
-        const initLog = combat.log.join('\n')
-
-        // 执行玩家回合（怪物回合由 server 分段发送）
-        const round = executePlayerTurn(session, targetId, method, spellId)
-
         return {
           output: [
             '=== 战斗开始 ===',
-            initLog,
-            '',
-            ...round.roundLog,
+            combat.log.join('\n'),
           ].filter(Boolean).join('\n'),
         }
       } catch (e: any) {

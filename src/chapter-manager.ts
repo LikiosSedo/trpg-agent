@@ -57,6 +57,9 @@ export class ChapterManager {
       this.state.idleTurns = 0
       this.state.nudgeIndex = 0
 
+      // beat 完成后重新评估 auto beat（新的前置条件可能已满足）
+      this.processAutoBeats()
+
       // 检查章节推进
       if (this.shouldAdvance(ch)) {
         this.advance(ch)
@@ -72,11 +75,14 @@ export class ChapterManager {
   }
 
   /**
-   * 处理 auto 类型的 beat（章节开始时自动触发）
+   * 处理 auto 类型的 beat（章节开始时 + 每次 beat 完成后自动触发）
+   * auto beat 的 facts 暂存到 pendingFacts，下轮由 getPromptContext() 注入 DM prompt
    */
   processAutoBeats(): Beat[] {
     const ch = this.chapter
     if (!ch) return []
+
+    if (!this.state.pendingFacts) this.state.pendingFacts = []
 
     const results: Beat[] = []
     for (const beat of ch.beats) {
@@ -85,6 +91,8 @@ export class ChapterManager {
       if (beat.requires && !beat.requires.every(r => this.state.completedBeats.includes(r))) continue
 
       this.state.completedBeats.push(beat.id)
+      // 将 auto beat 的 facts 暂存，等待 getPromptContext() 传递给 DM
+      this.state.pendingFacts.push(...beat.facts)
       results.push(beat)
     }
     return results
@@ -104,6 +112,16 @@ export class ChapterManager {
       `=== ${ch.title} ===`,
       ch.worldContext,
     ]
+
+    // 交付 auto beat 暂存的 facts（触发后首轮必须传达）
+    if (this.state.pendingFacts && this.state.pendingFacts.length > 0) {
+      parts.push('')
+      parts.push('【必须立即传达】以下事件已发生，本轮必须自然融入叙事：')
+      for (const fact of this.state.pendingFacts) {
+        parts.push(`  - ${fact}`)
+      }
+      this.state.pendingFacts = []
+    }
 
     // 找到下一个待触发的必需 beat，告诉 DM 该传达什么
     const pendingBeats = this.getPendingBeats(ch)

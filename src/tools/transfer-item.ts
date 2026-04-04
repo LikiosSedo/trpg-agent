@@ -58,6 +58,10 @@ export const TransferItemTool: Tool = {
     } else if (itemType && itemDescription) {
       item = { name: itemName, type: itemType, description: itemDescription, bonus: itemBonus }
       isDynamic = true
+      // 动态药水兜底：没有 bonus 时默认给 2（2d4+2 HP）
+      if (item.type === 'potion' && item.bonus === undefined) {
+        item = { ...item, bonus: 2 }
+      }
     } else {
       return { output: `物品"${itemName}"不在注册表中。新物品需要提供 itemType 和 itemDescription。`, isError: true }
     }
@@ -73,8 +77,8 @@ export const TransferItemTool: Tool = {
       return { output: `金币应通过交易系统处理，不能作为物品。请使用 goldAmount 参数。`, isError: true }
     }
 
-    // 深夜商店关门检查
-    if ((transferType === 'buy' || transferType === 'sell') && session.worldState.timeOfDay === 'night') {
+    // 深夜商店关门检查（skipNightCheck=true 时跳过——用于 NPC 已通过 ProposeTradeAction 同意的交易）
+    if ((transferType === 'buy' || transferType === 'sell') && session.worldState.timeOfDay === 'night' && !input.skipNightCheck) {
       const shopNpc = sourceId ? session.npcs.find(n => n.name === sourceId) : null
       if (shopNpc?.shopPricing) {
         return { output: `${shopNpc.name}的商店已经打烊了，深夜不营业。白天再来吧。`, isError: true }

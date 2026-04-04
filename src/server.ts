@@ -135,6 +135,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('system', { text: `💔 ${ev.npcName}对你失望了：${ev.reason}` }); break
         case 'safety_block':
           send('system', { text: `⛔ ${ev.reason}` }); break
+        case 'combat_narrative':
+          send('combat_narrative', { text: ev.text }); break
         case 'combat_monster':
           send('combat_monster', { text: ev.text }); break
         case 'combat_status':
@@ -165,14 +167,14 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('game_over', { reason: ev.reason, canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
           send('system', { text: ev.text }); break
-        case 'trade_confirm':
-          send('trade_confirm', { gold: ev.gold, npcName: ev.npcName, itemHint: ev.itemHint }); break
         case 'item_acquired':
           send('item_acquired', { text: ev.text }); break
         case 'trade_proposal':
           send('trade_proposal', { npc: ev.npc, items: ev.items, totalPrice: ev.totalPrice, canBargain: ev.canBargain }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
+        case 'dm_thinking':
+          send('dm_thinking', { text: ev.text }); break
         case 'auto_save':
           break // silent
         case 'death':
@@ -313,6 +315,7 @@ wss.on('connection', (ws: WebSocket, req) => {
             itemType: item.type,
             itemDescription: item.description || '',
             itemBonus: item.bonus,
+            skipNightCheck: true,  // NPC 已通过 ProposeTradeAction 同意，跳过深夜限制
           })
           if (result.isError) { allSuccess = false; results.push(`❌ ${item.name}: ${result.output}`) }
           else { results.push(`✅ ${item.name}`) }
@@ -321,6 +324,20 @@ wss.on('connection', (ws: WebSocket, req) => {
 
       send('item_acquired', { text: `交易完成：${results.join('、')}` })
       send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
+      engine.clearBargain()
+      return
+    }
+
+    // ── 砍价输入 ──
+    if (msg.type === 'bargain') {
+      if (!gameStarted || !engine) return
+      if (processing) { send('error', { text: '处理中...' }); return }
+      processing = true
+      try {
+        await streamEvents(engine.processBargain(msg.text?.trim() ?? ''))
+      } finally {
+        processing = false
+      }
       return
     }
 

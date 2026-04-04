@@ -43,8 +43,8 @@ function makeTestSession(): GameSession {
       ],
       clues: [],
       equipped: {
-        weapon: { name: 'Longsword', type: 'weapon', description: 'Deals 1d8 slashing damage.', bonus: 0 },
-        armor: { name: 'Leather Armor', type: 'armor', description: 'AC 11 + DEX.', bonus: 1 },
+        weapon: { name: '长剑', type: 'weapon', description: '造成1d8劈砍伤害。', bonus: 0 },
+        armor: { name: '皮甲', type: 'armor', description: 'AC 11 + 敏捷调整值。', bonus: 1 },
       },
     },
     npcs: [],
@@ -68,7 +68,7 @@ const monstersDb: Monster[] = [
     damageDice: '1d6+2',
     specialAbility: 'Nimble Escape',
     description: 'A small cunning humanoid.',
-    loot: ['Rusty Dagger', '3 gold'],
+    loot: ['锈蚀匕首', '3 gold'],
   },
   {
     name: 'Skeleton',
@@ -77,7 +77,7 @@ const monstersDb: Monster[] = [
     damageDice: '1d6+2',
     specialAbility: 'Undead Fortitude',
     description: 'Animated bones.',
-    loot: ['Bone Fragment', '5 gold'],
+    loot: ['骨骼碎片', '5 gold'],
   },
 ]
 
@@ -171,9 +171,9 @@ if (result === 'victory') {
   assert(session.combat === null, 'combat state cleared after victory')
   // Check loot was awarded
   assert(session.player.gold > 50, `gold increased from 50: got ${session.player.gold}`)
-  const hasLoot = session.player.inventory.some(i => i.name === 'Rusty Dagger')
-  assert(hasLoot, 'Rusty Dagger in inventory')
-  console.log(`  executePlayerTurn: victory in ${rounds} rounds, gold=${session.player.gold}, inventory has Rusty Dagger`)
+  const hasLoot = session.player.inventory.some(i => i.name === '锈蚀匕首')
+  assert(hasLoot, '锈蚀匕首 in inventory')
+  console.log(`  executePlayerTurn: victory in ${rounds} rounds, gold=${session.player.gold}, inventory has 锈蚀匕首`)
 } else {
   console.log(`  executePlayerTurn: ${result} in ${rounds} rounds (player tanky, shouldn't lose to goblin)`)
 }
@@ -245,7 +245,7 @@ session = getSession()
 startCombat(session, ['Goblin'], monstersDb)
 const loot = awardLoot(session)
 assert(loot.gold === 3, `loot gold = 3: got ${loot.gold}`)
-assert(loot.items.includes('Rusty Dagger'), 'loot includes Rusty Dagger')
+assert(loot.items.includes('锈蚀匕首'), 'loot includes 锈蚀匕首')
 assert(session.player.gold === 53, `player gold = 53: got ${session.player.gold}`)
 console.log(`  awardLoot: gold=${loot.gold}, items=${loot.items.join(', ')}`)
 

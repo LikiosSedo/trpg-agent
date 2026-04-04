@@ -33,7 +33,11 @@ export const SetActionsTool: Tool = {
 2. suggestions（2-3个）：推荐的下一步操作。玩家点击后作为输入发送，触发新一轮推理。
    适合：对话选项、移动目的地、调查线索等推进剧情的行为。
 
-注意：suggestions 应该是当前场景下最有价值的操作，而非泛泛的"看看四周"。`,
+注意：
+- suggestions 必须紧扣当前场景和NPC刚刚说的话，不要给泛泛的"看看四周"
+- 不要建议和昏迷/死亡的NPC交谈
+- 如果NPC正在提出选择或问题，suggestions 应该是对这些选择的具体回应
+- 优先给出推进当前对话/剧情的选项，而非离开或切换话题`,
   inputSchema: z.object({
     details: z.array(z.object({
       label: z.string().describe('按钮文字，如"打量格雷格"、"看看四周"'),

@@ -1,68 +1,74 @@
 [
   {
-    "name": "Shortsword",
+    "name": "短剑",
     "type": "weapon",
-    "description": "A light, finesse blade favored by rogues. Deals 1d6 piercing damage.",
+    "description": "轻便的刺击武器，深受盗贼喜爱。造成1d6穿刺伤害。",
     "bonus": 0
   },
   {
-    "name": "Longsword",
+    "name": "长剑",
     "type": "weapon",
-    "description": "A versatile martial weapon. Deals 1d8 slashing damage.",
+    "description": "多用途格斗武器。造成1d8劈砍伤害。",
     "bonus": 0
   },
   {
-    "name": "Shortbow",
+    "name": "短弓",
     "type": "weapon",
-    "description": "A simple ranged weapon with 80ft range. Deals 1d6 piercing damage.",
+    "description": "简易远程武器，射程80尺。造成1d6穿刺伤害。",
     "bonus": 0
   },
   {
-    "name": "Leather Armor",
+    "name": "皮甲",
     "type": "armor",
-    "description": "Light armor made of cured leather. AC 11 + DEX modifier.",
+    "description": "由鞣制皮革制成的轻甲。AC 11 + 敏捷调整值。",
     "bonus": 1
   },
   {
-    "name": "Chain Shirt",
-    "type": "armor",
-    "description": "Medium armor of interlocking metal rings. AC 13 + DEX modifier (max 2).",
-    "bonus": 3
+    "name": "短剑 +1",
+    "type": "weapon",
+    "description": "精良短剑，轻便趁手。造成1d6+1穿刺伤害。",
+    "bonus": 1
   },
   {
-    "name": "Healing Potion",
-    "type": "potion",
-    "description": "A vial of glowing red liquid. Restores 2d4+2 HP when consumed.",
+    "name": "锁子甲",
+    "type": "armor",
+    "description": "铁链编织的锁子甲。AC+2，略微沉重。",
     "bonus": 2
   },
   {
-    "name": "Antidote",
+    "name": "治疗药水",
     "type": "potion",
-    "description": "A bitter herbal remedy that cures poison and grants poison resistance for 1 hour."
+    "description": "一瓶发光的红色液体。饮用后恢复2d4+2生命值。",
+    "bonus": 2
   },
   {
-    "name": "Shadow Ward Potion",
+    "name": "解毒剂",
     "type": "potion",
-    "description": "A shimmering silver liquid brewed by Greenleaf. Grants resistance to necrotic damage for 10 minutes."
+    "description": "苦涩的草药疗方，可解除毒素并在1小时内赋予毒素抗性。"
   },
   {
-    "name": "Mine Key",
+    "name": "暗影防护药水",
+    "type": "potion",
+    "description": "叶绿调制的闪亮银色液体。饮用后10分钟内对死灵伤害有抗性。"
+  },
+  {
+    "name": "矿道钥匙",
     "type": "quest",
-    "description": "A heavy iron key that opens the sealed gate to the mid-level Greyspine Mines."
+    "description": "一把沉重的铁钥匙，可开启通往灰脊矿道中层的封闭铁门。"
   },
   {
-    "name": "Darian's Journal",
+    "name": "达里安的日志",
     "type": "quest",
-    "description": "The last pages of a dead mercenary's journal, containing sketches of strange symbols found deep in the mines."
+    "description": "一名死去雇佣兵的日志最后几页，内含矿道深处发现的奇异符号草图。"
   },
   {
-    "name": "Hempen Rope",
+    "name": "麻绳",
     "type": "misc",
-    "description": "50 feet of sturdy rope. Useful for climbing, binding, or improvised traps."
+    "description": "50尺坚韧的麻绳。可用于攀爬、捆绑或即兴陷阱。"
   },
   {
-    "name": "Torch",
+    "name": "火把",
     "type": "misc",
-    "description": "A simple torch that burns for 1 hour, providing bright light in a 20ft radius."
+    "description": "普通火把，燃烧1小时，在20尺半径内提供明亮光照。"
   }
 ]

@@ -115,6 +115,17 @@ export const CHAPTERS: ChapterDef[] = [
           '格雷格提供免费住宿——"后头有空房，今晚先歇着"',
         ],
       },
+      {
+        id: 'ch1_night_event',
+        trigger: 'auto',
+        requires: ['ch1_guild_direction'],
+        facts: [
+          '玩家回房歇息。深夜，窗外传来低沉的吟唱声——几秒后又消失了',
+          '走廊尽头隐约有脚步声。如果出门查看：走廊空无一人，但窗台上残留着一小摊泥水脚印，方向朝着矿道北面',
+          '第二天早上，格雷格在柜台后揉着眼睛。问起夜里的事，他皱眉："……你也听到了？我还以为是做梦。"',
+          '小莉在旁边小声说："不是梦。昨晚有人从镇北边走过去，三个人，穿着深色衣服。"',
+        ],
+      },
     ],
 
     discoveries: [
@@ -125,7 +136,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch1_d_notice',     location: 'dawnbreak-town', trigger: 'search',       label: '看到酒馆墙上贴着冒险者公会招募告示' },
     ],
 
-    advanceWhen: ['ch1_guild_direction'],
+    advanceWhen: ['ch1_guild_direction', 'ch1_night_event'],
 
     nudge: {
       afterIdleTurns: 8,
@@ -190,12 +201,23 @@ export const CHAPTERS: ChapterDef[] = [
         optional: true,
       },
       {
-        id: 'ch2_trial_complete',
-        trigger: 'quest:森林试炼',
+        id: 'ch2_forest_combat',
+        trigger: 'combat_end',
+        requires: ['ch2_enter_forest'],
         facts: [
-          '森林试炼完成，玩家证明了自己的基础战斗能力',
+          '森林中的威胁被击退，周围恢复了短暂的宁静',
+          '林间小路重新可以通行，猎人老林的安全得到确认',
+          '老林提醒玩家："最近林子不对劲，动物都在往南跑——它们在躲什么东西。矿山那个方向，别去。"',
+        ],
+      },
+      {
+        id: 'ch2_report_elena',
+        trigger: 'talk:艾琳娜',
+        requires: ['ch2_forest_combat'],
+        facts: [
           '回到公会报告时，艾琳娜点了点头："……有意思。比我预想的好一些。"',
-          '韩猛拍了拍玩家肩膀，语气里多了几分认真',
+          '她在任务记录簿上写下几笔，抬头看着玩家："从今天起，你算公会的正式成员了。"',
+          '韩猛拍了拍玩家肩膀，语气里多了几分认真："欢迎入队。别死太早。"',
         ],
       },
     ],
@@ -210,7 +232,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch2_d_moonpool',  location: 'twilight-woods',  trigger: 'search',       label: '发现月池边有仪式残留痕迹和奇怪符号' },
     ],
 
-    advanceWhen: ['ch2_trial_complete'],
+    advanceWhen: ['ch2_report_elena'],
 
     nudge: {
       afterIdleTurns: 10,
@@ -241,6 +263,7 @@ export const CHAPTERS: ChapterDef[] = [
       '陈妈提到最近有陌生人在月圆前后出没，都往矿道方向去。',
       '本章核心：深入矿道，发现暗影教团的存在和活动痕迹，收集证据。',
       '叙事要求：营造矿道的压迫感和恐惧。越深入越诡异。发现教团痕迹时要有冲击力。',
+      '引导策略：玩家进入矿道后，随着探索自然推进——不需要等玩家说"搜索"，DM应主动描写深入过程中遇到的异象。玩家带着证据回镇上找艾琳娜汇报即可推进。',
     ].join('\n'),
 
     beats: [
@@ -265,23 +288,24 @@ export const CHAPTERS: ChapterDef[] = [
       },
       {
         id: 'ch3_cult_traces',
-        trigger: 'search',
+        trigger: 'auto',
         requires: ['ch3_enter_mines'],
         facts: [
-          '在矿道中层的一个分叉洞室发现暗影教团的仪式痕迹',
+          '深入矿道中层时，矿灯照到一个分叉洞室——空气骤然冰冷',
           '墙壁上刻着蚀目者的标记——一只被斜线划过的眼睛',
           '地上有烧焦的蜡烛残留和干涸的暗色液体',
-          '空气中弥漫着不自然的寒气，金属味刺鼻',
+          '这不是自然现象。有人在这里进行过仪式。金属味刺鼻，令人头皮发麻',
         ],
       },
       {
         id: 'ch3_mine_complete',
-        trigger: 'quest:矿道调查',
+        trigger: 'talk:艾琳娜',
+        requires: ['ch3_cult_traces'],
         facts: [
-          '矿道调查揭示了触目惊心的真相——有组织在利用矿道进行某种仪式',
-          '带着证据回到公会，艾琳娜看完后沉默了很久',
+          '带着教团仪式的证据回到公会，艾琳娜看完后沉默了很久',
           '"……这比我担心的还要糟。"她的语气从未如此严肃',
-          '韩猛握紧了独臂的拳头',
+          '"蚀目者……"她低声重复这个名字，像是在回忆什么尘封的记忆',
+          '韩猛握紧了独臂的拳头："那帮人到底想干什么？"',
         ],
       },
     ],
@@ -293,6 +317,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch3_d_crystals',   location: 'greyspine-mines',  trigger: 'search',     label: '发现矿道中的黑色晶体，靠近铁器时会发出嗡鸣' },
       { id: 'ch3_d_cold_zone',  location: 'greyspine-mines',  trigger: 'search',     label: '矿道中层温度骤降区域，墙壁上有微光符文' },
       { id: 'ch3_d_camp',       location: 'greyspine-mines',  trigger: 'search',     label: '发现失踪搜救队的临时营地遗留物' },
+      { id: 'ch3_d_journal',    location: 'dawnbreak-town',   trigger: 'talk:格雷格', requires: ['ch3_mine_quest'], label: '格雷格交出达里安的旧日志——记录了矿道深层的异象和远古封印的线索' },
     ],
 
     advanceWhen: ['ch3_mine_complete'],
@@ -327,6 +352,7 @@ export const CHAPTERS: ChapterDef[] = [
       '小莉告诉格雷格她看到维克多身上缠着"灰色扭动的东西"。',
       '本章核心：调查荒原兽人与教团的联系，找到关键证据，为最终对决做准备。',
       '叙事要求：营造大幕将启的紧迫感。NPC开始主动分享更多秘密（信任度应该已经较高）。',
+      '引导策略：玩家到达荒原后，瞭望塔的发现会自然展开——DM应将瞭望塔描写为荒原中最醒目的地标，引导玩家前往。拿到笔记后回去找艾琳娜即可推进。',
     ].join('\n'),
 
     beats: [
@@ -351,13 +377,24 @@ export const CHAPTERS: ChapterDef[] = [
         optional: true,
       },
       {
-        id: 'ch4_wasteland_complete',
-        trigger: 'quest:荒原侦察',
+        id: 'ch4_tower_discovery',
+        trigger: 'auto',
+        requires: ['ch4_enter_wasteland'],
         facts: [
-          '荒原调查拼凑出了令人不安的全貌——教团的影响远比想象中广',
-          '废弃瞭望塔的笔记揭示了教团的最终目标："虚空棱镜"',
+          '穿过荒原到达废弃瞭望塔——塔顶层发现一具冒险者遗体和未完成的调查笔记',
+          '笔记详细记录了教团的仪式规律、成员联络方式，以及最终目标——"虚空棱镜"',
+          '笔记最后一行字迹潦草："它就在矿道最深处。他们需要一个能看见裂隙的人——"写到这里断了',
+        ],
+      },
+      {
+        id: 'ch4_wasteland_complete',
+        trigger: 'talk:艾琳娜',
+        requires: ['ch4_tower_discovery'],
+        facts: [
           '回到公会时，所有人都在等着听报告',
-          '艾琳娜看完笔记后沉默良久，终于说："……我200年前在旧文献中读到过这个名字。"',
+          '艾琳娜看完瞭望塔笔记后沉默良久，终于说："……我200年前在旧文献中读到过这个名字。虚空棱镜。"',
+          '"它能撕裂位面壁垒。如果教团拿到它——"她没说完，但所有人都明白了',
+          '韩猛站起身，语气决然："不能让他们得逞。我们得在蚀月之前阻止他们。"',
         ],
       },
     ],
@@ -369,6 +406,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch4_d_orc_camp',    location: 'shatterstone-wastes', trigger: 'search',        label: '兽人营地中发现教团标记——兽人被暗中操控' },
       { id: 'ch4_d_tower_notes', location: 'shatterstone-wastes', trigger: 'search',        label: '瞭望塔笔记中详述了"虚空棱镜"和位面裂隙' },
       { id: 'ch4_d_tomb',        location: 'shatterstone-wastes', trigger: 'search',        label: '古战场墓冢中发现石碑碎片，与镇口石碑图案呼应' },
+      { id: 'ch4_d_fireplace',   location: 'dawnbreak-town',      trigger: 'talk:维克多',   requires: ['ch4_d_victor_plea'], label: '维克多私下递来半烧毁的文件——教团胁迫他签署的"特别勘探许可"和矿道通行记录' },
     ],
 
     advanceWhen: ['ch4_wasteland_complete'],
