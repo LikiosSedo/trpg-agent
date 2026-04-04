@@ -782,7 +782,20 @@ function clearSave() {
 }
 
 // ─── 密码认证 + 存档检查 ───
-;(function checkSavedToken() {
+;(async function checkAuth() {
+  // 先检查是否需要密码
+  try {
+    const health = await fetch('/api/health').then(r => r.json())
+    if (!health.password) {
+      // 无密码模式 → 直接跳过认证
+      authToken = ''
+      document.getElementById('auth-screen').style.display = 'none'
+      showEntryScreen()
+      return
+    }
+  } catch {}
+
+  // 有密码模式 → 检查已保存的 token
   const saved = localStorage.getItem('trpg_token')
   if (saved) {
     authToken = saved
