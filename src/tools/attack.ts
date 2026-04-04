@@ -9,7 +9,7 @@ import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 import type { Monster } from '../types.js'
 import { getSession } from '../game-state.js'
-import { startCombat, executePlayerTurn, getCombatSummary, attemptFlee } from '../combat-manager.js'
+import { startCombat, executePlayerTurn, getCombatSummary, attemptFlee, isBuffSpell, castBuffSpell, executeMonsterPhase } from '../combat-manager.js'
 import { changeTrust } from '../trust-system.js'
 import { getPersonality } from '../npc-relationships.js'
 
@@ -192,7 +192,33 @@ export const AttackTool: Tool = {
       }
     }
 
-    // 战斗已在进行中，执行玩家回合
+    // 战斗已在进行中
+
+    // Buff 法术：施放增益后，怪物照常行动（不消耗攻击行动）
+    if (method === 'spell' && spellId && isBuffSpell(spellId)) {
+      try {
+        const buffResult = castBuffSpell(session, spellId)
+        if (!buffResult.success) {
+          return { output: buffResult.log.join('\n'), isError: true }
+        }
+        const roundLog = [...buffResult.log]
+
+        // 怪物回合照常执行
+        const monsterPhase = executeMonsterPhase(session)
+        if (monsterPhase.log.length > 0) {
+          roundLog.push('', '[怪物回合]', ...monsterPhase.log)
+        }
+        if (!monsterPhase.ended && session.combat?.active) {
+          roundLog.push('', getCombatSummary(session) ?? '')
+        }
+
+        return { output: roundLog.filter(Boolean).join('\n') }
+      } catch (e: any) {
+        return { output: e.message, isError: true }
+      }
+    }
+
+    // 攻击性法术或武器攻击
     try {
       const round = executePlayerTurn(session, targetId, method, spellId)
 

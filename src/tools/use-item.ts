@@ -9,6 +9,7 @@ import type { Tool } from 'open-claude-cli/engine'
 import { getSession, getFacts } from '../game-state.js'
 import { rollDice } from '../rules-engine.js'
 import { executeMonsterTurns, checkCombatEnd, endCombat, getCombatSummary } from '../combat-manager.js'
+import { applyEffect } from '../effect-manager.js'
 
 export const UseItemTool: Tool = {
   name: 'UseItem',
@@ -43,22 +44,52 @@ export const UseItemTool: Tool = {
     switch (action) {
       case 'use': {
         if (item!.type === 'potion') {
-          // Healing potion: roll healing
-          const healAmount = item!.bonus
-            ? rollDice(`${item!.bonus}d4+2`).total
-            : 0
-          if (healAmount > 0) {
+          const potionName = item!.name
+          player.inventory.splice(itemIdx, 1)
+
+          // 治疗药水：直接恢复 HP
+          if (item!.bonus && item!.bonus > 0) {
+            const healAmount = rollDice(`${item!.bonus}d4+2`).total
             const oldHp = player.hp
             player.hp = Math.min(player.maxHp, player.hp + healAmount)
-            player.inventory.splice(itemIdx, 1)
-            facts.addEvent(`使用${item!.name}，恢复${player.hp - oldHp}HP`)
-            result = { output: `使用${item!.name}：恢复${player.hp - oldHp}HP(${oldHp}→${player.hp}/${player.maxHp})。物品已消耗。` }
+            facts.addEvent(`使用${potionName}，恢复${player.hp - oldHp}HP`)
+            result = { output: `使用${potionName}：恢复${player.hp - oldHp}HP(${oldHp}→${player.hp}/${player.maxHp})。物品已消耗。` }
             break
           }
-          // Non-healing potion (antidote, shadow ward, etc.)
-          player.inventory.splice(itemIdx, 1)
-          facts.addEvent(`使用${item!.name}`)
-          result = { output: `使用${item!.name}：${item!.description}。物品已消耗。` }
+
+          // 解毒剂：清除毒素 + 毒素免疫 3 回合
+          if (potionName.includes('解毒')) {
+            const eff = applyEffect(player, {
+              name: '解毒',
+              type: 'poison_immunity',
+              value: 1,
+              turns: 3,
+              source: 'potion',
+              damageType: 'poison',
+            })
+            facts.addEvent(`使用${potionName}，获得毒素免疫(${eff.remainingTurns}轮)`)
+            result = { output: `使用${potionName}：毒素被清除，3轮内免疫毒素伤害。物品已消耗。` }
+            break
+          }
+
+          // 暗影防护药水：死灵伤害抗性 3 回合
+          if (potionName.includes('暗影防护')) {
+            const eff = applyEffect(player, {
+              name: '暗影防护',
+              type: 'resistance',
+              value: 0.5,  // 减半
+              turns: 3,
+              source: 'potion',
+              damageType: 'necrotic',
+            })
+            facts.addEvent(`使用${potionName}，获得死灵抗性(${eff.remainingTurns}轮)`)
+            result = { output: `使用${potionName}：3轮内死灵伤害减半。物品已消耗。` }
+            break
+          }
+
+          // 其他药水：通用消耗（描述效果）
+          facts.addEvent(`使用${potionName}`)
+          result = { output: `使用${potionName}：${item!.description}。物品已消耗。` }
           break
         }
         if (item!.type === 'quest') {
@@ -66,6 +97,22 @@ export const UseItemTool: Tool = {
           result = { output: `使用任务物品${item!.name}：${item!.description}。` }
           break
         }
+
+        // 火把：使用后获得光源效果
+        if (item!.name.includes('火把')) {
+          player.inventory.splice(itemIdx, 1)
+          applyEffect(player, {
+            name: '火把',
+            type: 'light',
+            value: 2,   // 搜索检定 +2
+            turns: 10,   // 持续 10 轮
+            source: 'equipment',
+          })
+          facts.addEvent('点燃火把，照亮周围')
+          result = { output: `点燃火把：10轮内在黑暗区域搜索检定+2。物品已消耗。` }
+          break
+        }
+
         result = { output: `${item!.name}(${item!.type})无法直接使用。` }
         break
       }

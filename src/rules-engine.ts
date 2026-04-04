@@ -1,4 +1,5 @@
 import type { PlayerCharacter } from './types.js'
+import { getEffectBonus, clearTemporaryEffects } from './effect-manager.js'
 
 export function rollD20(): number {
   return Math.floor(Math.random() * 20) + 1
@@ -77,7 +78,8 @@ export function rollInitiative(dexMod: number): { roll: number; total: number } 
 export function calculatePlayerAC(player: PlayerCharacter): number {
   const dexMod = player.abilityModifiers.DEX
   const armorBonus = player.equipped.armor?.bonus ?? 0
-  return 10 + dexMod + armorBonus
+  const effectAC = getEffectBonus(player, 'ac_bonus')
+  return 10 + dexMod + armorBonus + effectAC
 }
 
 /** 从伤害骰表达式中提取能力修正值，如 "1d6+2" → 2，"2d8-1" → -1，"2d8" → 0 */
@@ -107,4 +109,5 @@ export function longRest(player: PlayerCharacter): void {
   for (const spell of player.spells) {
     spell.remaining = spell.usesPerRest
   }
+  clearTemporaryEffects(player)
 }

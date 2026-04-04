@@ -28,6 +28,28 @@ export interface Item {
   bonus?: number // 武器攻击加值 / 护甲AC加值 / 药水恢复量
 }
 
+// ─── 效果系统 ───────────────────────────────────
+
+export type EffectType =
+  | 'ac_bonus'        // AC 加值（Shield、Shield of Faith）
+  | 'attack_bonus'    // 攻击加值
+  | 'damage_bonus'    // 伤害加值（Hunter's Mark）
+  | 'resistance'      // 伤害抗性：受到特定伤害减半（暗影防护药水）
+  | 'poison_immunity' // 毒素免疫（解毒剂）
+  | 'perception_bonus'// 察觉加值（Detect Magic）
+  | 'light'           // 光源（火把）——矿道/暗处搜索加值
+
+export interface ActiveEffect {
+  id: string             // 唯一标识，如 'shield_1712345678'
+  name: string           // 显示名："Shield" / "暗影防护"
+  type: EffectType
+  value: number          // 效果强度：+5 AC / +1d6 伤害 / 减半(0.5)
+  remainingTurns: number // >0: 剩余回合数, -1: 持续到手动移除（装备效果）
+  source: 'spell' | 'potion' | 'equipment' | 'environment'
+  /** 抗性/伤害加值适用的伤害类型（如 'necrotic', 'poison'），不填=通用 */
+  damageType?: string
+}
+
 // ─── 法术 ─────────────────────────────────────
 
 export interface Spell {
@@ -163,6 +185,7 @@ export interface PlayerCharacter {
     weapon?: Item
     armor?: Item
   }
+  activeEffects?: ActiveEffect[]
 }
 
 // ─── 事件 ──────────────────────────────────────

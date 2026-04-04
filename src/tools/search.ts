@@ -12,6 +12,7 @@ import { skillCheck } from '../rules-engine.js'
 import { locations } from '../data/maps.js'
 import { ChapterManager } from '../chapter-manager.js'
 import { LOOT_TABLES, rollLootTable } from '../loot-tables.js'
+import { getEffectBonus } from '../effect-manager.js'
 
 export const SearchTool: Tool = {
   name: 'Search',
@@ -109,7 +110,10 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
 
     // ── area：区域搜索 ───────────────────────────────
     if (type === 'area') {
-      const mod = player.abilityModifiers.WIS + (player.skills.includes('perception') ? 2 : 0)
+      // 光源效果：矿道等黑暗区域，火把提供搜索加值
+      const darkLocations = ['greyspine-mines']
+      const lightBonus = darkLocations.includes(locId) ? getEffectBonus(player, 'light') : 0
+      const mod = player.abilityModifiers.WIS + (player.skills.includes('perception') ? 2 : 0) + lightBonus
       // DC 根据场景动态调整
       let dc = 15  // 野外/矿道默认：找隐藏物品
       const subLoc = session.worldState.currentSubLocation ?? ''
@@ -131,7 +135,8 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
         facts.addEvent(`发现${hiddenPois[0].nameZh}`)
       }
 
-      const checkLine = `察觉检定(搜索区域)：d20=${result.roll}, 修正+${mod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`
+      const lightNote = lightBonus > 0 ? `(含火把+${lightBonus}) ` : ''
+      const checkLine = `察觉检定(搜索区域)：d20=${result.roll}, 修正+${mod}${lightNote}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`
 
       if (!result.success) {
         return { output: checkLine }

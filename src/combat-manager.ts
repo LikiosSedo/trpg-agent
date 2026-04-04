@@ -11,6 +11,7 @@ import {
   calculatePlayerAC, parseAttackMod, castSpell,
 } from './rules-engine.js'
 import { getFacts } from './game-state.js'
+import { getEffectBonus, hasEffect, tickEffects, applyEffect } from './effect-manager.js'
 
 const PROFICIENCY = 2
 
@@ -102,6 +103,49 @@ export function startCombat(
   return combat
 }
 
+// ─── Buff 法术注册表 ────────────────────────────
+
+interface BuffSpellDef {
+  type: import('./types.js').EffectType
+  value: number
+  turns: number
+  description: string
+}
+
+const BUFF_SPELLS: Record<string, BuffSpellDef> = {
+  'Shield':          { type: 'ac_bonus',     value: 5, turns: 1, description: '魔力屏障闪现，AC+5持续1轮' },
+  'Shield of Faith': { type: 'ac_bonus',     value: 2, turns: 3, description: '信仰之盾环绕全身，AC+2持续3轮' },
+  "Hunter's Mark":   { type: 'damage_bonus', value: 1, turns: 3, description: '猎人印记锁定目标，攻击额外+1d6伤害持续3轮' },
+}
+
+/** 检查法术是否是 buff 类型 */
+export function isBuffSpell(spellName: string): boolean {
+  return spellName in BUFF_SPELLS
+}
+
+/** 施放 buff 法术，返回日志。不消耗攻击行动（但消耗法术位）。 */
+export function castBuffSpell(session: GameSession, spellName: string): { log: string[]; success: boolean } {
+  const player = session.player
+  const def = BUFF_SPELLS[spellName]
+  if (!def) return { log: [`${spellName}不是增益法术`], success: false }
+
+  const cast = castSpell(player, spellName)
+  if (!cast.success) return { log: [`施法失败: ${cast.reason}`], success: false }
+
+  applyEffect(player, {
+    name: spellName,
+    type: def.type,
+    value: def.value,
+    turns: def.turns,
+    source: 'spell' as const,
+  })
+
+  return {
+    log: [`${player.name} 施放 ${spellName}：${def.description}`],
+    success: true,
+  }
+}
+
 // ─── 玩家攻击 ───────────────────────────────────
 
 export function executePlayerAttack(
@@ -165,7 +209,8 @@ export function executePlayerAttack(
   const weapon = player.equipped.weapon
   if (!weapon) throw new Error('未装备武器，无法进行武器攻击')
 
-  const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0)
+  const effectAtkBonus = getEffectBonus(player, 'attack_bonus')
+  const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus
   const atk = attackRoll(atkMod, monster.ac)
 
   if (!atk.hits) {
@@ -176,6 +221,9 @@ export function executePlayerAttack(
   const dmgMatch = weapon.description.match(/(\d+d\d+)/i)
   const dmgDice = dmgMatch ? dmgMatch[1] : '1d6'
   let damage = rollDamage(dmgDice) + player.abilityModifiers.STR
+  // damage_bonus 效果（如 Hunter's Mark）
+  const effectDmgBonus = getEffectBonus(player, 'damage_bonus')
+  if (effectDmgBonus > 0) damage += rollDamage(`${effectDmgBonus}d6`)
   if (atk.isCritical) damage += rollDamage(dmgDice)
   damage = Math.max(1, damage)
 
@@ -241,6 +289,21 @@ export function executeMonsterTurns(session: GameSession): {
       damage += rollDamage(diceOnly)
     }
     damage = Math.max(1, damage)
+
+    // 应用伤害抗性效果（如暗影防护药水：死灵伤害减半）
+    // 暗影系怪物的伤害视为 necrotic 类型
+    const monsterNameLower = monster.name.toLowerCase()
+    const isNecrotic = monsterNameLower.includes('shadow') || monsterNameLower.includes('暗影')
+      || monsterNameLower.includes('幽灵') || monsterNameLower.includes('亡灵')
+    if (isNecrotic && hasEffect(player, 'resistance', 'necrotic')) {
+      damage = Math.max(1, Math.floor(damage * 0.5))
+    }
+    // 毒素免疫
+    const isPoisonDmg = monsterNameLower.includes('spider') || monsterNameLower.includes('蜘蛛')
+      || monsterNameLower.includes('蛇') || monsterNameLower.includes('毒')
+    if (isPoisonDmg && hasEffect(player, 'poison_immunity', 'poison')) {
+      damage = 0
+    }
 
     player.hp = Math.max(0, player.hp - damage)
     const playerKilled = player.hp <= 0
@@ -434,7 +497,14 @@ export function executeMonsterPhase(session: GameSession): {
     log.push('\n=== 战斗失败 ===')
     endCombat(session)
   } else if (!check.ended) {
-    // 回合结束，准备下一轮
+    // 回合结束：递减效果持续时间
+    const expired = tickEffects(session.player)
+    if (expired.length > 0) {
+      log.push(`[效果消散] ${expired.join('、')}`)
+    }
+    // 清除防御姿态
+    combat.playerDefending = false
+    // 准备下一轮
     combat.round++
   }
 
