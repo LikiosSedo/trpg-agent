@@ -1332,7 +1332,7 @@ function renderMapPanel(data) {
     html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">地图未知</div></div>`
   }
 
-  // Sub-location topology (当前区域内地点关系)
+  // Sub-location topology (当前区域内地点关系) + 前往按钮
   const subLocs = data.subLocations || []
   if (subLocs.length > 0) {
     html += `<div class="panel-card" style="margin-top:12px"><div class="panel-card-title">📍 当前区域内地点</div>`
@@ -1340,18 +1340,47 @@ function renderMapPanel(data) {
     for (const sl of subLocs) {
       const isCurrent = sl.isCurrent
       const npcList = (sl.npcs || []).join('、')
-      html += `<div class="subloc-node${isCurrent ? ' current' : ''}">`
+      html += `<div class="subloc-node${isCurrent ? ' current' : ''}" style="display:flex;align-items:center;justify-content:space-between">`
+      html += `<div>`
       html += `<div class="subloc-name">${esc(sl.nameZh)}</div>`
       if (npcList) html += `<div class="subloc-npcs">👤 ${esc(npcList)}</div>`
       if (isCurrent) html += `<div class="subloc-you">← 你在这里</div>`
       html += `</div>`
+      if (!isCurrent) {
+        html += `<button onclick="mapGo('${esc(sl.nameZh)}')" `
+        html += `style="flex-shrink:0;background:#0f3460;color:#ccc;border:1px solid #333;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer">前往</button>`
+      }
+      html += `</div>`
     }
-    html += `</div>`
-    html += `<div style="font-size:11px;color:#555;margin-top:6px;text-align:center">对DM说"我去XX"即可移动</div>`
+    html += `</div></div>`
+  }
+
+  // 相邻可达区域 + 前往按钮
+  const reachable = data.reachableAreas || []
+  if (reachable.length > 0) {
+    html += `<div class="panel-card" style="margin-top:12px"><div class="panel-card-title">🚶 可前往的区域</div>`
+    for (const area of reachable) {
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a2e">`
+      html += `<div>`
+      html += `<div style="color:#ccc;font-size:14px">${esc(area.nameZh)}</div>`
+      if (area.description) html += `<div style="color:#666;font-size:11px;margin-top:2px">${esc(area.description)}</div>`
+      html += `</div>`
+      html += `<button onclick="mapGo('${esc(area.nameZh)}')" `
+      html += `style="flex-shrink:0;margin-left:8px;background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">前往</button>`
+      html += `</div>`
+    }
     html += `</div>`
   }
 
   return html
+}
+
+/** 地图前往按钮：直接发送精确移动指令 */
+function mapGo(destination) {
+  document.getElementById('input').value = `前往${destination}`
+  sendInput()
+  // 切回游戏 tab
+  switchTab('game')
 }
 
 function renderDanger(level) {
@@ -1607,28 +1636,79 @@ function renderNPCListPanel(data) {
   const npcs = data.npcs || []
   if (!npcs.length) return `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">尚未遇到任何人物</div></div>`
 
-  let html = ''
+  const npcLocs = data.npcLocations || {}
+  const playerLoc = data.playerLocation || ''
+  const playerSub = data.playerSubLocation || ''
+
+  // 分组：在场 vs 不在场
+  const here = [], away = []
   for (const npc of npcs) {
-    const trust = npc.trust ?? 0  // -10 to +10
-    const trustPct = ((trust + 10) / 20) * 100  // map to 0-100%
-    const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
-    // 子串匹配立绘（档案名可能是"格雷格·铁拳头"，映射表用"格雷格"）
-    const portrait = NPC_PORTRAIT_MAP[npc.name] ||
-      Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
-    // 提取短名用于查询（"格雷格·铁拳头" → "格雷格"）
-    const shortName = Object.keys(NPC_PORTRAIT_MAP).find(k => npc.name.includes(k)) || npc.name
-    html += `<div class="npc-card" onclick="viewNPCDetail('${esc(shortName)}')" style="cursor:pointer">`
-    html += `<div class="npc-avatar">${portrait
-      ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
-      : esc(npc.avatar || '👤')}</div>`
-    html += `<div class="npc-info">`
-    html += `<div class="npc-name">${esc(npc.name)} <span style="font-size:11px;color:#555">▶</span></div>`
-    if (npc.title) html += `<div class="npc-role">${esc(npc.title)}</div>`
-    html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
-    html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
-    html += `</div></div>`
+    const loc = npcLocs[npc.name]
+    const sameArea = loc && loc.location === playerLoc
+    const sameSub = sameArea && loc.subLocation === playerSub
+    if (sameSub) here.push(npc)
+    else away.push(npc)
   }
+
+  let html = ''
+
+  // 在场 NPC（有交谈按钮）
+  if (here.length) {
+    html += `<div style="font-size:12px;color:#e6b800;padding:4px 8px;margin-bottom:4px">当前在场</div>`
+    for (const npc of here) html += renderNPCCard(npc, npcLocs, true)
+  }
+
+  // 不在场 NPC（灰显 + 标注位置）
+  if (away.length) {
+    html += `<div style="font-size:12px;color:#666;padding:4px 8px;margin-top:8px;margin-bottom:4px">不在身边</div>`
+    for (const npc of away) html += renderNPCCard(npc, npcLocs, false)
+  }
+
   return html
+}
+
+function renderNPCCard(npc, npcLocs, isHere) {
+  const trust = npc.trust ?? 0
+  const trustPct = ((trust + 10) / 20) * 100
+  const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
+  const portrait = NPC_PORTRAIT_MAP[npc.name] ||
+    Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
+  const shortName = Object.keys(NPC_PORTRAIT_MAP).find(k => npc.name.includes(k)) || npc.name
+  const loc = npcLocs[npc.name]
+  const opacity = isHere ? '1' : '0.5'
+
+  let html = `<div class="npc-card" style="cursor:pointer;opacity:${opacity}">`
+  // 左侧：头像（点击看详情）
+  html += `<div class="npc-avatar" onclick="viewNPCDetail('${esc(shortName)}')">${portrait
+    ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
+    : esc(npc.avatar || '👤')}</div>`
+  html += `<div class="npc-info" onclick="viewNPCDetail('${esc(shortName)}')">`
+  html += `<div class="npc-name">${esc(npc.name)} <span style="font-size:11px;color:#555">▶</span></div>`
+  if (npc.title) html += `<div class="npc-role">${esc(npc.title)}</div>`
+  if (!isHere && loc) {
+    html += `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${esc(loc.subLocationZh || loc.locationZh)}</div>`
+  }
+  html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
+  html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
+  html += `</div>`
+  // 右侧：交谈按钮（仅在场 NPC）
+  if (isHere) {
+    html += `<div style="flex-shrink:0;margin-left:8px">`
+    html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
+    html += `style="background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
+    html += `</div>`
+  }
+  html += `</div>`
+  return html
+}
+
+/** 交谈按钮：填入输入框，不自动发送，玩家可补充内容 */
+function npcTalk(name) {
+  const input = document.getElementById('input')
+  input.value = `和${name}交谈：`
+  input.focus()
+  // 切回游戏 tab
+  switchTab('game')
 }
 
 function renderInventoryPanel(data) {
@@ -2338,7 +2418,8 @@ function showTradeProposal(data) {
   container.querySelectorAll('.trade-proposal-card').forEach(el => el.remove())
 
   const items = data.items || []
-  const totalPrice = data.totalPrice ?? 0
+  // 从 items 自动计算总价（不信任 DM 传的 totalPrice，DM 可能传 0 或漏传）
+  const totalPrice = items.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 1), 0) || data.totalPrice || 0
   const playerGold = getSavedSession()?.player?.gold ?? 0
   const canAfford = playerGold >= totalPrice
 
@@ -2354,7 +2435,7 @@ function showTradeProposal(data) {
   const card = document.createElement('div')
   card.className = 'trade-proposal-card'
   // Store trade data on DOM (avoids JSON-in-HTML-attribute escaping bug)
-  card._tradeData = { npc: data.npc || '商人', items, totalPrice }
+  card._tradeData = { npc: data.npc || '商人', items, totalPrice }  // totalPrice 已从 items 自动计算
   const balanceAfter = playerGold - totalPrice
   const balanceClass = canAfford ? 'affordable' : 'unaffordable'
   card.innerHTML = `
