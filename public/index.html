@@ -733,6 +733,53 @@
     padding: 8px 0 4px; flex-shrink: 0;
   }
 
+  /* ─── 攻击确认弹窗 ─── */
+  .attack-confirm-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.15s ease-out;
+  }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .attack-confirm-dialog {
+    background: #1a1015;
+    border: 1px solid #8b1a1a;
+    border-radius: 12px;
+    padding: 24px 28px;
+    max-width: 340px;
+    box-shadow: 0 0 40px rgba(139,26,26,0.3);
+    text-align: center;
+  }
+  .attack-confirm-icon { font-size: 36px; margin-bottom: 8px; }
+  .attack-confirm-title { color: #e8d0d0; font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+  .attack-confirm-warning {
+    background: rgba(139,26,26,0.15);
+    border: 1px solid rgba(139,26,26,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+    color: #c07070;
+    font-size: 13px;
+    text-align: left;
+  }
+  .attack-confirm-warning div { font-weight: 600; margin-bottom: 6px; }
+  .attack-confirm-warning ul { margin: 0; padding-left: 18px; }
+  .attack-confirm-warning li { margin: 3px 0; font-size: 12px; color: #a06060; }
+  .attack-confirm-btns { display: flex; gap: 12px; justify-content: center; }
+  .attack-confirm-cancel {
+    padding: 8px 20px; border-radius: 8px;
+    background: transparent; border: 1px solid #444; color: #888;
+    font-size: 14px; cursor: pointer;
+  }
+  .attack-confirm-cancel:hover { border-color: #666; color: #aaa; }
+  .attack-confirm-yes {
+    padding: 8px 24px; border-radius: 8px;
+    background: linear-gradient(135deg, #8b1a1a, #b02020);
+    border: none; color: #ffcccc; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  .attack-confirm-yes:hover { filter: brightness(1.15); box-shadow: 0 0 12px rgba(176,32,32,0.4); }
+
   /* ─── DM 思考日志面板 ─── */
   .thinking-panel {
     position: fixed;
@@ -1727,11 +1774,42 @@ function npcTalk(name) {
 
 /** 攻击按钮：确认后发送攻击指令 */
 function npcAttack(name) {
-  if (!confirm(`确定要攻击${name}吗？这会产生严重后果（信任暴跌、可能被追捕）。`)) return
+  showAttackConfirm(name)
+}
+
+function showAttackConfirm(name) {
+  // 移除旧弹窗
+  document.querySelectorAll('.attack-confirm-overlay').forEach(el => el.remove())
+
+  const overlay = document.createElement('div')
+  overlay.className = 'attack-confirm-overlay'
+  overlay.innerHTML = `
+    <div class="attack-confirm-dialog">
+      <div class="attack-confirm-icon">⚔️</div>
+      <div class="attack-confirm-title">确定要攻击 ${esc(name)} 吗？</div>
+      <div class="attack-confirm-warning">
+        <div>⚠ 这将产生严重后果</div>
+        <ul>
+          <li>信任度暴跌（-5 及关系网连坐）</li>
+          <li>NPC 可能还击或召唤护卫</li>
+          <li>镇民会追捕你</li>
+        </ul>
+      </div>
+      <div class="attack-confirm-btns">
+        <button class="attack-confirm-cancel" onclick="this.closest('.attack-confirm-overlay').remove()">取消</button>
+        <button class="attack-confirm-yes" onclick="executeNpcAttack('${esc(name)}')">拔剑</button>
+      </div>
+    </div>`
+  document.body.appendChild(overlay)
+  // 点遮罩关闭
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+}
+
+function executeNpcAttack(name) {
+  document.querySelectorAll('.attack-confirm-overlay').forEach(el => el.remove())
   const input = document.getElementById('input')
   input.value = `攻击${name}`
   switchTab('game')
-  // 自动发送
   setTimeout(() => sendInput(), 100)
 }
 
