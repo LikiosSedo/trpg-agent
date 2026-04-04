@@ -33,6 +33,7 @@ import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
+import { consumeTradeProposal } from './tools/propose-trade.js'
 import { readFileSync } from 'fs'
 
 // ─── NPC 战斗数据缓存（用于状态恢复系统） ─────────
@@ -143,6 +144,7 @@ export type TurnEvent =
   | { type: 'narrative_warning'; text: string }
   | { type: 'trade_confirm'; gold: number; npcName: string; itemHint?: string }
   | { type: 'item_acquired'; text: string }
+  | { type: 'trade_proposal'; npc: string; items: any[]; totalPrice: number; canBargain: boolean }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -826,6 +828,12 @@ export class GameEngine {
     const gameOver = consumeGameOver()
     if (gameOver) {
       yield { type: 'game_over', reason: gameOver.reason, canContinue: gameOver.canContinue, continueHint: gameOver.continueHint }
+    }
+
+    // 交易提案检查（DM 调用了 ProposeTradeAction？）
+    const trade = consumeTradeProposal()
+    if (trade) {
+      yield { type: 'trade_proposal', npc: trade.npc, items: trade.items, totalPrice: trade.totalPrice, canBargain: trade.canBargain }
     }
 
     // Consume trust changes from ChangeTrust tool

@@ -14,7 +14,7 @@ import {
   AttackTool, UseItemTool, SearchTool, RestTool,
   RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
-  ChangeTrustTool,
+  ChangeTrustTool, ProposeTradeActionTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -71,7 +71,7 @@ export function initDMAgent(): void {
       UseItemTool, SearchTool, RestTool,
       RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
-      ChangeTrustTool,
+      ChangeTrustTool, ProposeTradeActionTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,

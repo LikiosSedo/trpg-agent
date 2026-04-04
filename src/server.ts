@@ -169,6 +169,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('trade_confirm', { gold: ev.gold, npcName: ev.npcName, itemHint: ev.itemHint }); break
         case 'item_acquired':
           send('item_acquired', { text: ev.text }); break
+        case 'trade_proposal':
+          send('trade_proposal', { npc: ev.npc, items: ev.items, totalPrice: ev.totalPrice, canBargain: ev.canBargain }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
         case 'auto_save':
@@ -287,13 +289,37 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 交易执行（玩家点击交易确认卡片） ──
     if (msg.type === 'trade_execute') {
       if (!gameStarted || !engine) return
-      const result = await TransferItemTool.execute({
-        transferType: 'buy',
-        itemName: msg.item || 'unknown',
-        sourceId: msg.npc,
-        goldAmount: msg.gold,
-      })
-      send('system', { text: result.isError ? `交易失败：${result.output}` : `📦 ${result.output}` })
+      const items = msg.items || [{ name: msg.item, price: msg.gold, quantity: 1 }]
+      const npc = msg.npc
+      const results: string[] = []
+      let allSuccess = true
+
+      // 先检查总金额
+      const totalPrice = msg.totalPrice ?? items.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
+      if (engine.session.player.gold < totalPrice) {
+        send('system', { text: `交易失败：金币不足（需要${totalPrice}，拥有${engine.session.player.gold}）` })
+        return
+      }
+
+      // 逐个物品执行
+      for (const item of items) {
+        const qty = item.quantity || 1
+        for (let i = 0; i < qty; i++) {
+          const result = await TransferItemTool.execute({
+            transferType: 'buy',
+            itemName: item.name,
+            sourceId: npc,
+            goldAmount: item.price,
+            itemType: item.type,
+            itemDescription: item.description || '',
+            itemBonus: item.bonus,
+          })
+          if (result.isError) { allSuccess = false; results.push(`❌ ${item.name}: ${result.output}`) }
+          else { results.push(`✅ ${item.name}`) }
+        }
+      }
+
+      send('item_acquired', { text: `交易完成：${results.join('、')}` })
       send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
       return
     }

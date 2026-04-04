@@ -137,6 +137,17 @@
   .item-notif-icon { font-size: 24px; }
   .item-notif-text { color: #4caf50; font-size: 13px; line-height: 1.4; }
 
+  /* ─── Trade proposal card ─── */
+  .trade-proposal-card {
+    background: #1a2a3e; border: 2px solid #e6b800; border-radius: 12px;
+    padding: 16px; margin: 8px 0; animation: combatFadeIn 0.4s ease-out;
+  }
+  .trade-proposal-header { color: #e6b800; font-size: 15px; font-weight: bold; margin-bottom: 10px; }
+  .trade-item-row { display: flex; justify-content: space-between; padding: 4px 0; color: #ccc; font-size: 13px; border-bottom: 1px solid #0f3460; }
+  .trade-item-price { color: #e6b800; }
+  .trade-proposal-total { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #ccc; font-weight: bold; }
+  .trade-proposal-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
   /* ─── Trade confirmation card ─── */
   .trade-card {
     background: #1a2a3e; border: 1px solid #e6b800; border-radius: 10px;
@@ -1795,6 +1806,11 @@ function handleWsMessage(e) {
       showTradeCard(msg)
       break
 
+    // ─── 交易提案（DM 驱动的完整交易卡片） ───
+    case 'trade_proposal':
+      showTradeProposal(msg)
+      break
+
     // ─── 音频 ───
     case 'audio':
       switchAudio(msg.bgm, msg.ambient)
@@ -2107,6 +2123,55 @@ function showItemNotification(text) {
   container.scrollTop = container.scrollHeight
   // 5秒后淡出
   setTimeout(() => { card.style.opacity = '0.5' }, 5000)
+}
+
+function showTradeProposal(data) {
+  const container = document.getElementById('messages')
+  // 移除旧的交易卡片
+  container.querySelectorAll('.trade-proposal-card').forEach(el => el.remove())
+
+  const items = data.items || []
+  const totalPrice = data.totalPrice ?? 0
+  const playerGold = getSavedSession()?.player?.gold ?? 0
+  const canAfford = playerGold >= totalPrice
+
+  let itemsHtml = ''
+  for (const item of items) {
+    const qty = item.quantity > 1 ? ` x${item.quantity}` : ''
+    itemsHtml += `<div class="trade-item-row">
+      <span>${esc(item.name)}${qty}</span>
+      <span class="trade-item-price">${item.price * (item.quantity || 1)} 金</span>
+    </div>`
+  }
+
+  const card = document.createElement('div')
+  card.className = 'trade-proposal-card'
+  card.innerHTML = `
+    <div class="trade-proposal-header">💰 交易 — ${esc(data.npc || '商人')}</div>
+    <div class="trade-proposal-items">${itemsHtml}</div>
+    <div class="trade-proposal-total">
+      <span>总计：${totalPrice} 金币</span>
+      <span style="color:${canAfford ? '#4caf50' : '#f44336'}">余额：${playerGold} → ${playerGold - totalPrice}</span>
+    </div>
+    <div class="trade-proposal-btns">
+      ${data.canBargain ? `<button class="trade-btn" style="background:#0f3460;color:#e6b800;border:1px solid #e6b800" onclick="tradeBargain(this)">💬 砍价</button>` : ''}
+      <button class="trade-btn confirm" ${canAfford ? '' : 'disabled style="opacity:0.4"'} onclick="tradeConfirm(this, '${esc(data.npc)}', ${JSON.stringify(items).replace(/'/g, "\\'")}  , ${totalPrice})">✅ 确认交易</button>
+      <button class="trade-btn cancel" onclick="this.closest('.trade-proposal-card').remove()">❌ 取消</button>
+    </div>`
+  container.appendChild(card)
+  container.scrollTop = container.scrollHeight
+}
+
+function tradeConfirm(btn, npc, items, totalPrice) {
+  ws.send(JSON.stringify({ type: 'trade_execute', npc, items, totalPrice }))
+  btn.closest('.trade-proposal-card').innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px">✅ 交易完成</div>'
+}
+
+function tradeBargain(btn) {
+  btn.closest('.trade-proposal-card').remove()
+  const input = document.getElementById('input')
+  input.value = '能再便宜点吗？'
+  input.focus()
 }
 
 function showTradeCard(data) {

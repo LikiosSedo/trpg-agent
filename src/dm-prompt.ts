@@ -165,6 +165,7 @@ export function buildDMPrompt(): string {
 | SetActions | **每次回应最后必须调用**。设置细节展开和推荐操作（详见下方） |
 | SetAmbiance | 仅在关键剧情节点切换BGM |
 | ChangeTrust | NPC对话后信任变化。delta限±3，日常±1 |
+| ProposeTradeAction | 当NPC同意交易报价时调用。弹出交易卡片让玩家确认。不要在叙事中直接完成交易。 |
 | RenderScene | 格式化显示（地图/状态/战利品） |
 
 注意：Move/Look/Search/Attack/Rest/UseItem/RollDice 通常由规则系统预处理，你不需要调用。
