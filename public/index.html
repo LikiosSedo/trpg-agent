@@ -416,8 +416,8 @@
   /* 进度条文字 */
   .progress-text { font-size: 11px; color: #888; margin-top: 2px; }
 
-  /* 游戏界面底部留空给 tab bar */
-  #game-screen { padding-bottom: 52px; }
+  /* 游戏界面 */
+  #game-screen { padding-bottom: 52px; overflow: hidden; }
 
   /* ─── Pixel Map Grid ─── */
   .map-grid {
@@ -1668,6 +1668,18 @@ function handleWsMessage(e) {
         document.getElementById('send').disabled = false
         document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
         updateCombatPanel()
+        // 战斗结束 → 切回场景 BGM（从当前会话状态推导）
+        const savedSess = getSavedSession()
+        if (savedSess) {
+          const loc = savedSess.worldState?.currentLocation || 'dawnbreak-town'
+          const sub = savedSess.worldState?.currentSubLocation
+          const time = savedSess.worldState?.timeOfDay || 'morning'
+          // 简单映射：根据位置选回场景音乐
+          const bgmMap = { 'dawnbreak-town': time === 'night' ? 'town-night' : 'town-day', 'twilight-woods': 'forest', 'greyspine-mines': 'mines', 'shatterstone-wastes': 'wasteland' }
+          const ambMap = { 'dawnbreak-town': time === 'night' ? 'crickets' : 'birds', 'twilight-woods': 'birds', 'greyspine-mines': 'drip', 'shatterstone-wastes': 'wind' }
+          if (sub === 'shattered-shield-tavern') { switchAudio('tavern', 'fire') }
+          else { switchAudio(bgmMap[loc] || 'town-day', ambMap[loc] || 'silence') }
+        }
         showSceneActions()
       }
       break
