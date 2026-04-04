@@ -2161,9 +2161,9 @@ document.getElementById('input').addEventListener('input', function() {
   this.style.height = Math.min(this.scrollHeight, 120) + 'px'
 })
 
-// Enter 发送，Shift+Enter 换行
+// Enter 发送，Shift+Enter 换行，输入法确认时不发送（isComposing）
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
     if (document.getElementById('create-screen').style.display !== 'none') {
       startGame()
