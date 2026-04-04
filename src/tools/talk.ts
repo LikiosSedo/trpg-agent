@@ -109,8 +109,8 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const baseDC = npcEntry?.socialDC ?? 10
       // 信任度分段影响说服难度
       let trustMod = 0
-      if (npc.trust >= 7) trustMod = -4       // 挚友，几乎有求必应
-      else if (npc.trust >= 4) trustMod = -2  // 熟人，愿意帮忙
+      if (npc.trust >= 7) trustMod = -6       // 挚友
+      else if (npc.trust >= 4) trustMod = -3  // 熟人
       else if (npc.trust <= -6) {             // 极度敌对，拒绝沟通
         return { output: `${npcId}完全拒绝和你交流。` }
       }
