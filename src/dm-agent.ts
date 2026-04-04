@@ -12,7 +12,8 @@ import { homedir } from 'node:os'
 import {
   DiceTool, MoveTool, LookTool, TalkTool,
   AttackTool, UseItemTool, SearchTool, RestTool,
-  RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool, GameOverTool,
+  RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
+  // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
   ChangeTrustTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
@@ -68,7 +69,8 @@ export function initDMAgent(): void {
     tools: [
       DiceTool, MoveTool, LookTool, TalkTool,
       UseItemTool, SearchTool, RestTool,
-      RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool, GameOverTool,
+      RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
+  // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
       ChangeTrustTool,
     ],
     systemPrompt: buildDMPrompt(),

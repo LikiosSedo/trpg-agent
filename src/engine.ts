@@ -877,6 +877,17 @@ export class GameEngine {
       return
     }
 
+    // 全镇驱逐检测：3+ 个能战斗的 NPC 信任到战斗级别 → Game Over
+    const { getPersonality: getP } = await import('./npc-relationships.js')
+    const hostileNPCs = session.npcs.filter(n => {
+      const p = getP(n.name)
+      return n.trust <= p.thresholds.combat && p.canFight
+    })
+    if (hostileNPCs.length >= 3) {
+      yield { type: 'game_over', reason: `你与破晓镇多数居民为敌（${hostileNPCs.map(n => n.name).join('、')}），被全镇驱逐。`, canContinue: false }
+      return
+    }
+
     // 自动存档
     this.turnsSinceLastSave++
     if (this.turnsSinceLastSave >= 5) {
