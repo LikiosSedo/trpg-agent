@@ -600,6 +600,75 @@ export class GameEngine {
     // NPC 状态恢复检查
     checkNPCConditionRecovery(session)
 
+    // 暴力后果检查
+    const alertJson = session.worldState.flags['violence_alert'] as string | undefined
+    if (alertJson && !session.combat?.active) {
+      try {
+        const alert = JSON.parse(alertJson)
+        if (!alert.responded) {
+          const elapsed = session.turnCount - alert.triggerTurn
+
+          // Player fled the area — discovery happens but no combat
+          if (session.worldState.currentLocation !== alert.location) {
+            alert.responded = true
+            session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+            yield { type: 'narrative_warning', text: `你离开了${alert.location}，但${alert.victimName}的遭遇很快会被发现...` }
+          }
+          // Pre-warning (1 turn before response)
+          else if (elapsed === alert.delay - 1) {
+            yield { type: 'narrative_warning', text: '⚠️ 远处传来急促的脚步声和喊叫声，有人正在赶来！' }
+          }
+          // Response time
+          else if (elapsed >= alert.delay) {
+            const { getPersonality: getP } = await import('./npc-relationships.js')
+
+            // Find a combat-capable NPC who is hostile to the player
+            // Priority: 韩猛 (law enforcement) first, then others
+            const candidates = session.npcs.filter(n =>
+              n.name !== alert.victimName &&
+              n.condition !== 'unconscious' &&
+              getP(n.name).canFight &&
+              n.trust <= getP(n.name).thresholds.hostile
+            )
+            const responder = candidates.sort((a, b) => {
+              if (a.name === '韩猛') return -1
+              if (b.name === '韩猛') return 1
+              return 0
+            })[0] ?? null
+
+            if (responder) {
+              alert.responded = true
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+
+              // Move responder to the scene
+              const { moveNPC } = await import('./npc-mobility.js')
+              moveNPC(responder, alert.subLocation, session)
+
+              // Trigger combat with responder
+              const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
+              const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
+              const allDb = [...monstersJson, ...npcCombatJson]
+              const { startCombat } = await import('./combat-manager.js')
+
+              try {
+                startCombat(session, [responder.name], allDb as any)
+                console.log(`[consequence] ${responder.name} 赶到现场，发起战斗！`)
+                yield { type: 'narrative_warning', text: `⚔️ ${responder.name}赶到了现场！` }
+                yield* this.emitCombatStart()
+              } catch (err) {
+                console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
+              }
+            } else {
+              // No fighter available, but reputation damage
+              alert.responded = true
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              yield { type: 'narrative_warning', text: '镇民发现了你的暴行，你的名声在破晓镇已经臭名昭著。' }
+            }
+          }
+        }
+      } catch { /* malformed alert JSON, ignore */ }
+    }
+
     // 检查过期承诺
     const brokenPromises = checkBrokenPromises(session)
     for (const bp of brokenPromises) {
@@ -624,6 +693,20 @@ export class GameEngine {
     const idle = checkIdleEvent(input)
     if (idle) parts.push(idle)
 
+    // Violence alert DM context injection
+    const alertData = session.worldState.flags['violence_alert']
+    if (alertData) {
+      try {
+        const alert = JSON.parse(alertData as string)
+        if (!alert.responded) {
+          const remaining = alert.delay - (session.turnCount - alert.triggerTurn)
+          if (remaining > 0 && remaining <= 3) {
+            parts.push(`[世界事件：${alert.victimName}的遭遇即将被发现，约${remaining}轮后有人赶到]`)
+          }
+        }
+      } catch { /* ignore malformed */ }
+    }
+
     // Adaptive tool reminder
     const reminders: string[] = []
     if (session.turnCount % 5 === 0) reminders.push('回应结束前必须调用SetActions设置选项。')
@@ -643,6 +726,41 @@ export class GameEngine {
       parts.push(formatActionResult(actionResult))
     } else {
       console.log(`[rules-agent] 跳过预执行: ${action.type} (TALK/NARRATIVE 交给 DM)`)
+    }
+
+    // Set violence alert for consequence system (NPC attacks only)
+    if (action.type === 'ATTACK' && actionResult?.success) {
+      const targetNpc = session.npcs.find(n => n.name === action.target)
+      if (targetNpc) {
+        let delay = 5
+        const time = session.worldState.timeOfDay
+        if (time === 'night') delay += 4
+        else if (time === 'evening') delay += 2
+
+        // Check witnesses at same sub-location
+        const witnesses = session.npcs.filter(n =>
+          n.name !== action.target &&
+          n.location === session.worldState.currentLocation &&
+          (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation &&
+          n.condition !== 'unconscious'
+        )
+        if (witnesses.length > 0) delay -= 3
+        // Civilian witness reports faster
+        const { getPersonality } = await import('./npc-relationships.js')
+        if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
+
+        delay = Math.max(1, delay)
+
+        session.worldState.flags['violence_alert'] = JSON.stringify({
+          triggerTurn: session.turnCount,
+          victimName: action.target,
+          location: session.worldState.currentLocation,
+          subLocation: session.worldState.currentSubLocation,
+          delay,
+          responded: false,
+        })
+        console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应`)
+      }
     }
 
     parts.push(input)
