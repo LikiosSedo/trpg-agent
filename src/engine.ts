@@ -663,8 +663,11 @@ export class GameEngine {
         'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
         'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
       }
+      // 只显示已解锁（遇到过/被提到过）的 NPC 位置
+      const unlockedNames = new Set(this.dossier.toListData(trustMap).map(n => n.name))
       const npcLocations: Record<string, { location: string; subLocation: string; locationZh: string; subLocationZh: string }> = {}
       for (const npc of session.npcs) {
+        if (!unlockedNames.has(npc.name)) continue  // 未解锁的 NPC 不显示
         const sub = npc.subLocation ?? npc.homeBase ?? ''
         const subName = getSubLocationName(sub)
         npcLocations[npc.name] = {
