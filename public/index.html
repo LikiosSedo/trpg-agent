@@ -46,6 +46,22 @@
     border-radius: 16px; font-size: 13px; cursor: pointer;
   }
   .action-btn:hover { color: #e6b800; border-color: #e6b800; }
+  .action-btn-quest {
+    background: linear-gradient(135deg, #1a0f3d, #2d1b69);
+    border: 1px solid #b8860b;
+    color: #e6c866;
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(184, 134, 11, 0.2);
+    animation: questPulse 2s ease-in-out infinite;
+  }
+  .action-btn-quest:hover {
+    color: #ffd700; border-color: #ffd700;
+    box-shadow: 0 0 14px rgba(255, 215, 0, 0.3);
+  }
+  @keyframes questPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(184, 134, 11, 0.2); }
+    50% { box-shadow: 0 0 14px rgba(184, 134, 11, 0.4); }
+  }
   .msg.combat-player-result {
     color: #4ecdc4 !important; font-size: 13px;
     background: #0e2a2a; border-left: 3px solid #4ecdc4; padding: 8px 12px;
@@ -132,15 +148,37 @@
     height: 100%; border-radius: 2px; background: #f44336;
     transition: width 0.3s;
   }
+  /* ─── Active Effects (buff indicators) ─── */
+  .effects-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .effect-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(230, 184, 0, 0.15); border: 1px solid #e6b800;
+    border-radius: 12px; padding: 3px 10px; font-size: 11px; color: #e6b800;
+    animation: combatFadeIn 0.3s ease-out;
+  }
+  .effect-chip.spell { border-color: #bb86fc; color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
+  .effect-chip.potion { border-color: #4caf50; color: #4caf50; background: rgba(76, 175, 80, 0.12); }
+  .effect-chip.equipment { border-color: #64b5f6; color: #64b5f6; background: rgba(100, 181, 246, 0.12); }
+  .effect-chip .effect-turns { opacity: 0.7; font-size: 10px; }
+  .combat-effects-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 8px; }
+  .combat-selector-item.buff-spell { border-left: 3px solid #bb86fc; padding-left: 9px; }
+  .combat-selector-item.attack-spell { border-left: 3px solid #ff8c42; padding-left: 9px; }
+  .combat-selector-item .spell-tag { font-size: 10px; margin-left: 6px; opacity: 0.7; }
+  .combat-selector-item .spell-tag.buff { color: #bb86fc; }
+  .combat-selector-item .spell-tag.attack { color: #ff8c42; }
+  .item-notification .equip-compare { display: flex; gap: 12px; margin-top: 4px; font-size: 11px; }
+  .equip-compare .stat-up { color: #4caf50; }
+  .equip-compare .stat-down { color: #f44336; }
   /* ─── Item notification ─── */
   .item-notification {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: flex-start; flex-direction: column; gap: 4px;
     background: linear-gradient(135deg, #1a2e1a 0%, #1a3a1a 100%);
     border: 1px solid #4caf50; border-radius: 10px;
     padding: 10px 14px; margin: 6px 0;
     animation: combatFadeIn 0.4s ease-out;
     transition: opacity 1s;
   }
+  .item-notif-row { display: flex; align-items: center; gap: 10px; }
   .item-notif-icon { font-size: 24px; }
   .item-notif-text { color: #4caf50; font-size: 13px; line-height: 1.4; }
 
@@ -1305,6 +1343,19 @@ function renderStatusPanel(data) {
     html += `</div>`
   }
 
+  // 当前效果
+  const effects = data.activeEffects || []
+  if (effects.length > 0) {
+    html += `<div class="panel-card"><div class="panel-card-title">当前效果</div><div class="effects-bar">`
+    const EFFECT_ICONS = { ac_bonus: '🛡', attack_bonus: '⚔', damage_bonus: '💥', resistance: '✨', poison_immunity: '🧪', perception_bonus: '👁', light: '🔥' }
+    for (const e of effects) {
+      const icon = EFFECT_ICONS[e.type] || '✦'
+      const turns = e.remaining === -1 ? '永久' : `${e.remaining}轮`
+      html += `<span class="effect-chip ${e.source || ''}">${icon} ${esc(e.name)} <span class="effect-turns">${turns}</span></span>`
+    }
+    html += `</div></div>`
+  }
+
   // 法术/技能
   if (data.spells && data.spells.length) {
     html += `<div class="panel-card"><div class="panel-card-title">法术</div>`
@@ -2095,6 +2146,7 @@ function handleWsMessage(e) {
       combatTargets = msg.targets || []
       combatSpells = msg.spells || []
       combatItems = msg.items || []
+      window._combatActiveEffects = msg.activeEffects || []
       sending = false
       document.getElementById('send').disabled = false
       setCombatButtonsEnabled(true)
@@ -2367,6 +2419,25 @@ function updateCombatPanel() {
   if (combatMode) {
     const label = document.getElementById('combat-round-label')
     if (label) label.textContent = `第 ${combatRound} 轮 — 你的回合`
+    // 显示当前 buff 效果
+    let effectsBar = panel.querySelector('.combat-effects-bar')
+    if (!effectsBar) {
+      effectsBar = document.createElement('div')
+      effectsBar.className = 'combat-effects-bar'
+      const roundLabel = document.getElementById('combat-round-label')
+      if (roundLabel) roundLabel.parentNode.insertBefore(effectsBar, roundLabel.nextSibling)
+    }
+    const effects = window._combatActiveEffects || []
+    const ICONS = { ac_bonus: '🛡', attack_bonus: '⚔', damage_bonus: '💥', resistance: '✨', poison_immunity: '🧪', light: '🔥' }
+    if (effects.length > 0) {
+      effectsBar.innerHTML = effects.map(e => {
+        const icon = ICONS[e.type] || '✦'
+        const turns = e.remaining === -1 ? '' : `${e.remaining}轮`
+        return `<span class="effect-chip ${e.source || ''}">${icon}${esc(e.name)} <span class="effect-turns">${turns}</span></span>`
+      }).join('')
+    } else {
+      effectsBar.innerHTML = ''
+    }
   }
 }
 
@@ -2392,8 +2463,9 @@ function showCombatSelector(title, items, onSelect) {
   sel.appendChild(titleEl)
   for (const item of items) {
     const row = document.createElement('div')
-    row.className = 'combat-selector-item'
-    row.innerHTML = `<span>${esc(item.label)}</span>${item.info ? `<span class="item-info">${esc(item.info)}</span>` : ''}`
+    row.className = 'combat-selector-item' + (item.extraClass ? ' ' + item.extraClass : '')
+    const tagStr = item.tagHtml || ''
+    row.innerHTML = `<span>${esc(item.label)}${tagStr}</span>${item.info ? `<span class="item-info">${esc(item.info)}</span>` : ''}`
     row.addEventListener('click', () => {
       hideCombatSelector()
       onSelect(item)
@@ -2442,11 +2514,21 @@ function combatSpell() {
     appendMsg('没有可用的法术。', 'system')
     return
   }
-  // Need target selection after spell selection for attack spells
-  showCombatSelector('选择法术', combatSpells.map(s => ({
-    label: s.name, info: s.isCantrip ? '戏法' : `${s.remaining}/${s.max}`, value: s.name, desc: s.desc,
-  })), (spell) => {
-    if (combatTargets.length === 1) {
+  // Build spell list with buff/attack tags
+  const spellItems = combatSpells.map(s => {
+    const tag = s.isBuff ? '<span class="spell-tag buff">增益</span>' : '<span class="spell-tag attack">攻击</span>'
+    const usage = s.isCantrip ? '戏法' : `${s.remaining}/${s.max}`
+    return {
+      label: s.name, info: usage, value: s.name, isBuff: !!s.isBuff,
+      extraClass: s.isBuff ? 'buff-spell' : 'attack-spell',
+      tagHtml: tag,
+    }
+  })
+  showCombatSelector('选择法术', spellItems, (spell) => {
+    if (spell.isBuff) {
+      // Buff spells: no target needed, send directly
+      sendCombatAction('spell', combatTargets[0]?.id || '', spell.value)
+    } else if (combatTargets.length === 1) {
       sendCombatAction('spell', combatTargets[0].id, spell.value)
     } else {
       showCombatSelector('选择目标', combatTargets.map(t => ({
@@ -2510,14 +2592,16 @@ function showSceneActions(actions) {
     div.appendChild(btn)
   }
 
-  // 推荐操作按钮（点击发送为玩家输入，触发新一轮）
+  // 推荐操作按钮（★ 前缀 = 主线任务，特殊样式）
   for (const s of suggestions) {
+    const isMainQuest = s.startsWith('★')
+    const displayText = isMainQuest ? s.slice(1) : s
     const btn = document.createElement('span')
-    btn.className = 'action-btn'
-    btn.textContent = s
+    btn.className = isMainQuest ? 'action-btn action-btn-quest' : 'action-btn'
+    btn.textContent = isMainQuest ? `🗡 ${displayText}` : displayText
     btn.onclick = () => {
       div.remove()
-      document.getElementById('input').value = s
+      document.getElementById('input').value = displayText
       sendInput()
     }
     div.appendChild(btn)
@@ -2565,14 +2649,57 @@ function closeNPCCard() {
 }
 
 // ─── 交易确认卡片 ───
+// 装备对比数据库（bonus 值来自 equipment.json，与后端一致）
+const EQUIP_DB = {
+  '短剑': { slot: 'weapon', bonus: 0, dice: '1d6' },
+  '长剑': { slot: 'weapon', bonus: 0, dice: '1d8' },
+  '短弓': { slot: 'weapon', bonus: 0, dice: '1d6' },
+  '短剑 +1': { slot: 'weapon', bonus: 1, dice: '1d6' },
+  '灵银长剑': { slot: 'weapon', bonus: 1, dice: '1d8' },
+  '破晓战锤': { slot: 'weapon', bonus: 2, dice: '1d10' },
+  '皮甲': { slot: 'armor', bonus: 1 },
+  '强化皮甲': { slot: 'armor', bonus: 2 },
+  '锁子甲': { slot: 'armor', bonus: 2 },
+  '晨光护胸甲': { slot: 'armor', bonus: 3 },
+}
+
+function buildEquipCompare(itemName) {
+  const newItem = EQUIP_DB[itemName]
+  if (!newItem) return ''
+  const session = getSavedSession()
+  if (!session?.player?.equipped) return ''
+  const current = newItem.slot === 'weapon' ? session.player.equipped.weapon : session.player.equipped.armor
+  if (!current) return `<div class="equip-compare"><span class="stat-up">当前无${newItem.slot === 'weapon' ? '武器' : '护甲'}，可直接装备</span></div>`
+  const currentInfo = EQUIP_DB[current.name]
+  if (!currentInfo) return ''
+  const bonusDiff = newItem.bonus - currentInfo.bonus
+  if (bonusDiff === 0 && newItem.dice === currentInfo.dice) return ''
+  const parts = []
+  if (newItem.slot === 'weapon') {
+    if (newItem.dice !== currentInfo.dice) parts.push(`伤害 ${currentInfo.dice}→${newItem.dice}`)
+    if (bonusDiff !== 0) parts.push(`<span class="${bonusDiff > 0 ? 'stat-up' : 'stat-down'}">加值 ${bonusDiff > 0 ? '+' : ''}${bonusDiff}</span>`)
+  } else {
+    if (bonusDiff !== 0) parts.push(`<span class="${bonusDiff > 0 ? 'stat-up' : 'stat-down'}">AC ${bonusDiff > 0 ? '+' : ''}${bonusDiff}</span>`)
+  }
+  if (parts.length === 0) return ''
+  return `<div class="equip-compare">vs ${esc(current.name)}：${parts.join(' ')}</div>`
+}
+
 function showItemNotification(text) {
   const container = document.getElementById('messages')
   const card = document.createElement('div')
   card.className = 'item-notification'
-  card.innerHTML = `<span class="item-notif-icon">📦</span><span class="item-notif-text">${esc(text)}</span>`
+  // 尝试提取物品名称做装备对比
+  let compareHtml = ''
+  for (const name of Object.keys(EQUIP_DB)) {
+    if (text.includes(name)) {
+      compareHtml = buildEquipCompare(name)
+      break
+    }
+  }
+  card.innerHTML = `<div class="item-notif-row"><span class="item-notif-icon">📦</span><span class="item-notif-text">${esc(text)}</span></div>${compareHtml}`
   container.appendChild(card)
   container.scrollTop = container.scrollHeight
-  // 5秒后淡出
   setTimeout(() => { card.style.opacity = '0.5' }, 5000)
 }
 

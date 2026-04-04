@@ -258,17 +258,16 @@ function buildFallbackActions(session: GameSession): SceneActions {
         const [type, target] = beat.trigger.split(':')
         if (type === 'talk' && target) {
           const npc = npcsHere.find(n => n.name === target)
-          if (npc && !suggestions.includes(`和${target}交谈`)) {
-            suggestions.push(`和${target}交谈`)
+          if (npc && !suggestions.includes(`★和${target}交谈`) && !suggestions.includes(`和${target}交谈`)) {
+            suggestions.push(`★和${target}交谈`)
           }
         } else if (type === 'arrive' && target) {
-          // 深夜不推荐去危险区域
           const destArea = locations[target]
           if (destArea && target !== loc) {
             if (isNight && (target === 'twilight-woods' || target === 'greyspine-mines' || target === 'shatterstone-wastes')) {
-              // 夜间替换为更合理的建议
+              // 夜间不推荐去危险区域
             } else {
-              suggestions.push(`前往${destArea.nameZh}`)
+              suggestions.push(`★前往${destArea.nameZh}`)
             }
           }
         }
