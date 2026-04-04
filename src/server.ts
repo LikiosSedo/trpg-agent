@@ -226,7 +226,10 @@ wss.on('connection', (ws: WebSocket, req) => {
         engine = GameEngine.resumeGame(msg.session, msg.dossier, msg.session.dmMessages)
         gameStarted = true
         console.log(`[server] resumed session for ${engine.session.player.name}`)
-        send('resumed', {})
+
+        // 恢复完整视觉状态（音频、战斗、HUD）
+        const snapshot = engine.getStateSnapshot()
+        send('resumed', snapshot)
       } catch (err) {
         console.error('[server] resume failed:', err)
         send('resume_failed', { text: `恢复失败: ${(err as Error).message.slice(0, 80)}` })

@@ -1735,16 +1735,30 @@ function handleWsMessage(e) {
       isResuming = false
       appendMsg('── 存档已恢复，继续冒险 ──', 'reconnect')
       {
-        const s = getSavedSession()
-        if (s) {
-          updateHUD(s)
-          // Restore combat mode if session had active combat
-          if (s.combat?.active) {
-            combatMode = true
-            combatRound = s.combat.round || 1
-            combatTargets = (s.combat.monsters || []).filter(m => m.hp > 0).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
-            updateCombatPanel()
-          }
+        // 从服务端快照恢复完整视觉状态
+        const snap = msg
+
+        // 1. HUD
+        if (snap.session) updateHUD(snap.session)
+
+        // 2. 音频恢复
+        if (snap.audio) {
+          switchAudio(snap.audio.bgm, snap.audio.ambient)
+        }
+
+        // 3. 战斗状态恢复
+        if (snap.combat) {
+          combatMode = true
+          combatRound = snap.combat.round || 1
+          combatTargets = (snap.combat.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
+          combatSpells = (snap.combat.spells || []).map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0 }))
+          combatItems = (snap.combat.items || []).map(i => ({ name: i.name, desc: i.description }))
+          updateCombatPanel()
+          showCombatPortraits(snap.combat.monsters)
+        } else {
+          // 非战斗 → 确保 HUD 从 localStorage 兜底
+          const s = getSavedSession()
+          if (s) updateHUD(s)
         }
       }
       break

@@ -1056,4 +1056,39 @@ export class GameEngine {
   getWorldGuide(): string {
     return renderWorldGuide()
   }
+
+  /** 恢复时的完整视觉状态快照 */
+  getStateSnapshot(): Record<string, any> {
+    const session = this.session
+    const audio = resolveAudio(
+      session.worldState.currentLocation,
+      session.worldState.currentSubLocation,
+      session.worldState.timeOfDay,
+      !!session.combat?.active,
+    )
+
+    const snapshot: Record<string, any> = {
+      audio,
+      session,
+      combat: null as any,
+    }
+
+    // 如果在战斗中，发送战斗状态供前端重建 UI
+    if (session.combat?.active) {
+      const alive = session.combat.monsters.filter(m => m.hp > 0)
+      snapshot.combat = {
+        round: session.combat.round,
+        monsters: alive.map(m => ({
+          id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp,
+          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+        })),
+        spells: session.player.spells.filter(s => s.remaining > 0 || s.usesPerRest === 0),
+        items: session.player.inventory.filter(i => i.type === 'potion'),
+        playerHp: session.player.hp,
+        playerMaxHp: session.player.maxHp,
+      }
+    }
+
+    return snapshot
+  }
 }
