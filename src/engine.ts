@@ -1260,7 +1260,27 @@ export class GameEngine {
       actions,
     }
 
-    // 区域遭遇自动触发战斗（Move 工具设置了 pending_encounter flag）
+    // 原地待机遭遇：危险区域内不移动，每 3 轮检查一次（15% 概率）
+    if (!session.combat?.active && !session.worldState.flags['pending_encounter']) {
+      const loc = locations[session.worldState.currentLocation]
+      if (loc && loc.monsterPool.length > 0 && (loc as any).dangerLevel !== 'safe') {
+        const cooldownKey = `encounter_cooldown_${session.worldState.currentLocation}`
+        const lastTurn = Number(session.worldState.flags[cooldownKey] ?? 0)
+        const turnsSinceLast = session.turnCount - lastTurn
+        if (turnsSinceLast >= 3 && action.type !== 'MOVE') {
+          // 每 3 轮检查一次，15% 概率
+          if (Math.random() < 0.15) {
+            const pool = loc.monsterPool as string[]
+            const picked = pool[Math.floor(Math.random() * pool.length)]
+            session.worldState.flags['pending_encounter'] = picked
+            session.worldState.flags[cooldownKey] = session.turnCount
+            console.log(`[combat] 原地待机遭遇触发：${picked}（${turnsSinceLast}轮未移动）`)
+          }
+        }
+      }
+    }
+
+    // 区域遭遇自动触发战斗（Move 工具或待机检查设置了 pending_encounter flag）
     const pendingEncounter = session.worldState.flags['pending_encounter'] as string | undefined
     if (pendingEncounter && !session.combat?.active) {
       delete session.worldState.flags['pending_encounter']
