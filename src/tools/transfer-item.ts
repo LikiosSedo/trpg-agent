@@ -112,7 +112,8 @@ export const TransferItemTool: Tool = {
       fromId: sourceId,
       toType: ['sell', 'player_to_npc'].includes(transferType) ? 'npc' : 'player',
       toId: ['sell', 'player_to_npc'].includes(transferType) ? sourceId : undefined,
-      transferType: transferType === 'npc_to_player' ? 'gift' : transferType,
+      transferType: transferType === 'npc_to_player' ? 'gift'
+        : transferType === 'player_to_npc' ? 'give' : transferType,
       goldAmount,
       isDynamic,
     }
@@ -170,7 +171,7 @@ function executeTransferAction(
   }
 
   // 送礼信任提升
-  if (request.transferType === 'player_to_npc' && request.toId) {
+  if (request.transferType === 'give' && request.toId) {
     const giftValue = validation.autoPrice ?? 5
     const trustDelta = giftValue >= 25 ? 2 : 1
     changeTrust(session, {

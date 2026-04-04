@@ -111,10 +111,17 @@ export const AttackTool: Tool = {
 
       if (guardConfig) {
         // 筛选可用护卫（未昏迷/恢复中，有战斗数据）
+        const playerLoc = session.worldState.currentLocation
+        const playerSub = session.worldState.currentSubLocation
         const availableShields = guardConfig.shields.filter(name => {
-          // NPC 护卫检查 condition
           const npc = session.npcs.find(n => n.name === name)
-          if (npc) return npc.condition !== 'unconscious' && npc.condition !== 'recovering'
+          if (npc) {
+            // 护卫必须在同一子区域且状态正常
+            if (npc.condition === 'unconscious' || npc.condition === 'recovering') return false
+            if (npc.location !== playerLoc) return false
+            if ((npc.subLocation ?? npc.homeBase) !== playerSub) return false
+            return true
+          }
           // 非 NPC 护卫（如卫兵 monster）直接可用
           return npcDb.some(n => n.name === name) || monstersDb.some(n => n.name === name)
         })
@@ -203,10 +210,11 @@ export const AttackTool: Tool = {
         }
         const roundLog = [...buffResult.log]
 
-        // 怪物回合照常执行
+        // 敌方回合
         const monsterPhase = executeMonsterPhase(session)
         if (monsterPhase.log.length > 0) {
-          roundLog.push('', '[怪物回合]', ...monsterPhase.log)
+          const isNpcFight = session.combat?.monsters.some(m => session.npcs.some(n => n.name === m.name))
+          roundLog.push('', isNpcFight ? '[敌方回合]' : '[怪物回合]', ...monsterPhase.log)
         }
         if (!monsterPhase.ended && session.combat?.active) {
           roundLog.push('', getCombatSummary(session) ?? '')

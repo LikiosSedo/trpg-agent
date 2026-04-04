@@ -131,12 +131,18 @@ export interface TrackedPromise {
 export type NPCMobility = 'stationary' | 'local' | 'roaming'
 
 export type NPCRole = 'blacksmith' | 'herbalist' | 'guild_leader' | 'guild_officer'
-                     | 'innkeeper' | 'mayor' | 'bard' | 'child' | 'general'
+                     | 'innkeeper' | 'mayor' | 'bard' | 'child' | 'general' | 'guard'
+
+/** NPC 情报条目：每条情报有章节门控 */
+export interface NPCFact {
+  text: string
+  minChapter: number  // 1-4，NPC 在此章节才"知道/想起"这条信息
+}
 
 export interface NPC {
   name: string
   trust: number // -10 ~ 10
-  knownFacts: string[] // NPC 掌握的情报
+  knownFacts: NPCFact[] // NPC 掌握的情报（按重要度排序，章节+信任双重门控）
   playerPromises: string[] // 玩家对该 NPC 做过的承诺
   interactionLog: string[] // 交互摘要（最近10条，供不在场时回顾）
   location: string
@@ -230,4 +236,5 @@ export interface GameSession {
   chapter?: ChapterState        // 章节系统（新游戏有，旧存档可能没有）
   dmMessages?: any[]            // DM Agent 对话历史（持久化到 localStorage）
   interactionNpc?: string       // 当前正在交互的 NPC（对话/交易状态绑定）
+  timeAccum?: number            // 加权时间累积值（达到阈值自动推进时段）
 }

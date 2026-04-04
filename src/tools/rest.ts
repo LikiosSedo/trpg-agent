@@ -36,6 +36,7 @@ export const RestTool: Tool = {
       shortRest(player)
       const healed = player.hp - oldHp
       const newTime = advanceTime()
+      session.timeAccum = 0
       facts.addEvent(`短休息，恢复${healed}HP`)
       return { output: `短休息完成。恢复${healed}HP(${oldHp}→${player.hp}/${player.maxHp})。现在是${newTime}。` }
     }
@@ -47,6 +48,7 @@ export const RestTool: Tool = {
       .filter(s => s.usesPerRest > 0)
       .map(s => `${s.name}(${s.remaining}/${s.usesPerRest})`)
     const newTime = advanceTime()
+    session.timeAccum = 0
     facts.addEvent(`长休息，完全恢复`, 'normal')
     return {
       output: [

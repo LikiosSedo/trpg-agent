@@ -71,8 +71,9 @@ export const MoveTool: Tool = {
       // Set sub-location to area's default entrance
       const defaultPoi = destArea.pointsOfInterest.find((p: any) => p.isDefault)
       session.worldState.currentSubLocation = defaultPoi?.id ?? destArea.pointsOfInterest[0]?.id
-      // 区域间移动推进时间
+      // 区域间移动推进时间 & 重置累积
       const newTime = advanceTime()
+      session.timeAccum = 0
       facts.addEvent(`移动至${destArea.nameZh}（现在是${newTime}）`)
 
       // 通知章节系统

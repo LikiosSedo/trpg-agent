@@ -42,6 +42,7 @@ function makeTestSession(): GameSession {
         { name: 'Magic Missile', description: '', effect: 'Deal 3d4+3 force damage.', usesPerRest: 3, remaining: 3 },
       ],
       clues: [],
+      xp: 0,
       equipped: {
         weapon: { name: '长剑', type: 'weapon', description: '造成1d8劈砍伤害。', bonus: 0 },
         armor: { name: '皮甲', type: 'armor', description: 'AC 11 + 敏捷调整值。', bonus: 1 },

@@ -30,6 +30,7 @@ const ROLE_ITEM_RULES: Record<NPCRole, string[]> = {
   bard: ['misc'],
   child: ['misc'],
   general: ['misc', 'quest'],
+  guard: ['weapon', 'armor', 'misc'],
 }
 
 // Max item bonus by player level
@@ -98,7 +99,7 @@ export function validateTransfer(
       // Quest item: check knownFacts correlation
       if (request.item.type === 'quest') {
         const itemWords = `${request.item.name}${request.item.description}`.split('')
-        const factsText = npc.knownFacts.join('')
+        const factsText = npc.knownFacts.map(f => typeof f === 'string' ? f : f.text).join('')
         const hasCorrelation = itemWords.some(w => w.length > 1 && factsText.includes(w))
         if (!hasCorrelation) {
           warnings.push(`${npc.name}的已知信息与"${request.item.name}"关联较弱`)

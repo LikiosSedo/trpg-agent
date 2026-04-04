@@ -135,14 +135,14 @@ export const UseItemTool: Tool = {
         break
       }
       case 'unequip': {
-        if (itemId === player.equipped.weapon?.name) {
+        if (player.equipped.weapon && itemId === player.equipped.weapon.name) {
           player.inventory.push(player.equipped.weapon)
           const name = player.equipped.weapon.name
           player.equipped.weapon = undefined
           result = { output: `卸下武器${name}，放入背包。` }
           break
         }
-        if (itemId === player.equipped.armor?.name) {
+        if (player.equipped.armor && itemId === player.equipped.armor.name) {
           player.inventory.push(player.equipped.armor)
           const name = player.equipped.armor.name
           player.equipped.armor = undefined
@@ -178,7 +178,8 @@ export const UseItemTool: Tool = {
     if (session.combat?.active && !result!.isError) {
       const monsterResult = executeMonsterTurns(session)
       if (monsterResult.log.length > 0) {
-        result!.output += '\n\n[怪物回合]\n' + monsterResult.log.join('\n')
+        const isNpcFight = session.combat?.monsters.some(m => session.npcs.some(n => n.name === m.name))
+        result!.output += `\n\n[${isNpcFight ? '敌方回合' : '怪物回合'}]\n` + monsterResult.log.join('\n')
       }
       const check = checkCombatEnd(session)
       if (check.ended && check.result === 'defeat') {

@@ -6,7 +6,16 @@
 <meta name="color-scheme" content="dark">
 <meta name="supported-color-schemes" content="dark">
 <title>破晓镇 · 蚀目之影</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rpg-awesome@0.2.0/css/rpg-awesome.min.css">
 <style>
+  /* rpg-awesome 图标颜色继承父元素，并保持内联显示 */
+  i.ra { color: inherit; font-style: normal; display: inline-block; }
+  /* tab 图标稍微放大一点，确保和原 emoji 视觉大小接近 */
+  .tab-icon i.ra { font-size: 20px; }
+  /* 战斗按钮图标间距 */
+  .combat-btn i.ra { margin-right: 4px; }
+  /* more-grid 图标 */
+  .more-icon i.ra { font-size: 28px; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { color-scheme: dark; }
   body {
@@ -51,16 +60,59 @@
     border: 1px solid #b8860b;
     color: #e6c866;
     font-weight: 600;
-    box-shadow: 0 0 8px rgba(184, 134, 11, 0.2);
-    animation: questPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(184, 134, 11, 0.15);
+    animation: questPulse 2.4s ease-in-out infinite;
   }
   .action-btn-quest:hover {
     color: #ffd700; border-color: #ffd700;
-    box-shadow: 0 0 14px rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
+    animation: none;
   }
   @keyframes questPulse {
-    0%, 100% { box-shadow: 0 0 8px rgba(184, 134, 11, 0.2); }
-    50% { box-shadow: 0 0 14px rgba(184, 134, 11, 0.4); }
+    0%, 100% {
+      box-shadow: 0 0 4px rgba(184, 134, 11, 0.1);
+      border-color: #8a6508;
+    }
+    50% {
+      box-shadow: 0 0 18px rgba(230, 184, 0, 0.55), 0 0 4px rgba(184, 134, 11, 0.3);
+      border-color: #e6b800;
+    }
+  }
+
+  /* ─── 常驻主线任务提示条 ─── */
+  #quest-hint-bar {
+    display: none;
+    background: linear-gradient(135deg, #1a0f3d 0%, #0f1a2e 100%);
+    border-bottom: 1px solid rgba(184, 134, 11, 0.4);
+    padding: 8px 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #quest-hint-bar:hover { background: linear-gradient(135deg, #221450 0%, #142240 100%); }
+  #quest-hint-bar.show { display: flex; align-items: center; gap: 10px; }
+  .quest-hint-chapter {
+    font-size: 10px; color: #b8860b; font-weight: 600;
+    background: rgba(184, 134, 11, 0.15); border-radius: 4px;
+    padding: 2px 6px; white-space: nowrap; flex-shrink: 0;
+  }
+  .quest-hint-objective {
+    flex: 1; font-size: 13px; color: #e6c866;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .quest-hint-progress {
+    font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0;
+  }
+  .quest-hint-progress-dots {
+    display: inline-flex; gap: 3px; margin-left: 4px; vertical-align: middle;
+  }
+  .quest-hint-progress-dots .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #333; border: 1px solid #555;
+  }
+  .quest-hint-progress-dots .dot.filled {
+    background: #b8860b; border-color: #daa520;
   }
   .msg.combat-player-result {
     color: #4ecdc4 !important; font-size: 13px;
@@ -574,6 +626,165 @@
   /* 游戏界面 */
   #game-screen { padding-bottom: 52px; overflow: hidden; }
 
+  /* ─── Scene Banner (compact 120px) ─── */
+  .scene-banner {
+    width: 100%; border-radius: 8px; overflow: hidden;
+    position: relative; cursor: pointer;
+  }
+  .scene-banner img {
+    width: 100%; height: 120px; object-fit: cover; display: block;
+    image-rendering: pixelated;
+  }
+  .scene-banner .scene-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 16px 12px 8px;
+    color: #e6c866; font-size: 14px; font-weight: bold;
+    text-shadow: 0 0 6px rgba(0,0,0,0.9);
+  }
+  .scene-banner .scene-sublabel {
+    font-size: 11px; color: #aaa; font-weight: normal; margin-top: 2px;
+  }
+
+  /* ─── POI chip strip ─── */
+  .poi-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; scrollbar-width: none; }
+  .poi-strip::-webkit-scrollbar { display: none; }
+  .poi-chip {
+    flex-shrink: 0; padding: 4px 10px; border-radius: 14px;
+    background: #1a1a3e; border: 1px solid #333;
+    color: #ccc; font-size: 11px; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .poi-chip.current { background: #2a1a00; border-color: #e6b800; color: #e6c866; }
+  .poi-chip.undiscovered { opacity: 0.4; }
+  .poi-go {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    background: #533483; color: #ddd; font-size: 9px; cursor: pointer;
+    border: none; line-height: 1.6;
+  }
+  .poi-go:hover { background: #6b44a8; color: #fff; }
+
+  /* ─── Area grid thumb ─── */
+  .area-thumb {
+    border-radius: 6px; overflow: hidden; position: relative;
+    border: 2px solid rgba(255,255,255,0.1); cursor: pointer;
+  }
+  .area-thumb.current { border-color: #e6b800; box-shadow: 0 0 10px rgba(230,184,0,0.4); }
+  .area-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; image-rendering: pixelated; }
+  .area-thumb:not(.current) img { filter: brightness(0.55); }
+  .area-thumb .area-ov {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 2px 3px; display: flex; align-items: flex-end; justify-content: space-between;
+  }
+  .area-thumb .area-nm { font-size: 10px; text-shadow: 1px 1px 0 #000; }
+  .area-go {
+    padding: 1px 5px; border-radius: 8px; font-size: 8px;
+    background: #533483; color: #ddd; border: none; cursor: pointer;
+    flex-shrink: 0; line-height: 1.5;
+  }
+  .area-go:hover { background: #6b44a8; }
+
+  /* ─── Fullscreen Overlay (shared) ─── */
+  .world-map-overlay, .scene-detail-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+  }
+  .world-map-overlay.open, .scene-detail-overlay.open { display: block; }
+
+  /* Background click-to-close layer */
+  .wm-bg, .sd-bg {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.92);
+  }
+
+  /* Close button — always on top, always visible */
+  .wm-close-btn, .sd-close-btn {
+    position: fixed; top: 10px; right: 12px; z-index: 210;
+    background: rgba(30,30,60,0.9); border: 1px solid #555;
+    color: #ddd; font-size: 14px; padding: 6px 16px;
+    border-radius: 20px; cursor: pointer;
+  }
+  .wm-close-btn:hover, .sd-close-btn:hover { background: #444; color: #fff; }
+
+  /* Content container — centered, scrollable */
+  .wm-content, .sd-content {
+    position: absolute; inset: 0; z-index: 205;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 50px 20px 20px;
+    pointer-events: none;
+  }
+  .wm-content > *, .sd-content > * { pointer-events: auto; }
+
+  /* World map specifics */
+  .wm-content .wm-title {
+    color: #e6c866; font-size: 16px; font-weight: bold; margin-bottom: 10px;
+  }
+  .wm-content img {
+    max-width: 90vw; max-height: 55vh; border-radius: 8px;
+    border: 2px solid #444;
+  }
+  .wm-content .wm-desc {
+    color: #b8a67a; font-size: 13px; margin-top: 12px; max-width: 85vw;
+    text-align: center; line-height: 1.7; padding: 0 10px;
+  }
+
+  /* Scene detail specifics */
+  .sd-content img {
+    max-width: 90vw; max-height: 45vh; border-radius: 8px;
+    border: 2px solid #333; image-rendering: pixelated;
+  }
+  .sd-content .sd-title {
+    color: #e6c866; font-size: 18px; font-weight: bold; margin-top: 12px;
+  }
+  .sd-content .sd-desc {
+    color: #aaa; font-size: 13px; margin-top: 8px; max-width: 85vw;
+    text-align: center; line-height: 1.6;
+  }
+  .sd-content .sd-go {
+    margin-top: 14px; padding: 8px 28px; border-radius: 8px;
+    background: #533483; color: #fff; border: none;
+    font-size: 14px; cursor: pointer;
+  }
+  .sd-content .sd-go:hover { background: #6b44a8; }
+  .sd-content .sd-go.here {
+    background: #2a1a00; border: 1px solid #e6b800; color: #e6c866; cursor: default;
+  }
+
+  /* ─── Travel Confirm Dialog ─── */
+  .travel-confirm-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.15s ease-out;
+  }
+  .travel-confirm-dialog {
+    background: #16213e; border: 1px solid #533483;
+    border-radius: 12px; padding: 20px 24px; max-width: 300px;
+    box-shadow: 0 0 30px rgba(83,52,131,0.3); text-align: center;
+  }
+  .tc-title { color: #e6c866; font-size: 15px; font-weight: bold; margin-bottom: 14px; }
+  .tc-btns { display: flex; gap: 12px; justify-content: center; }
+  .tc-cancel {
+    padding: 7px 18px; border-radius: 8px;
+    background: transparent; border: 1px solid #444; color: #888;
+    font-size: 13px; cursor: pointer;
+  }
+  .tc-cancel:hover { border-color: #666; color: #aaa; }
+  .tc-go {
+    padding: 7px 22px; border-radius: 8px;
+    background: linear-gradient(135deg, #533483, #6b44a8);
+    border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tc-go:hover { filter: brightness(1.15); }
+
+  /* ─── Map bottom button row ─── */
+  .map-bottom-row { display: flex; gap: 8px; margin-top: 10px; }
+  .map-bottom-btn {
+    flex: 1; padding: 8px; border-radius: 8px; cursor: pointer;
+    background: #1a1a3e; border: 1px solid #333; color: #ccc;
+    font-size: 12px; text-align: center; transition: all 0.2s;
+  }
+  .map-bottom-btn:hover { border-color: #e6b800; color: #e6c866; }
+
   /* ─── Pixel Map Grid ─── */
   .map-grid {
     display: grid;
@@ -881,7 +1092,7 @@
 
 <!-- 密码验证 -->
 <div id="auth-screen" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-  <h2 style="color:#e6b800; margin-bottom:10px">⚔️ 破晓镇 · 蚀目之影</h2>
+  <h2 style="color:#e6b800; margin-bottom:10px"><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h2>
   <p style="color:#888; margin-bottom:20px">请输入访问密码</p>
   <input id="auth-password" type="password" placeholder="密码" style="background:#0f3460; border:1px solid #533483; color:#e0e0e0; padding:10px; border-radius:6px; font-size:16px; width:250px; text-align:center; margin-bottom:12px;">
   <button id="auth-btn" onclick="authenticate()" style="background:#533483; color:white; border:none; padding:10px 30px; border-radius:6px; font-size:15px; cursor:pointer;">进入</button>
@@ -890,7 +1101,7 @@
 
 <!-- 恢复存档 -->
 <div id="resume-screen" style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-  <h2 style="color:#e6b800; margin-bottom:10px">⚔️ 欢迎回来</h2>
+  <h2 style="color:#e6b800; margin-bottom:10px"><i class="ra ra-sword"></i> 欢迎回来</h2>
   <div id="resume-info" style="color:#aaa; margin-bottom:20px; text-align:center; line-height:1.8;"></div>
   <div style="display:flex; gap:12px;">
     <button onclick="resumeGame()" style="background:#533483; color:white; border:none; padding:12px 30px; border-radius:8px; font-size:15px; cursor:pointer;">继续冒险</button>
@@ -900,25 +1111,25 @@
 
 <!-- 角色创建 -->
 <div id="create-screen" style="display:none">
-  <h2>⚔️ 破晓镇 · 蚀目之影</h2>
+  <h2><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h2>
   <p style="color:#888; margin-bottom:20px; text-align:center">一个 AI 驱动的跑团冒险游戏</p>
   <input id="player-name" placeholder="你叫什么名字？" autofocus>
   <p style="color:#aaa; margin-bottom:10px">选择职业:</p>
   <div class="class-grid">
     <div class="class-btn" data-class="fighter" onclick="selectClass(this)">
-      <div class="name">⚔️ 剑士</div>
+      <div class="name"><i class="ra ra-sword"></i> 剑士</div>
       <div class="desc">力量与勇气 STR 16</div>
     </div>
     <div class="class-btn" data-class="mage" onclick="selectClass(this)">
-      <div class="name">🔮 法师</div>
+      <div class="name"><i class="ra ra-crystal-ball"></i> 法师</div>
       <div class="desc">奥术知识 INT 16</div>
     </div>
     <div class="class-btn" data-class="ranger" onclick="selectClass(this)">
-      <div class="name">🏹 游侠</div>
+      <div class="name"><i class="ra ra-archery-target"></i> 游侠</div>
       <div class="desc">敏捷感知 DEX 16</div>
     </div>
     <div class="class-btn" data-class="cleric" onclick="selectClass(this)">
-      <div class="name">✨ 牧师</div>
+      <div class="name"><i class="ra ra-fairy-wand"></i> 牧师</div>
       <div class="desc">信仰治疗 WIS 16</div>
     </div>
   </div>
@@ -928,14 +1139,20 @@
 <!-- 游戏界面 -->
 <div id="game-screen" style="display:none; flex:1; flex-direction:column;">
   <div id="header">
-    <h1>⚔️ 破晓镇 · 蚀目之影</h1>
+    <h1><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h1>
     <div id="player-hud" style="display:none;font-size:12px;color:#aaa;margin-top:4px">
-      <span id="hud-hp" style="color:#4caf50">❤️ --/--</span>
+      <span id="hud-hp" style="color:#4caf50"><i class="ra ra-health"></i> --/--</span>
       <span style="margin:0 8px;color:#333">|</span>
-      <span id="hud-gold" style="color:#e6b800">💰 --</span>
+      <span id="hud-gold" style="color:#e6b800"><i class="ra ra-gold-bar"></i> --</span>
       <span style="margin:0 8px;color:#333">|</span>
-      <span id="hud-location" style="color:#888">📍 --</span>
+      <span id="hud-location" style="color:#888"><i class="ra ra-compass"></i> --</span>
     </div>
+  </div>
+  <!-- 常驻主线任务提示条 -->
+  <div id="quest-hint-bar">
+    <span class="quest-hint-chapter" id="quest-hint-chapter"></span>
+    <span class="quest-hint-objective" id="quest-hint-objective"></span>
+    <span class="quest-hint-progress" id="quest-hint-progress"></span>
   </div>
   <div id="messages"></div>
 
@@ -943,11 +1160,11 @@
   <div id="combat-panel">
     <div class="combat-round" id="combat-round-label"></div>
     <div class="combat-actions" id="combat-actions">
-      <button class="combat-btn" onclick="combatAttack()">⚔ 攻击</button>
-      <button class="combat-btn" onclick="combatSpell()">✨ 法术</button>
-      <button class="combat-btn" onclick="combatItem()">🧪 物品</button>
-      <button class="combat-btn" onclick="combatFlee()">🏃 逃跑</button>
-      <button class="combat-btn" onclick="combatDefend()">🛡 防御</button>
+      <button class="combat-btn" onclick="combatAttack()"><i class="ra ra-sword"></i> 攻击</button>
+      <button class="combat-btn" onclick="combatSpell()"><i class="ra ra-fairy-wand"></i> 法术</button>
+      <button class="combat-btn" onclick="combatItem()"><i class="ra ra-potion"></i> 物品</button>
+      <button class="combat-btn" onclick="combatFlee()"><i class="ra ra-footprint"></i> 逃跑</button>
+      <button class="combat-btn" onclick="combatDefend()"><i class="ra ra-shield"></i> 防御</button>
     </div>
     <div class="combat-selector" id="combat-selector"></div>
   </div>
@@ -965,6 +1182,29 @@
     <span id="thinking-toggle">▶</span>
   </div>
   <div id="thinking-content" class="thinking-content"></div>
+</div>
+
+<!-- World Map Fullscreen Overlay -->
+<div class="world-map-overlay" id="world-map-overlay">
+  <div class="wm-close-btn" onclick="closeWorldMap()">✕ 关闭</div>
+  <div class="wm-content" onclick="event.stopPropagation()">
+    <div class="wm-title">🗺️ 世界地图</div>
+    <img src="portraits/scenes/map-world-parchment.png" alt="世界地图">
+    <div class="wm-desc">灰脊山脉东麓，破晓镇是连接四方的唯一枢纽。西南是终年弥漫紫雾的暮色森林，传说精灵遗族仍在林深处守护古老圣所；北面灰脊矿道深入山腹，矮人工匠曾在此锻造神兵，如今矿井中回荡着不明低语；东部碎石荒原寸草不生，地裂中涌出的暗蚀能量正在缓缓扩散。近来，一股被称为「蚀影」的神秘力量正从地底蔓延，令生灵异变、亡者不安——冒险者们必须在蚀影吞噬一切之前揭开它的源头。</div>
+  </div>
+  <div class="wm-bg" onclick="closeWorldMap()"></div>
+</div>
+
+<!-- Scene Detail Overlay (click area thumb to expand) -->
+<div class="scene-detail-overlay" id="scene-detail-overlay">
+  <div class="sd-close-btn" onclick="closeSceneDetail()">✕ 关闭</div>
+  <div class="sd-content" onclick="event.stopPropagation()">
+    <img id="sd-img" src="" alt="">
+    <div class="sd-title" id="sd-title"></div>
+    <div class="sd-desc" id="sd-desc"></div>
+    <button class="sd-go" id="sd-go-btn">前往</button>
+  </div>
+  <div class="sd-bg" onclick="closeSceneDetail()"></div>
 </div>
 
 <!-- Bottom Sheet -->
@@ -996,23 +1236,23 @@
 <!-- Tab 栏 -->
 <div id="tab-bar">
   <div class="tab active" data-tab="game" onclick="switchTab('game')">
-    <span class="tab-icon">🎮</span>
+    <span class="tab-icon"><i class="ra ra-dragon"></i></span>
     <span>游戏</span>
   </div>
   <div class="tab" data-tab="status" onclick="switchTab('status')">
-    <span class="tab-icon">👤</span>
+    <span class="tab-icon"><i class="ra ra-knight-helmet"></i></span>
     <span>状态</span>
   </div>
   <div class="tab" data-tab="npc" onclick="switchTab('npc')">
-    <span class="tab-icon">📋</span>
+    <span class="tab-icon"><i class="ra ra-scroll-unfurled"></i></span>
     <span>人物</span>
   </div>
   <div class="tab" data-tab="map" onclick="switchTab('map')">
-    <span class="tab-icon">🗺</span>
+    <span class="tab-icon"><i class="ra ra-compass"></i></span>
     <span>地图</span>
   </div>
   <div class="tab" data-tab="more" onclick="switchTab('more')">
-    <span class="tab-icon">⋯</span>
+    <span class="tab-icon"><i class="ra ra-cog-wheel"></i></span>
     <span>更多</span>
   </div>
 </div>
@@ -1347,7 +1587,7 @@ function renderStatusPanel(data) {
   const effects = data.activeEffects || []
   if (effects.length > 0) {
     html += `<div class="panel-card"><div class="panel-card-title">当前效果</div><div class="effects-bar">`
-    const EFFECT_ICONS = { ac_bonus: '🛡', attack_bonus: '⚔', damage_bonus: '💥', resistance: '✨', poison_immunity: '🧪', perception_bonus: '👁', light: '🔥' }
+    const EFFECT_ICONS = { ac_bonus: '<i class="ra ra-shield"></i>', attack_bonus: '<i class="ra ra-sword"></i>', damage_bonus: '<i class="ra ra-explosion"></i>', resistance: '<i class="ra ra-fairy-wand"></i>', poison_immunity: '<i class="ra ra-potion"></i>', perception_bonus: '<i class="ra ra-eye-monster"></i>', light: '<i class="ra ra-candle-fire"></i>' }
     for (const e of effects) {
       const icon = EFFECT_ICONS[e.type] || '✦'
       const turns = e.remaining === -1 ? '永久' : `${e.remaining}轮`
@@ -1399,142 +1639,195 @@ function renderQuestPanel(data) {
   return html
 }
 
+// ─── 地图面板常量 ───
+const MAP_SCENE_IMAGES = {
+  'dawnbreak-town': 'portraits/scenes/scene-dawnbreak-town.png',
+  'twilight-woods': 'portraits/scenes/scene-twilight-woods.png',
+  'greyspine-mines': 'portraits/scenes/scene-greyspine-mines.png',
+  'shatterstone-wastes': 'portraits/scenes/scene-shatterstone-wastes.png',
+}
+const MAP_AREA_ZH = {
+  'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
+  'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
+}
+const MAP_TERRAIN = {
+  '破晓镇':   { row: 2, col: 2, id: 'dawnbreak-town' },
+  '暮色森林': { row: 3, col: 1, id: 'twilight-woods' },
+  '灰脊矿道': { row: 1, col: 2, id: 'greyspine-mines' },
+  '碎石荒原': { row: 2, col: 3, id: 'shatterstone-wastes' },
+}
+
 function renderMapPanel(data) {
   const areas = (data.locations || data.areas || []).map(a => ({
     ...a, name: a.nameZh || a.name || ''
   }))
   const current = data.currentLocation || data.currentArea || ''
   window._mapAreas = areas
-  const exploreData = window._exploreData || {}
-
-  const TERRAIN = {
-    '破晓镇':   { icon: '🏘️', color: '#8B4513', row: 3, col: 3 },
-    '暮色森林': { icon: '🌲', color: '#2d5016', row: 5, col: 1 },
-    '灰脊矿道': { icon: '⛏️', color: '#4a4a5a', row: 1, col: 3 },
-    '碎石荒原': { icon: '🏜️', color: '#8B7355', row: 3, col: 5 },
-  }
-  const CONN_DEFS = [
-    { from: '灰脊矿道', to: '破晓镇', row: 2, col: 3, type: 'v' },
-    { from: '破晓镇', to: '碎石荒原', row: 3, col: 4, type: 'h' },
-    { from: '破晓镇', to: '暮色森林', row: 4, col: 2, type: 'd' },
-  ]
-
-  let html = ''
-  if (data.regionName) {
-    html += `<div class="panel-card"><div class="panel-card-title">${esc(data.regionName)}</div>`
-    if (data.regionDesc) html += `<div style="font-size:12px;color:#aaa">${esc(data.regionDesc)}</div>`
-    html += `</div>`
-  }
-
-  const cells = []
-  const occupied = new Set()
-  const areaNames = new Set(areas.map(a => a.name))
-
-  for (let i = 0; i < areas.length; i++) {
-    const area = areas[i]
-    const t = TERRAIN[area.name]
-    if (!t) continue
-    occupied.add(`${t.row},${t.col}`)
-    const isCurrent = area.id === current || area.name === current
-    const danger = area.danger != null ? area.danger : null
-    cells.push(
-      `<div class="map-cell terrain${isCurrent ? ' current' : ''}" ` +
-      `style="grid-row:${t.row};grid-column:${t.col};background:${t.color}" ` +
-      `onclick="toggleMapDetail(${i})">` +
-      (isCurrent ? '<span class="cell-pin">📍</span>' : '') +
-      `<span class="cell-icon">${t.icon}</span>` +
-      `<span class="cell-name">${esc(area.name)}</span>` +
-      (danger != null ? `<span class="cell-danger">${renderDanger(danger)}</span>` : '') +
-      (function() {
-        const ei = exploreData[area.name]
-        if (ei && ei.total > 0) return `<span class="cell-explore">${ei.found}/${ei.total}</span>`
-        return ''
-      })() +
-      `</div>`
-    )
-  }
-
-  // Empty area slots
-  const slots = [[1,1],[1,3],[1,5],[3,1],[3,3],[3,5],[5,1],[5,3],[5,5]]
-  for (const [r, c] of slots) {
-    if (!occupied.has(`${r},${c}`)) {
-      cells.push(`<div class="map-cell empty" style="grid-row:${r};grid-column:${c}"></div>`)
-    }
-  }
-
-  // Connections (only between areas present in data)
-  for (const conn of CONN_DEFS) {
-    if (areaNames.has(conn.from) && areaNames.has(conn.to)) {
-      cells.push(`<div class="map-conn map-conn-${conn.type}" style="grid-row:${conn.row};grid-column:${conn.col}"></div>`)
-    }
-  }
-
-  html += `<div class="map-grid">${cells.join('')}</div>`
-  html += `<div id="map-detail-box"></div>`
-
-  // Fallback list for unmapped areas
-  const unmapped = areas.filter(a => !TERRAIN[a.name])
-  for (const area of unmapped) {
-    const isCurrent = area.id === current || area.name === current
-    html += `<div class="map-area ${isCurrent ? 'current' : ''}" style="margin-top:8px">`
-    html += `<span class="area-marker">${isCurrent ? '📍' : '📌'}</span>`
-    html += `<div><div class="area-name">${esc(area.name)}</div>`
-    if (area.description) html += `<div class="area-desc">${esc(area.description)}</div>`
-    html += `</div></div>`
-  }
+  window._mapData = data
 
   if (!areas.length) {
-    html += `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">地图未知</div></div>`
+    return `<div class="panel-card"><div style="color:#888;text-align:center;padding:20px;">地图未知</div></div>`
   }
 
-  // Sub-location topology (当前区域内地点关系) + 前往按钮
+  let html = ''
+
+  // ── 第1层：当前区域场景横幅（120px裁切，点击展开全图） ──
+  const sceneImg = MAP_SCENE_IMAGES[current]
+  if (sceneImg) {
+    const nameZh = MAP_AREA_ZH[current] || ''
+    const subLocName = data.currentSubLocationName || ''
+    html += `<div class="scene-banner" onclick="openSceneDetail('${current}', true)">`
+    html += `<img src="${sceneImg}" alt="${esc(nameZh)}">`
+    html += `<div class="scene-label"><div>${esc(nameZh)}`
+    if (subLocName) html += `<div class="scene-sublabel">📍 ${esc(subLocName)}</div>`
+    html += `</div></div></div>`
+  }
+
+  // ── 第2层：POI 横向滑动条（chip + 小前往按钮） ──
   const subLocs = data.subLocations || []
   if (subLocs.length > 0) {
-    html += `<div class="panel-card" style="margin-top:12px"><div class="panel-card-title">📍 当前区域内地点</div>`
-    html += `<div class="subloc-topo">`
+    html += `<div class="poi-strip">`
     for (const sl of subLocs) {
-      const isCurrent = sl.isCurrent
-      const npcList = (sl.npcs || []).join('、')
-      html += `<div class="subloc-node${isCurrent ? ' current' : ''}" style="display:flex;align-items:center;justify-content:space-between">`
-      html += `<div>`
-      html += `<div class="subloc-name">${esc(sl.nameZh)}</div>`
-      if (npcList) html += `<div class="subloc-npcs">👤 ${esc(npcList)}</div>`
-      if (isCurrent) html += `<div class="subloc-you">← 你在这里</div>`
-      html += `</div>`
-      if (!isCurrent) {
-        html += `<button onclick="mapGo('${esc(sl.nameZh)}')" `
-        html += `style="flex-shrink:0;background:#0f3460;color:#ccc;border:1px solid #333;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer">前往</button>`
+      const isCur = sl.isCurrent
+      const disc = sl.discovered !== false
+      const npcs = (sl.npcs || []).filter(n => n !== '???').join('、')
+      if (!disc) {
+        html += `<div class="poi-chip undiscovered">???</div>`
+      } else {
+        html += `<div class="poi-chip${isCur ? ' current' : ''}">`
+        html += isCur ? `📍 ${esc(sl.nameZh)}` : esc(sl.nameZh)
+        if (npcs) html += ` <span style="color:#888;font-size:10px">${esc(npcs)}</span>`
+        if (!isCur) html += ` <button class="poi-go" onclick="event.stopPropagation();mapGoConfirm('${esc(sl.nameZh)}')">前往</button>`
+        html += `</div>`
       }
-      html += `</div>`
-    }
-    html += `</div></div>`
-  }
-
-  // 相邻可达区域 + 前往按钮
-  const reachable = data.reachableAreas || []
-  if (reachable.length > 0) {
-    html += `<div class="panel-card" style="margin-top:12px"><div class="panel-card-title">🚶 可前往的区域</div>`
-    for (const area of reachable) {
-      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a2e">`
-      html += `<div>`
-      html += `<div style="color:#ccc;font-size:14px">${esc(area.nameZh)}</div>`
-      if (area.description) html += `<div style="color:#666;font-size:11px;margin-top:2px">${esc(area.description)}</div>`
-      html += `</div>`
-      html += `<button onclick="mapGo('${esc(area.nameZh)}')" `
-      html += `style="flex-shrink:0;margin-left:8px;background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">前往</button>`
-      html += `</div>`
     }
     html += `</div>`
   }
+
+  // ── 第3层：区域网格（3×3, 65px格子，场景图背景） ──
+  html += `<div style="display:grid;grid-template-columns:65px 65px 65px;grid-template-rows:65px 65px 65px;gap:4px;justify-content:center;margin:6px auto;">`
+  const used = new Set()
+  for (const area of areas) {
+    const t = MAP_TERRAIN[area.name]
+    if (!t) continue
+    used.add(`${t.row},${t.col}`)
+    const isCur = area.id === current || area.name === current
+    const scImg = MAP_SCENE_IMAGES[t.id]
+    // 点击格子 = 展开该区域全图详情
+    html += `<div class="area-thumb${isCur ? ' current' : ''}" `
+    html += `style="grid-row:${t.row};grid-column:${t.col}" `
+    html += `onclick="openSceneDetail('${t.id}', ${isCur})">`
+    if (scImg) {
+      html += `<img src="${scImg}" alt="${esc(area.name)}">`
+    }
+    html += `<div class="area-ov">`
+    html += `<span class="area-nm" style="color:${isCur ? '#e6c866' : '#ccc'};font-weight:${isCur ? 'bold' : 'normal'}">${esc(area.name)}</span>`
+    if (!isCur) html += `<button class="area-go" onclick="event.stopPropagation();mapGoConfirm('${esc(area.name)}')">前往</button>`
+    html += `</div>`
+    if (isCur) html += `<div style="position:absolute;top:2px;right:3px;font-size:10px"><i class="ra ra-on-target" style="color:#e6b800"></i></div>`
+    html += `</div>`
+  }
+  for (let r = 1; r <= 3; r++) for (let c = 1; c <= 3; c++) {
+    if (!used.has(`${r},${c}`)) html += `<div style="grid-row:${r};grid-column:${c}"></div>`
+  }
+  html += `</div>`
+
+  // ── 第4层：世界地图缩略图（点击展开全屏） ──
+  html += `<div style="margin-top:10px;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;border:1px solid #444;" onclick="openWorldMap()">`
+  html += `<img src="portraits/scenes/map-world-parchment.png" alt="世界地图" style="width:100%;height:80px;object-fit:cover;display:block;filter:brightness(0.7);">`
+  html += `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);">`
+  html += `<span style="color:#e6c866;font-size:13px;font-weight:bold;text-shadow:0 0 8px rgba(0,0,0,0.9);">🗺️ 世界地图 · 点击展开</span>`
+  html += `</div></div>`
 
   return html
 }
 
-/** 地图前往按钮：直接发送精确移动指令 */
-function mapGo(destination) {
+// ─── 场景详情全屏浮层 ───
+const AREA_LORE = {
+  'dawnbreak-town': '破晓镇 · 灰脊山脉东麓的矿业小镇，约五百人聚居。镇中心矗立着刻满无人能解读符文的「晨光石碑」，传说与远古封印有关。铁砧铺的叮当声日夜不歇，碎盾亭酒馆的灯光温暖而模糊——在这表面平静的小镇下，冒险者公会的任务板上失踪报告日渐增多，暗影教团的触须已悄然伸入。\n\n危险等级：安全区域',
+  'twilight-woods': '暮色森林 · 破晓镇西南的古老密林，终年笼罩在暗紫色的薄雾中。扭曲的古树遮天蔽日，树根之间发光的菌类散发幽蓝微光。猎人小屋的烟囱是林中唯一的人烟标记，精灵游侠艾琳娜在此守望。据说森林深处有古代精灵的遗迹，而近来，不寻常的暗影生物开始在林间游荡。\n\n危险等级：中等 · 出没怪物：灰狼、暗影蛛',
+  'greyspine-mines': '灰脊矿道 · 深入灰脊山脉的废弃矿井群。曾经出产珍贵的暗铁矿石，数月前突然因「矿难」封闭。矿道深处传出的异响和偶尔飘出的紫色烟雾让矿工们讳莫如深。精炼师维克多仍在矿口附近坚持作业，但他似乎知道比表面更多的真相。\n\n危险等级：高危 · 出没怪物：亡灵矿工、洞穴拟态怪',
+  'shatterstone-wastes': '碎石荒原 · 破晓镇东部的荒芜之地，遍布裂缝与碎石。大地上刻着巨大的、来源不明的几何纹路，在月光下隐隐发光。曾是古代战场，至今仍能听到风中若有若无的低语。这里被认为是「蚀目之影」力量最为浓厚之处——暗影教团的仪式祭坛就隐藏在荒原深处的某个角落。\n\n危险等级：极高 · 出没怪物：蚀暗兽、幽影',
+}
+
+function openSceneDetail(areaId, isCurrent) {
+  const overlay = document.getElementById('scene-detail-overlay')
+  const img = document.getElementById('sd-img')
+  const title = document.getElementById('sd-title')
+  const desc = document.getElementById('sd-desc')
+  const goBtn = document.getElementById('sd-go-btn')
+
+  const scImg = MAP_SCENE_IMAGES[areaId]
+  const nameZh = MAP_AREA_ZH[areaId] || areaId
+
+  if (scImg) img.src = scImg
+  img.alt = nameZh
+  title.textContent = nameZh
+
+  // 优先用详细设定，fallback 到服务端简短描述
+  const lore = AREA_LORE[areaId]
+  if (lore) {
+    desc.innerHTML = lore.split('\n\n').map(p => `<p style="margin:4px 0">${esc(p)}</p>`).join('')
+  } else {
+    const area = (window._mapAreas || []).find(a => a.id === areaId)
+    desc.textContent = area?.description || ''
+  }
+
+  if (isCurrent) {
+    goBtn.className = 'sd-go here'
+    goBtn.textContent = '📍 当前位置'
+    goBtn.onclick = null
+  } else {
+    goBtn.className = 'sd-go'
+    goBtn.textContent = '前往' + nameZh
+    goBtn.onclick = (e) => { e.stopPropagation(); closeSceneDetail(); mapGoConfirm(nameZh) }
+  }
+  overlay.classList.add('open')
+}
+function closeSceneDetail() {
+  document.getElementById('scene-detail-overlay').classList.remove('open')
+}
+
+// ─── 世界地图全屏浮层 ───
+function openWorldMap() {
+  document.getElementById('world-map-overlay').classList.add('open')
+}
+function closeWorldMap() {
+  document.getElementById('world-map-overlay').classList.remove('open')
+}
+
+// ESC 关闭所有浮层
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeWorldMap()
+    closeSceneDetail()
+    document.querySelectorAll('.travel-confirm-overlay').forEach(el => el.remove())
+  }
+})
+
+// ─── 前往确认弹框 ───
+function mapGoConfirm(destination) {
+  const overlay = document.createElement('div')
+  overlay.className = 'travel-confirm-overlay'
+  overlay.innerHTML = `
+    <div class="travel-confirm-dialog">
+      <div class="tc-title">确定前往「${esc(destination)}」？</div>
+      <div class="tc-btns">
+        <button class="tc-cancel" onclick="this.closest('.travel-confirm-overlay').remove()">取消</button>
+        <button class="tc-go" onclick="mapGoExecute('${esc(destination)}');this.closest('.travel-confirm-overlay').remove()">出发</button>
+      </div>
+    </div>`
+  document.body.appendChild(overlay)
+  // 点击蒙层关闭
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+}
+
+/** 执行前往 */
+function mapGoExecute(destination) {
+  closeSceneDetail()
+  closePanel()
   document.getElementById('input').value = `前往${destination}`
   sendInput()
-  // 切回游戏 tab
   switchTab('game')
 }
 
@@ -1547,29 +1840,15 @@ function renderDanger(level) {
   return esc(String(level))
 }
 
-function toggleMapDetail(idx) {
-  const area = window._mapAreas?.[idx]
-  if (!area) return
-  const box = document.getElementById('map-detail-box')
-  if (!box) return
-  if (box.dataset.idx === String(idx)) { box.innerHTML = ''; box.dataset.idx = ''; return }
-  box.dataset.idx = idx
-  let h = `<div class="map-detail"><div class="detail-name">📍 ${esc(area.name)}</div>`
-  if (area.danger != null) h += `<div class="detail-danger">⚠ 危险等级: ${renderDanger(area.danger)}</div>`
-  if (area.description) h += `<div class="detail-desc">${esc(area.description)}</div>`
-  h += `</div>`
-  box.innerHTML = h
-}
-
 function renderChapterPanel(data) {
   let html = ''
   // 章节标题
-  html += `<div class="panel-card"><div class="panel-card-title">📖 ${esc(data.title || '未知章节')}</div></div>`
+  html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-book"></i> ${esc(data.title || '未知章节')}</div></div>`
   // 探索度
   const exploration = data.exploration || {}
   const locs = Object.entries(exploration)
   if (locs.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">🗺️ 探索进度</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-compass"></i> 探索进度</div>`
     for (const [loc, v] of locs) {
       const pct = v.total > 0 ? Math.round(v.found / v.total * 100) : 0
       const full = pct >= 100
@@ -1584,7 +1863,7 @@ function renderChapterPanel(data) {
   // 已发现内容
   const discoveries = data.discoveries || []
   if (discoveries.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">✨ 已发现</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-crystal-cluster"></i> 已发现</div>`
     for (const d of discoveries) {
       html += `<div class="recap-item clue">${esc(d)}</div>`
     }
@@ -1594,8 +1873,8 @@ function renderChapterPanel(data) {
 }
 
 function renderShopPanel(data) {
-  let html = `<div class="panel-card"><div class="panel-card-title">🏪 ${esc(data.npcName || '商店')}</div>`
-  html += `<div style="color:#e6b800;font-size:13px;margin-bottom:8px">💰 你的金币: ${data.playerGold ?? 0}</div>`
+  let html = `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-gold-bar"></i> ${esc(data.npcName || '商店')}</div>`
+  html += `<div style="color:#e6b800;font-size:13px;margin-bottom:8px"><i class="ra ra-gold-bar"></i> 你的金币: ${data.playerGold ?? 0}</div>`
   const items = data.items || []
   if (!items.length) {
     html += `<div style="color:#888;padding:12px 0;">商店没有库存了。</div>`
@@ -1624,7 +1903,7 @@ function renderRecapPanel(data) {
   let html = ''
   const critical = data.critical || []
   if (critical.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">⚡ 关键事件</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-lightning-bolt"></i> 关键事件</div>`
     for (const e of critical) {
       html += `<div class="recap-item"><span class="recap-turn">第${e.turn}轮</span>${esc(e.fact)}</div>`
     }
@@ -1632,7 +1911,7 @@ function renderRecapPanel(data) {
   }
   const recent = data.recent || []
   if (recent.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">📜 近期事件</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-scroll-unfurled"></i> 近期事件</div>`
     for (const e of recent) {
       html += `<div class="recap-item"><span class="recap-turn">第${e.turn}轮</span>${esc(e.fact)}</div>`
     }
@@ -1640,7 +1919,7 @@ function renderRecapPanel(data) {
   }
   const clues = data.clues || []
   if (clues.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">🔍 已知线索</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-crystal-cluster"></i> 已知线索</div>`
     for (const c of clues) {
       html += `<div class="recap-item clue">${esc(c)}</div>`
     }
@@ -1648,7 +1927,7 @@ function renderRecapPanel(data) {
   }
   const npcDialogues = data.npcDialogues || []
   if (npcDialogues.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">💬 对话记录</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-speech-bubble"></i> 对话记录</div>`
     for (const nd of npcDialogues) {
       html += `<div class="recap-npc-name">${esc(nd.name)}</div>`
       for (const log of nd.logs.slice(-5)) {
@@ -1661,12 +1940,12 @@ function renderRecapPanel(data) {
   const active = quests.active || []
   const completed = quests.completed || []
   if (active.length || completed.length) {
-    html += `<div class="panel-card"><div class="panel-card-title">📋 任务</div>`
+    html += `<div class="panel-card"><div class="panel-card-title"><i class="ra ra-scroll-unfurled"></i> 任务</div>`
     for (const q of active) {
-      html += `<div class="recap-item quest active">🔸 ${esc(q)}</div>`
+      html += `<div class="recap-item quest active"><i class="ra ra-sword"></i> ${esc(q)}</div>`
     }
     for (const q of completed) {
-      html += `<div class="recap-item quest done">✅ ${esc(q)}</div>`
+      html += `<div class="recap-item quest done"><i class="ra ra-trophy"></i> ${esc(q)}</div>`
     }
     html += `</div>`
   }
@@ -1681,34 +1960,34 @@ function renderMorePanel() {
   <div style="font-size:12px;color:#666;padding:0 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">冒险</div>
   <div class="more-grid">
     <div class="more-item" onclick="moreCmd('/quest', '任务')">
-      <div class="more-icon">⚔</div><div class="more-label">任务</div>
+      <div class="more-icon"><i class="ra ra-sword"></i></div><div class="more-label">任务</div>
     </div>
     <div class="more-item" onclick="moreCmd('/inventory', '背包')">
-      <div class="more-icon">🎒</div><div class="more-label">背包</div>
+      <div class="more-icon"><i class="ra ra-ammo-bag"></i></div><div class="more-label">背包</div>
     </div>
     <div class="more-item" onclick="moreCmd('/shop', '商店')">
-      <div class="more-icon">🏪</div><div class="more-label">商店</div>
+      <div class="more-icon"><i class="ra ra-gold-bar"></i></div><div class="more-label">商店</div>
     </div>
     <div class="more-item" onclick="moreCmd('/recap', '故事回顾')">
-      <div class="more-icon">📖</div><div class="more-label">故事回顾</div>
+      <div class="more-icon"><i class="ra ra-book"></i></div><div class="more-label">故事回顾</div>
     </div>
     <div class="more-item" onclick="moreCmd('/chapter', '章节进度')">
-      <div class="more-icon">📊</div><div class="more-label">章节进度</div>
+      <div class="more-icon"><i class="ra ra-scroll-unfurled"></i></div><div class="more-label">章节进度</div>
     </div>
     <div class="more-item" onclick="moreCmd('/world', '世界知识')">
-      <div class="more-icon">🌍</div><div class="more-label">世界知识</div>
+      <div class="more-icon"><i class="ra ra-mountains"></i></div><div class="more-label">世界知识</div>
     </div>
   </div>
   <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">系统</div>
   <div class="more-grid">
     <div class="more-item" onclick="downloadSave()">
-      <div class="more-icon">📥</div><div class="more-label">下载存档</div>
+      <div class="more-icon"><i class="ra ra-save"></i></div><div class="more-label">下载存档</div>
     </div>
     <div class="more-item" onclick="triggerUploadSave()">
-      <div class="more-icon">📤</div><div class="more-label">上传存档</div>
+      <div class="more-icon"><i class="ra ra-load"></i></div><div class="more-label">上传存档</div>
     </div>
     <div class="more-item" onclick="moreCmd('/help', '帮助')">
-      <div class="more-icon">📋</div><div class="more-label">帮助</div>
+      <div class="more-icon"><i class="ra ra-help"></i></div><div class="more-label">帮助</div>
     </div>
   </div>
   <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">开发者</div>
@@ -1835,8 +2114,8 @@ function renderNPCCard(npc, npcLocs, isHere) {
   let html = `<div class="npc-card" style="cursor:pointer;opacity:${opacity}">`
   // 左侧：头像（点击看详情）
   html += `<div class="npc-avatar" onclick="viewNPCDetail('${esc(shortName)}')">${portrait
-    ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
-    : esc(npc.avatar || '👤')}</div>`
+    ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='<i class=&quot;ra ra-knight-helmet&quot; style=&quot;font-size:32px&quot;></i>'">`
+    : '<i class="ra ra-knight-helmet" style="font-size:32px"></i>'}</div>`
   html += `<div class="npc-info" onclick="viewNPCDetail('${esc(shortName)}')">`
   const conditionLabels = { wounded: '负伤', unconscious: '昏迷', recovering: '恢复中' }
   const conditionColors = { wounded: '#e89b3e', unconscious: '#c05050', recovering: '#8888aa' }
@@ -1844,7 +2123,7 @@ function renderNPCCard(npc, npcLocs, isHere) {
   html += `<div class="npc-name">${esc(npc.name)} ${cond ? `<span style="font-size:11px;color:${conditionColors[cond]};margin-left:4px;font-weight:600">[${conditionLabels[cond]}]</span>` : ''} <span style="font-size:11px;color:#555">▶</span></div>`
   if (npc.title) html += `<div class="npc-role">${esc(npc.title)}</div>`
   if (!isHere && loc) {
-    html += `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${esc(loc.subLocationZh || loc.locationZh)}</div>`
+    html += `<div style="font-size:11px;color:#888;margin-top:2px"><i class="ra ra-on-target"></i> ${esc(loc.subLocationZh || loc.locationZh)}</div>`
   }
   html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
   html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
@@ -1856,15 +2135,15 @@ function renderNPCCard(npc, npcLocs, isHere) {
     html += `<div style="flex-shrink:0;margin-left:8px;display:flex;flex-direction:column;gap:4px">`
     if (canTalk) {
       html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
-      html += `style="background:#533483;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
+      html += `style="background:#533483;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap"><i class="ra ra-speech-bubble"></i> 交谈</button>`
     } else {
-      html += `<button disabled style="background:#333;color:#666;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap">💬 交谈</button>`
+      html += `<button disabled style="background:#333;color:#666;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap"><i class="ra ra-speech-bubble"></i> 交谈</button>`
     }
     if (canAttack) {
       html += `<button onclick="event.stopPropagation();npcAttack('${esc(shortName)}')" `
-      html += `style="background:#8b1a1a;color:#ff4444;border:1px solid #aa2020;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600">⚔ 攻击</button>`
+      html += `style="background:#8b1a1a;color:#ff4444;border:1px solid #aa2020;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600"><i class="ra ra-sword"></i> 攻击</button>`
     } else {
-      html += `<button disabled style="background:#222;color:#555;border:1px solid #333;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap">⚔ 攻击</button>`
+      html += `<button disabled style="background:#222;color:#555;border:1px solid #333;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap"><i class="ra ra-sword"></i> 攻击</button>`
     }
     html += `</div>`
   }
@@ -1893,10 +2172,10 @@ function showAttackConfirm(name) {
   overlay.className = 'attack-confirm-overlay'
   overlay.innerHTML = `
     <div class="attack-confirm-dialog">
-      <div class="attack-confirm-icon">⚔️</div>
+      <div class="attack-confirm-icon"><i class="ra ra-sword ra-3x"></i></div>
       <div class="attack-confirm-title">确定要攻击 ${esc(name)} 吗？</div>
       <div class="attack-confirm-warning">
-        <div>⚠ 这将产生严重后果</div>
+        <div><i class="ra ra-skull"></i> 这将产生严重后果</div>
         <ul>
           <li>信任度暴跌（-5 及关系网连坐）</li>
           <li>NPC 可能还击或召唤护卫</li>
@@ -2002,7 +2281,7 @@ function renderNPCDetailPanel(data) {
 
   // 未解锁情报提示
   if (data.locked > 0) {
-    html += `<div style="text-align:center;color:#555;font-size:12px;padding:8px">🔒 还有 ${data.locked} 条情报未解锁（提升信任度）</div>`
+    html += `<div style="text-align:center;color:#555;font-size:12px;padding:8px"><i class="ra ra-locked-fortress"></i> 还有 ${data.locked} 条情报未解锁（提升信任度）</div>`
   }
 
   return html
@@ -2245,7 +2524,7 @@ function handleWsMessage(e) {
       break
 
     case 'error':
-      appendMsg('⚠️ ' + msg.text, 'error')
+      appendMsg('⚠ ' + msg.text, 'error')
       sending = false
       document.getElementById('send').disabled = false
       break
@@ -2255,7 +2534,7 @@ function handleWsMessage(e) {
       break
 
     case 'quest_progress':
-      appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
+      appendMsg(`◆ ${msg.quest}: ${msg.text}`, 'system')
       break
 
     // ─── 死亡 ───
@@ -2291,6 +2570,17 @@ function handleWsMessage(e) {
       showItemNotification(msg.text)
       break
 
+    // ─── 系统消息（时间推进等） ───
+    case 'system_message':
+    case 'narrative_warning': {
+      const sysDiv = document.createElement('div')
+      sysDiv.style.cssText = 'text-align:center;color:#b8860b;font-size:13px;padding:8px 0;opacity:0.9;font-style:italic;'
+      sysDiv.textContent = msg.text
+      document.getElementById('messages').appendChild(sysDiv)
+      sysDiv.scrollIntoView({ behavior: 'smooth' })
+      break
+    }
+
     // ─── 交易提案（DM 驱动的完整交易卡片） ───
     case 'trade_proposal':
       showTradeProposal(msg)
@@ -2323,6 +2613,7 @@ function handleWsMessage(e) {
     case 'sync':
       saveToLocal(msg.session, msg.dossier)
       updateHUD(msg.session)
+      updateQuestHint(msg.questHint)
       // Update combat round from session if in combat
       if (msg.session?.combat?.active) {
         combatRound = msg.session.combat.round || 1
@@ -2338,6 +2629,7 @@ function handleWsMessage(e) {
 
         // 1. HUD
         if (snap.session) updateHUD(snap.session)
+        if (snap.questHint) updateQuestHint(snap.questHint)
 
         // 2. 音频恢复
         if (snap.audio) {
@@ -2428,10 +2720,10 @@ function updateCombatPanel() {
       if (roundLabel) roundLabel.parentNode.insertBefore(effectsBar, roundLabel.nextSibling)
     }
     const effects = window._combatActiveEffects || []
-    const ICONS = { ac_bonus: '🛡', attack_bonus: '⚔', damage_bonus: '💥', resistance: '✨', poison_immunity: '🧪', light: '🔥' }
+    const ICONS = { ac_bonus: '<i class="ra ra-shield"></i>', attack_bonus: '<i class="ra ra-sword"></i>', damage_bonus: '<i class="ra ra-explosion"></i>', resistance: '<i class="ra ra-fairy-wand"></i>', poison_immunity: '<i class="ra ra-potion"></i>', light: '<i class="ra ra-candle-fire"></i>' }
     if (effects.length > 0) {
       effectsBar.innerHTML = effects.map(e => {
-        const icon = ICONS[e.type] || '✦'
+        const icon = ICONS[e.type] || '◆'
         const turns = e.remaining === -1 ? '' : `${e.remaining}轮`
         return `<span class="effect-chip ${e.source || ''}">${icon}${esc(e.name)} <span class="effect-turns">${turns}</span></span>`
       }).join('')
@@ -2483,7 +2775,7 @@ function showCombatSelector(title, items, onSelect) {
 
 function sendCombatAction(action, targetId, spellId, itemId) {
   if (!ws || sending) return
-  const labels = { attack: '⚔ 攻击', spell: '✨ 法术', item: '🧪 物品', flee: '🏃 逃跑', defend: '🛡 防御' }
+  const labels = { attack: '⚔ 攻击', spell: '✦ 法术', item: '◈ 物品', flee: '>> 逃跑', defend: '◉ 防御' }
   const target = targetId ? combatTargets.find(t => t.id === targetId) : null
   const spell = spellId ? combatSpells.find(s => s.name === spellId) : null
   const item = itemId ? combatItems.find(i => i.name === itemId) : null
@@ -2557,6 +2849,48 @@ function combatDefend() {
 }
 
 // ─── 场景动作（DM 动态生成 + fallback） ───
+
+// ─── 常驻主线任务提示条 ───
+function updateQuestHint(hint) {
+  const bar = document.getElementById('quest-hint-bar')
+  if (!bar) return
+
+  if (!hint || !hint.objective) {
+    bar.classList.remove('show')
+    return
+  }
+
+  const wasHidden = !bar.classList.contains('show')
+  bar.classList.add('show')
+
+  // 首次出现时滚动到底部，避免遮挡已有文本
+  if (wasHidden) {
+    requestAnimationFrame(() => {
+      const msgs = document.getElementById('messages')
+      if (msgs?.lastElementChild) msgs.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+    })
+  }
+
+  document.getElementById('quest-hint-chapter').textContent = hint.chapter || ''
+  document.getElementById('quest-hint-objective').textContent = hint.objective
+
+  // 进度点
+  const progressEl = document.getElementById('quest-hint-progress')
+  const [done, total] = (hint.progress || '0/0').split('/').map(Number)
+  let dotsHtml = ''
+  for (let i = 0; i < total; i++) {
+    dotsHtml += '<span class="dot' + (i < done ? ' filled' : '') + '"></span>'
+  }
+  progressEl.innerHTML = done + '/' + total + '<span class="quest-hint-progress-dots">' + dotsHtml + '</span>'
+
+  // 点击 → 执行推荐动作
+  bar.onclick = () => {
+    if (hint.action) {
+      document.getElementById('input').value = hint.action
+      sendInput()
+    }
+  }
+}
 function showSceneActions(actions) {
   const container = document.getElementById('messages')
   const existing = container.querySelector('.actions')
@@ -2577,7 +2911,7 @@ function showSceneActions(actions) {
   for (const d of details) {
     const btn = document.createElement('span')
     btn.className = 'action-btn detail'
-    btn.textContent = '🔍 ' + d.label
+    btn.textContent = '◆ ' + d.label
     btn.onclick = () => {
       btn.classList.add('disabled')
       btn.style.opacity = '0.4'
@@ -2697,7 +3031,7 @@ function showItemNotification(text) {
       break
     }
   }
-  card.innerHTML = `<div class="item-notif-row"><span class="item-notif-icon">📦</span><span class="item-notif-text">${esc(text)}</span></div>${compareHtml}`
+  card.innerHTML = `<div class="item-notif-row"><span class="item-notif-icon"><i class="ra ra-ammo-bag" style="font-size:24px"></i></span><span class="item-notif-text">${esc(text)}</span></div>${compareHtml}`
   container.appendChild(card)
   container.scrollTop = container.scrollHeight
   setTimeout(() => { card.style.opacity = '0.5' }, 5000)
@@ -2730,7 +3064,7 @@ function showTradeProposal(data) {
   const balanceAfter = playerGold - totalPrice
   const balanceClass = canAfford ? 'affordable' : 'unaffordable'
   card.innerHTML = `
-    <div class="trade-proposal-header">🪙 交易 — ${esc(data.npc || '商人')}</div>
+    <div class="trade-proposal-header"><i class="ra ra-gold-bar"></i> 交易 — ${esc(data.npc || '商人')}</div>
     <div class="trade-proposal-items">${itemsHtml}</div>
     <div class="trade-proposal-total">
       <span>总计</span>
@@ -2738,7 +3072,7 @@ function showTradeProposal(data) {
     </div>
     <div class="trade-proposal-balance ${balanceClass}">余额：${playerGold} → ${balanceAfter} 金</div>
     <div class="trade-proposal-btns">
-      ${data.canBargain ? `<button class="trade-btn trade-btn-bargain" onclick="tradeBargain(this)">💬 砍价</button>` : ''}
+      ${data.canBargain ? `<button class="trade-btn trade-btn-bargain" onclick="tradeBargain(this)"><i class="ra ra-speech-bubble"></i> 砍价</button>` : ''}
       <button class="trade-btn trade-btn-confirm" ${canAfford ? '' : 'disabled'} onclick="tradeConfirm(this)">确认交易</button>
       <button class="trade-btn trade-btn-cancel" onclick="this.closest('.trade-proposal-card').remove()">取消</button>
     </div>`
@@ -2750,7 +3084,7 @@ function tradeConfirm(btn) {
   const card = btn.closest('.trade-proposal-card')
   const { npc, items, totalPrice } = card._tradeData
   ws.send(JSON.stringify({ type: 'trade_execute', npc, items, totalPrice }))
-  card.innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px">✅ 交易完成</div>'
+  card.innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px"><i class="ra ra-trophy"></i> 交易完成</div>'
 }
 
 function tradeBargain(btn) {
@@ -2785,7 +3119,10 @@ function showNPCPortrait(npcName, portraitSrc) {
   bar.dataset.npc = npcName
   bar.innerHTML = `<img src="${esc(portraitSrc)}" alt="${esc(npcName)}" onerror="this.style.display='none'">` +
     `<div><div class="npc-speak-name">${esc(npcName)}</div>` +
-    `<div class="npc-speak-hint">正在与你对话</div></div>`
+    `<div class="npc-speak-hint">正在与你对话</div></div>` +
+    `<button onclick="document.getElementById('input').value='和${esc(npcName)}交谈';sendInput();this.closest('.npc-portrait-bar').remove()" ` +
+    `style="margin-left:auto;background:#0f3460;color:#8ab;border:1px solid #445;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;flex-shrink:0">` +
+    `<i class="ra ra-speech-bubble"></i> 交谈</button>`
   container.appendChild(bar)
   container.scrollTop = container.scrollHeight
 }
@@ -2833,7 +3170,7 @@ function showCombatPortraits(monsters) {
     card.className = 'combat-monster-card' + (dead ? ' dead' : '')
     card.innerHTML = (m.portrait
       ? `<img src="${esc(m.portrait)}" alt="${esc(m.name)}" onerror="this.style.display='none'">`
-      : `<div style="width:48px;height:48px;background:#1a0a0a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px">⚔</div>`) +
+      : `<div style="width:48px;height:48px;background:#1a0a0a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px"><i class="ra ra-monster-skull" style="color:#ff8c42"></i></div>`) +
       `<div class="monster-name">${esc(m.name)}</div>` +
       `<div class="monster-hp">${dead ? '击杀' : m.hp + '/' + m.maxHp}</div>` +
       (dead ? '' : `<div class="hp-bar-mini"><div class="hp-fill" style="width:${pct}%"></div></div>`)
@@ -2856,12 +3193,12 @@ function updateHUD(session) {
   if (hpEl) {
     const hpPct = p.maxHp > 0 ? p.hp / p.maxHp : 1
     hpEl.style.color = hpPct > 0.5 ? '#4caf50' : hpPct > 0.25 ? '#ff9800' : '#f44336'
-    hpEl.textContent = `❤️ ${p.hp}/${p.maxHp}`
+    hpEl.innerHTML = `<i class="ra ra-health"></i> ${p.hp}/${p.maxHp}`
   }
-  if (goldEl) goldEl.textContent = `💰 ${p.gold}`
+  if (goldEl) goldEl.innerHTML = `<i class="ra ra-gold-bar"></i> ${p.gold}`
   if (locEl) {
     const locNames = { 'dawnbreak-town':'破晓镇','twilight-woods':'暮色森林','greyspine-mines':'灰脊矿道','shatterstone-wastes':'碎石荒原' }
-    locEl.textContent = `📍 ${locNames[session.worldState?.currentLocation] ?? '未知'}`
+    locEl.innerHTML = `<i class="ra ra-compass"></i> ${locNames[session.worldState?.currentLocation] ?? '未知'}`
   }
 }
 

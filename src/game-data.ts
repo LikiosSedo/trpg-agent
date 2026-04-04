@@ -4,7 +4,7 @@
  * main.ts 和 server.ts 共用，避免数据重复和不一致。
  */
 
-import type { PlayerCharacter, GameSession, NPC, Spell, AbilityScores } from './types.js'
+import type { PlayerCharacter, GameSession, NPC, NPCFact, Spell, AbilityScores } from './types.js'
 import { createChapterState } from './chapter-manager.js'
 
 // ─── Character Class Templates ───────────────
@@ -86,7 +86,12 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '格雷格',
       trust: 0,
-      knownFacts: ['镇上矿洞最近不太平', '冒险者公会在招人', '二十年前在矿洞里失去了挚友达里安', '柜台底下锁着达里安留下的旧日志，记录了矿道深处的异象'],
+      knownFacts: [
+        { text: '镇上矿洞最近不太平', minChapter: 1 },
+        { text: '冒险者公会在招人', minChapter: 1 },
+        { text: '二十年前在矿洞里失去了挚友达里安', minChapter: 2 },
+        { text: '柜台底下锁着达里安留下的旧日志，记录了矿道深处的异象', minChapter: 3 },
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -104,7 +109,11 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '小莉',
       trust: 0,
-      knownFacts: ['能感知他人身上的异常气息', '镇长身上缠着灰色扭动的东西', '卡恩让她后背发凉'],
+      knownFacts: [
+        { text: '能感知他人身上的异常气息', minChapter: 1 },
+        { text: '镇长身上缠着灰色扭动的东西', minChapter: 1 },
+        { text: '卡恩让她后背发凉', minChapter: 2 },
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -118,7 +127,13 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '艾琳娜',
       trust: 0,
-      knownFacts: ['冒险者公会近期任务激增，人手不够', '矿道失踪事件的详细情报', '卡恩的文件太完美——有遮蔽', '小莉身上有微弱的天赋波动', '200年前读到过虚空棱镜的残篇'],
+      knownFacts: [
+        { text: '冒险者公会近期任务激增，人手不够', minChapter: 1 },
+        { text: '矿道失踪事件的详细情报', minChapter: 1 },
+        { text: '卡恩的文件太完美——有遮蔽', minChapter: 2 },
+        { text: '小莉身上有微弱的天赋波动', minChapter: 3 },
+        { text: '200年前读到过虚空棱镜的残篇', minChapter: 3 },
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -135,7 +150,14 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '维克多',
       trust: 0,
-      knownFacts: ['最近精神状态很差，签文件手都在抖', '曾经是个好镇长，承诺改善矿工条件', '半年前开始回避与人交流', '卡恩是教团的传话人', '女儿索菲亚被暗影教团绑架', '壁炉暗格里藏着石碑的被删记录'],
+      knownFacts: [
+        { text: '最近精神状态很差，签文件手都在抖', minChapter: 1 },
+        { text: '曾经是个好镇长，承诺改善矿工条件', minChapter: 1 },
+        { text: '半年前开始回避与人交流', minChapter: 1 },
+        { text: '卡恩是教团的传话人', minChapter: 3 },
+        { text: '女儿索菲亚被暗影教团绑架', minChapter: 4 },
+        { text: '壁炉暗格里藏着石碑的被删记录', minChapter: 4 },
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -151,7 +173,14 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '卡恩',
       trust: 0,
-      knownFacts: ['自称来自东方的游吟诗人，琴艺精湛', '对破晓镇的历史了如指掌，比本地人还熟', '怀疑酒馆帮工女孩是灵视者', '维克多被控制的细节', '暗影教团的全部计划', '独立破译了棱镜激活咒语'],
+      knownFacts: [
+        { text: '自称来自东方的游吟诗人，琴艺精湛', minChapter: 1 },
+        { text: '对破晓镇的历史了如指掌，比本地人还熟', minChapter: 1 },
+        { text: '怀疑酒馆帮工女孩是灵视者', minChapter: 3 },
+        { text: '维克多被控制的细节', minChapter: 4 },
+        { text: '暗影教团的全部计划', minChapter: 4 },
+        { text: '独立破译了棱镜激活咒语', minChapter: 4 },
+      ],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -166,11 +195,11 @@ export function createInitialNPCs(): NPC[] {
       name: '陈妈',
       trust: 0,
       knownFacts: [
-        '镇上来往旅客的动向',
-        '最近有陌生人频繁出入镇外',
-        '卡恩深夜独自外出',
-        '那些陌生人总在月圆前后出现，每次都往矿道方向去',
-        '去年矿难后镇长变了一个人，以前常来旅店聊天现在连门都不出',
+        { text: '镇上来往旅客的动向', minChapter: 1 },
+        { text: '最近有陌生人频繁出入镇外', minChapter: 1 },
+        { text: '卡恩深夜独自外出', minChapter: 2 },
+        { text: '那些陌生人总在月圆前后出现，每次都往矿道方向去', minChapter: 3 },
+        { text: '去年矿难后镇长变了一个人，以前常来旅店聊天现在连门都不出', minChapter: 2 },
       ],
       playerPromises: [],
       interactionLog: [],
@@ -188,11 +217,11 @@ export function createInitialNPCs(): NPC[] {
       name: '格罗姆',
       trust: 0,
       knownFacts: [
-        '矿石品质近期下降',
-        '矿石中出现不明黑色晶体',
-        '保留了黑色晶体样本',
-        '黑色晶体靠近铁器时会发出微弱嗡鸣像在共振',
-        '北方矮人古矿志中有关于虚空矿脉的记载，症状与当前矿道异变惊人相似',
+        { text: '矿石品质近期下降', minChapter: 1 },
+        { text: '矿石中出现不明黑色晶体', minChapter: 1 },
+        { text: '保留了黑色晶体样本', minChapter: 2 },
+        { text: '黑色晶体靠近铁器时会发出微弱嗡鸣像在共振', minChapter: 2 },
+        { text: '北方矮人古矿志中有关于虚空矿脉的记载，症状与当前矿道异变惊人相似', minChapter: 3 },
       ],
       playerPromises: [],
       interactionLog: [],
@@ -223,11 +252,11 @@ export function createInitialNPCs(): NPC[] {
       name: '叶绿',
       trust: 0,
       knownFacts: [
-        '助手近期行为古怪常深夜外出',
-        '助手抽屉里有画着奇怪符号的纸',
-        '怀疑助手加入了秘密组织',
-        '最近有矿工来求诊说在矿道里听到低语声，回来后频繁做噩梦',
-        '助手符号纸上有一个像眼睛被斜线划过的标记',
+        { text: '助手近期行为古怪常深夜外出', minChapter: 1 },
+        { text: '助手抽屉里有画着奇怪符号的纸', minChapter: 2 },
+        { text: '怀疑助手加入了秘密组织', minChapter: 2 },
+        { text: '最近有矿工来求诊说在矿道里听到低语声，回来后频繁做噩梦', minChapter: 1 },
+        { text: '助手符号纸上有一个像眼睛被斜线划过的标记', minChapter: 3 },
       ],
       playerPromises: [],
       interactionLog: [],
@@ -255,11 +284,11 @@ export function createInitialNPCs(): NPC[] {
       name: '韩猛',
       trust: 0,
       knownFacts: [
-        '派出调查矿道的小队接连失联',
-        '失联小队最后报告中有暗影教团痕迹',
-        '公会地下室囤积了应急武器',
-        '最后一支失联小队报告矿道中层异常寒冷，墙壁上有会动的符文',
-        '艾琳娜私下跟他说过这不是普通的塌方要做最坏准备',
+        { text: '派出调查矿道的小队接连失联', minChapter: 1 },
+        { text: '失联小队最后报告中有暗影教团痕迹', minChapter: 2 },
+        { text: '公会地下室囤积了应急武器', minChapter: 2 },
+        { text: '最后一支失联小队报告矿道中层异常寒冷，墙壁上有会动的符文', minChapter: 3 },
+        { text: '艾琳娜私下跟他说过这不是普通的塌方要做最坏准备', minChapter: 3 },
       ],
       playerPromises: [],
       interactionLog: [],

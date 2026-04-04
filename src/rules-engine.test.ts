@@ -49,15 +49,16 @@ function makeTestSession(): GameSession {
         { name: 'Shield', description: '', effect: '+5 AC reaction.', usesPerRest: 3, remaining: 0 },
       ],
       clues: [],
+      xp: 0,
       equipped: {
         weapon: { name: '短剑', type: 'weapon', description: '造成1d6穿刺伤害。', bonus: 0 },
       },
     },
     npcs: [
-      { name: '陈妈', trust: 3, knownFacts: ['镇上最近失踪了两个矿工'], playerPromises: [], location: 'dawnbreak-town', mood: 'friendly' },
+      { name: '陈妈', trust: 3, knownFacts: [{ text: '镇上最近失踪了两个矿工', minChapter: 1 }], playerPromises: [], interactionLog: [], location: 'dawnbreak-town', mood: 'friendly' },
     ],
     quests: [
-      { name: '矿洞调查', description: '调查灰脊矿道的异常', status: 'active', objectives: ['进入矿道', '找到失踪矿工'] },
+      { name: '矿洞调查', description: '调查灰脊矿道的异常', status: 'active', objectives: ['进入矿道', '找到失踪矿工'], objectivesCompleted: [false, false], reward: { gold: 50, xp: 100 } },
     ],
     worldState: {
       currentLocation: 'dawnbreak-town',

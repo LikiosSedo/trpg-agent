@@ -214,9 +214,10 @@ export type TurnEvent =
   | { type: 'item_acquired'; text: string }
   | { type: 'trade_proposal'; npc: string; items: any[]; totalPrice: number; canBargain: boolean }
   | { type: 'death' }
-  | { type: 'sync'; session: GameSession; dossier: any }
+  | { type: 'sync'; session: GameSession; dossier: any; questHint: QuestHint | null }
   | { type: 'combat_narrative'; text: string }
   | { type: 'dm_thinking'; text: string }
+  | { type: 'system_message'; text: string }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -235,13 +236,46 @@ function buildFallbackActions(session: GameSession): SceneActions {
   )
   const suggestions: string[] = []
 
-  // 场景优先：刚打完仗 → 搜索/离开
+  // 场景优先：刚打完仗 → 搜索 + 可能的回程beat推荐
   if (inCombatAftermath) {
     suggestions.push('搜索周围')
-    const area = locations[loc]
-    if (area) {
-      const otherPoi = area.pointsOfInterest.find((p: any) => p.discovered !== false && p.id !== subLoc)
-      if (otherPoi) suggestions.push(`前往${(otherPoi as any).nameZh}`)
+    // 检查是否有"回去汇报"类beat（如 ch2_report_elena）
+    if (session.chapter) {
+      const chapterDef = getChapter(session.chapter.currentChapter)
+      if (chapterDef) {
+        for (const beat of chapterDef.beats) {
+          if (session.chapter.completedBeats.includes(beat.id)) continue
+          if (beat.requires && !beat.requires.every((r: string) => session.chapter!.completedBeats.includes(r))) continue
+          if (beat.trigger === 'auto') continue
+          const [bType, bTarget] = beat.trigger.split(':')
+          if (bType === 'talk' && bTarget) {
+            const npc = session.npcs.find(n => n.name === bTarget)
+            if (npc) {
+              if (npc.location !== loc) {
+                const destArea = locations[npc.location]
+                if (destArea) suggestions.push(`★回${destArea.nameZh}找${bTarget}`)
+              } else {
+                const npcSub = npc.subLocation ?? npc.homeBase
+                if (npcSub && npcSub !== subLoc) {
+                  const area = locations[loc]
+                  const poi = area?.pointsOfInterest.find((p: any) => p.id === npcSub)
+                  if (poi) suggestions.push(`★前往${(poi as any).nameZh}找${bTarget}`)
+                } else {
+                  suggestions.push(`★和${bTarget}交谈`)
+                }
+              }
+            }
+          }
+          break  // 只取第一个可推进的beat
+        }
+      }
+    }
+    if (suggestions.length < 3) {
+      const area = locations[loc]
+      if (area) {
+        const otherPoi = area.pointsOfInterest.find((p: any) => p.discovered !== false && p.id !== subLoc)
+        if (otherPoi) suggestions.push(`前往${(otherPoi as any).nameZh}`)
+      }
     }
     return { details: [], suggestions: suggestions.slice(0, 3) }
   }
@@ -260,6 +294,24 @@ function buildFallbackActions(session: GameSession): SceneActions {
           const npc = npcsHere.find(n => n.name === target)
           if (npc && !suggestions.includes(`★和${target}交谈`) && !suggestions.includes(`和${target}交谈`)) {
             suggestions.push(`★和${target}交谈`)
+          } else if (!npc) {
+            // NPC 不在当前子地点 → 推荐前往
+            const npcData = session.npcs.find(n => n.name === target)
+            if (npcData) {
+              const npcSub = npcData.subLocation ?? npcData.homeBase
+              if (npcData.location !== loc) {
+                // 不同区域 → 跨区导航
+                const destArea = locations[npcData.location]
+                if (destArea) suggestions.push(`★前往${destArea.nameZh}找${target}`)
+              } else if (npcSub && npcSub !== subLoc) {
+                // 同区域不同子地点 → 子地点导航
+                const area = locations[loc]
+                if (area) {
+                  const poi = area.pointsOfInterest.find((p: any) => p.id === npcSub)
+                  if (poi) suggestions.push(`★前往${(poi as any).nameZh}找${target}`)
+                }
+              }
+            }
           }
         } else if (type === 'arrive' && target) {
           const destArea = locations[target]
@@ -310,6 +362,135 @@ function buildFallbackActions(session: GameSession): SceneActions {
   }
 
   return { details: [], suggestions: suggestions.slice(0, 3) }
+}
+
+/** 从建议文本中提取关键词（NPC名、地点名）用于语义去重 */
+function extractKeywords(text: string, session: GameSession): string[] {
+  const keywords: string[] = []
+  // NPC 名字
+  for (const npc of session.npcs) {
+    if (text.includes(npc.name)) keywords.push(npc.name)
+  }
+  // 地点中文名
+  for (const loc of Object.values(locations)) {
+    if (text.includes(loc.nameZh)) keywords.push(loc.nameZh)
+    for (const poi of loc.pointsOfInterest) {
+      if (text.includes((poi as any).nameZh)) keywords.push((poi as any).nameZh)
+    }
+  }
+  return keywords
+}
+
+// ─── 主线提示（常驻，不受 DM 行为影响） ──────────
+
+interface QuestHint {
+  /** 当前章节标题 */
+  chapter: string
+  /** 当前主线目标描述 */
+  objective: string
+  /** 推荐动作（人类可读，如"前往暮色森林"） */
+  action: string
+  /** 进度指示：已完成beat数 / advanceWhen要求数 */
+  progress: string
+}
+
+/**
+ * 根据当前章节和已完成 beat 推算下一步主线方向。
+ * 设计原则：始终给出明确的行动指引，即使玩家迷路也能找到方向。
+ */
+function getQuestHint(session: GameSession): QuestHint | null {
+  if (!session.chapter) return null
+  const chapterDef = getChapter(session.chapter.currentChapter)
+  if (!chapterDef) return null
+
+  const completed = session.chapter.completedBeats
+  const loc = session.worldState.currentLocation
+
+  // 找到第一个未完成的、前置满足的、非auto的beat
+  let nextBeat = null
+  for (const beat of chapterDef.beats) {
+    if (completed.includes(beat.id)) continue
+    if (beat.trigger === 'auto') continue
+    if (beat.requires && !beat.requires.every(r => completed.includes(r))) continue
+    nextBeat = beat
+    break
+  }
+
+  // 所有beat已完成 → 章节即将推进
+  if (!nextBeat) {
+    return {
+      chapter: chapterDef.title,
+      objective: '本章任务已完成',
+      action: chapterDef.nextChapter ? '等待剧情推进...' : '最终章',
+      progress: `${chapterDef.advanceWhen.length}/${chapterDef.advanceWhen.length}`,
+    }
+  }
+
+  // 根据 trigger 类型生成指引
+  const [type, target] = nextBeat.trigger.split(':')
+  let objective = ''
+  let action = ''
+
+  if (type === 'talk' && target) {
+    const npc = session.npcs.find(n => n.name === target)
+    const npcLoc = npc?.location
+    const npcSub = npc?.subLocation ?? npc?.homeBase
+    const subLoc = session.worldState.currentSubLocation
+    const sameLocation = npcLoc === loc
+    const sameSubLocation = sameLocation && npcSub === subLoc
+
+    // 根据beat id 给出更具体的目标描述
+    if (nextBeat.id.includes('meet')) {
+      objective = `前去见${target}`
+    } else if (nextBeat.id.includes('report')) {
+      objective = `回去向${target}汇报`
+    } else if (nextBeat.id.includes('quest')) {
+      objective = `与${target}讨论任务`
+    } else {
+      objective = `与${target}交谈`
+    }
+
+    if (sameSubLocation) {
+      action = `和${target}交谈`
+    } else if (sameLocation && npcSub) {
+      // 同区域不同子地点
+      const area = locations[loc]
+      const poi = area?.pointsOfInterest.find((p: any) => p.id === npcSub)
+      action = poi ? `前往${(poi as any).nameZh}找${target}` : `去找${target}`
+    } else if (npcLoc) {
+      const area = locations[npcLoc]
+      action = area ? `前往${area.nameZh}找${target}` : `去找${target}`
+    } else {
+      action = `找到${target}`
+    }
+  } else if (type === 'arrive' && target) {
+    const area = locations[target]
+    const areaName = area?.nameZh ?? target
+    if (target === loc) {
+      objective = `探索${areaName}`
+      action = '继续深入探索'
+    } else {
+      objective = `前往${areaName}`
+      action = `前往${areaName}`
+    }
+  } else if (type === 'combat_end') {
+    objective = '完成战斗'
+    action = '击败敌人'
+  } else if (type === 'search') {
+    objective = '搜索周围环境'
+    action = '搜索周围'
+  }
+
+  // 计算进度
+  const advanceBeats = chapterDef.advanceWhen
+  const doneCount = advanceBeats.filter(id => completed.includes(id)).length
+
+  return {
+    chapter: chapterDef.title,
+    objective,
+    action,
+    progress: `${doneCount}/${advanceBeats.length}`,
+  }
 }
 
 // ─── 存档迁移 ──────────────────────────────────
@@ -626,15 +807,24 @@ export class GameEngine {
             id: loc.id, nameZh: loc.nameZh, danger: loc.dangerLevel, description: loc.description,
           })),
           currentSubLocation: session.worldState.currentSubLocation,
+          currentSubLocationName: currentLoc?.pointsOfInterest?.find((p: any) => p.id === session.worldState.currentSubLocation)?.nameZh ?? '',
           subLocations: currentLoc?.pointsOfInterest
-            ?.filter((p: any) => p.discovered !== false)
-            .map((p: any) => ({
-              id: p.id, nameZh: p.nameZh, description: p.description,
+            ?.map((p: any) => ({
+              id: p.id,
+              nameZh: p.discovered !== false ? p.nameZh : '???',
+              description: p.discovered !== false ? p.description : '',
+              discovered: p.discovered !== false,
               isCurrent: p.id === session.worldState.currentSubLocation,
-              npcs: session.npcs
-                .filter(n => n.location === session.worldState.currentLocation &&
+              npcs: (() => {
+                if (p.discovered === false) return []  // 未发现的地点不显示NPC
+                const here = session.npcs.filter(n =>
+                  n.location === session.worldState.currentLocation &&
                   (n.subLocation ?? n.homeBase) === p.id)
-                .map(n => n.name),
+                const known = here.filter(n => this.dossier.isUnlocked(n.name)).map(n => n.name)
+                const unknownCount = here.length - known.length
+                if (unknownCount > 0) known.push(unknownCount === 1 ? '???' : `??? (+${unknownCount})`)
+                return known
+              })(),
             })) ?? [],
           reachableAreas,
         },
@@ -929,7 +1119,7 @@ export class GameEngine {
                 yield { type: 'narrative_warning', text: `你还没来得及行动——${alert.arrivedResponder}已经冲到面前！` }
                 console.log(`[consequence] 战斗已触发，玩家行动被打断: "${input}"`)
                 session.dmMessages = getDMMessages()
-                yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+                yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
                 return
               } catch (err) {
                 console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
@@ -1008,6 +1198,30 @@ export class GameEngine {
     const action = await classifyIntent(input, session)
     console.log(`[rules-agent] 输入: "${input}" → 分类: ${JSON.stringify(action)}`)
     let actionResult: ActionResult | null = null
+
+    // ── 加权时间累积：小动作累积到阈值自动推进时段 ──
+    const TIME_COST: Record<string, number> = {
+      TALK: 2, SEARCH: 2, BUY: 1, SELL: 1, GIVE: 1, USE: 1, MOVE: 1,
+      ATTACK: 0, LOOK: 0, FLEE: 0, NARRATIVE: 0, REST: 0,
+    }
+    const TIME_THRESHOLD = 20
+    const cost = TIME_COST[action.type] ?? 0
+    if (cost > 0) {
+      session.timeAccum = (session.timeAccum ?? 0) + cost
+      console.log(`[time] ${action.type} +${cost} → 累积 ${session.timeAccum}/${TIME_THRESHOLD}`)
+      if (session.timeAccum >= TIME_THRESHOLD) {
+        const newTime = advanceTime()
+        session.timeAccum = 0
+        console.log(`[time] 累积到达阈值，时间推进至: ${newTime}`)
+        const transitions: Record<string, string> = {
+          '清晨': '🌅 夜色渐退，东方泛起鱼肚白……清晨到来了。',
+          '下午': '☀️ 日头高悬，不知不觉已经到了下午。',
+          '黄昏': '🌆 余晖染红天际，黄昏的阴影开始蔓延……',
+          '深夜': '🌙 夜幕低垂，街灯摇曳，深夜的破晓镇显得格外安静——也格外危险。',
+        }
+        yield { type: 'system_message', text: transitions[newTime] ?? `时间流逝，现在是${newTime}。` }
+      }
+    }
 
     if (shouldPreExecute(action)) {
       actionResult = await executeAction(action, session)
@@ -1242,7 +1456,36 @@ export class GameEngine {
 
     // DM 结束 + 场景选项
     const dmActions = consumeActions()
-    const actions = dmActions ?? buildFallbackActions(session)
+    const fallback = buildFallbackActions(session)
+    const actions = dmActions ?? fallback
+    // DM 提供了选项时，把 fallback 中的★主线建议智能合并（去重）
+    if (dmActions && fallback.suggestions) {
+      const questSuggestions = fallback.suggestions.filter(s => s.startsWith('★'))
+      if (questSuggestions.length > 0) {
+        if (!actions.suggestions) actions.suggestions = []
+        for (const qs of questSuggestions) {
+          const questText = qs.slice(1) // 去掉★
+          // 提取关键词（NPC名、地点名）用于语义匹配
+          const keywords = extractKeywords(questText, session)
+          // 检查 DM 的 suggestions 中是否已有语义相似的选项
+          const dupIdx = actions.suggestions.findIndex(s =>
+            keywords.some(kw => s.includes(kw))
+          )
+          // 也检查 details 中是否有重复
+          const detailDup = (actions.details ?? []).some(d =>
+            keywords.some(kw => d.label.includes(kw))
+          )
+          if (dupIdx >= 0) {
+            // 升级已有选项为★样式（保留DM的原始措辞）
+            actions.suggestions[dupIdx] = `★${actions.suggestions[dupIdx]}`
+          } else if (!detailDup) {
+            // 没有重复，追加★建议
+            actions.suggestions.push(qs)
+          }
+          // detailDup 为 true 时：DM 的 detail 已覆盖，不额外追加
+        }
+      }
+    }
     // 过滤无效选项：不能和昏迷/死亡 NPC 交互
     if (actions.suggestions) {
       const invalidNpcs = session.npcs
@@ -1427,7 +1670,7 @@ export class GameEngine {
     session.dmMessages = getDMMessages()
 
     // 同步
-    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+    yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
 
     // 死亡检测
     if (session.player.hp <= 0) {
@@ -1559,7 +1802,7 @@ export class GameEngine {
 
     // 同步
     session.dmMessages = getDMMessages()
-    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+    yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
 
     this.turnsSinceLastSave++
     if (this.turnsSinceLastSave >= 5) {
@@ -1695,7 +1938,7 @@ export class GameEngine {
           syncNPCConditionAfterCombat(session, combatMonsters)
           yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
           yield* this.combatDMNarrative(`玩家在与${enemyNames}的战斗中倒下了。描写最后的时刻。`)
-          yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+          yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
           if (session.player.hp <= 0) {
             session.dossierData = this.dossier.toJSON()
             getFacts().save('death-save')
@@ -1740,7 +1983,7 @@ export class GameEngine {
         }
 
         yield* this.combatDMNarrative(`玩家从与${enemyNames}的战斗中成功逃脱。描写逃跑的紧迫感和脱离战斗后的喘息。`)
-        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
       // 逃跑失败 → 浪费回合，怪物正常回合继续（skipMonsterPhase=false）
@@ -1787,7 +2030,7 @@ export class GameEngine {
             : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
         )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
-        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
       yield { type: 'combat_status', text: turnResult.roundLog.join('\n'), ended: false }
@@ -1812,7 +2055,7 @@ export class GameEngine {
           : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
       )
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
-      yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+      yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
       if (session.player.hp <= 0) {
         session.dossierData = this.dossier.toJSON()
         getFacts().save('death-save')
@@ -1859,7 +2102,7 @@ export class GameEngine {
         )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         // endCombat already called by executeMonsterPhase for defeat
-        yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         if (session.player.hp <= 0) {
           session.dossierData = this.dossier.toJSON()
           getFacts().save('death-save')
@@ -1899,7 +2142,7 @@ export class GameEngine {
       }
     }
 
-    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+    yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
 
     // Death check
     if (session.player.hp <= 0) {
@@ -1954,7 +2197,31 @@ export class GameEngine {
     )
     yield { type: 'audio', bgm: openAudio.bgm, ambient: openAudio.ambient }
 
-    const actions = consumeActions() ?? buildFallbackActions(session)
+    const dmOpenActions = consumeActions()
+    const fallbackOpen = buildFallbackActions(session)
+    const actions = dmOpenActions ?? fallbackOpen
+    // 开场也智能合并★主线建议（语义去重）
+    if (dmOpenActions && fallbackOpen.suggestions) {
+      const questSuggestions = fallbackOpen.suggestions.filter(s => s.startsWith('★'))
+      if (questSuggestions.length > 0) {
+        if (!actions.suggestions) actions.suggestions = []
+        for (const qs of questSuggestions) {
+          const questText = qs.slice(1)
+          const keywords = extractKeywords(questText, session)
+          const dupIdx = actions.suggestions.findIndex(s =>
+            keywords.some(kw => s.includes(kw))
+          )
+          const detailDup = (actions.details ?? []).some(d =>
+            keywords.some(kw => d.label.includes(kw))
+          )
+          if (dupIdx >= 0) {
+            actions.suggestions[dupIdx] = `★${actions.suggestions[dupIdx]}`
+          } else if (!detailDup) {
+            actions.suggestions.push(qs)
+          }
+        }
+      }
+    }
     yield { type: 'dm_end', combat: false, pendingMonster: false, actions }
 
     // 开场 NPC 解锁（只有同区域的 NPC 才解锁——车夫提到格雷格不算见面）
@@ -1967,7 +2234,7 @@ export class GameEngine {
     }
 
     session.dmMessages = getDMMessages()
-    yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+    yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
   }
 
   // ─── 工具方法 ────────────────────────────
@@ -1994,6 +2261,7 @@ export class GameEngine {
       audio,
       session,
       combat: null as any,
+      questHint: getQuestHint(session),
     }
 
     // 如果在战斗中，发送战斗状态供前端重建 UI

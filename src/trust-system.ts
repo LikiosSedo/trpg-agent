@@ -4,8 +4,14 @@
  * 多通道信任变化 + 关系网连坐 + 梯度响应 + 承诺追踪
  */
 
-import type { NPC, GameSession, TrustThresholds } from './types.js'
+import type { NPC, GameSession, TrustThresholds, NPCFact } from './types.js'
 import { getPersonality, type NPCPersonality } from './npc-relationships.js'
+
+/** 从 session.chapter.currentChapter（如 'ch2'）提取章节数字，默认1 */
+function getChapterNum(session: GameSession): number {
+  const id = session.chapter?.currentChapter ?? 'ch1'
+  return parseInt(id.replace(/\D/g, ''), 10) || 1
+}
 
 // ─── 事件类型 ──────────────────────────────
 
@@ -78,9 +84,20 @@ export function changeTrust(session: GameSession, event: TrustChangeEvent): Trus
     }
   }
 
+  // 章节信任软上限：超过上限后增长衰减为 1/3（向下取整，可能为0）
+  let effectiveDelta = event.delta
+  if (event.delta > 0) {
+    const chapterNum = getChapterNum(session)
+    const ceiling = personality.trustCeiling[chapterNum] ?? 10
+    if (npc.trust >= ceiling) {
+      // 已在天花板以上：大幅衰减
+      effectiveDelta = Math.floor(event.delta / 3)
+    }
+  }
+
   // 应用变化
   const oldTrust = npc.trust
-  npc.trust = Math.max(-10, Math.min(10, npc.trust + event.delta))
+  npc.trust = Math.max(-10, Math.min(10, npc.trust + effectiveDelta))
 
   // 关系网连坐（非连坐来源才触发，避免递归）
   if (event.channel !== 'reputation') {
@@ -150,23 +167,39 @@ export function getAttitudeDirective(npc: NPC): string {
 
 // ─── 信息门控 ──────────────────────────────
 
-/** 根据信任度决定 NPC 可以透露多少 knownFacts */
-/** 信任度 → 情报透露（五档）
- * 负值:   不透露任何情报
- * 0:      第1档 — 基本印象（前2条）
- * 1~2:    第2档 — 表面了解（前4条）
- * 3~4:    第3档 — 深入了解（前6条）
- * 5~6:    第4档 — 核心秘密（前8条）
- * 7~10:   第5档 — 全部情报
+/** 双重门控：章节 + 信任度
+ *
+ * 第一层：章节门控 — NPC 只"知道"当前章节已解锁的情报
+ *   每条 NPCFact 有 minChapter，章节 < minChapter 时 NPC 还不知道这件事。
+ *
+ * 第二层：信任度门控 — NPC 愿意透露多少已知情报（五档）
+ *   负值:   不透露任何情报
+ *   0:      第1档 — 基本印象（前2条）
+ *   1~2:    第2档 — 表面了解（前4条）
+ *   3~4:    第3档 — 深入了解（前6条）
+ *   5~6:    第4档 — 核心秘密（前8条）
+ *   7~10:   第5档 — 全部情报
+ *
+ * 返回纯文本数组，供 DM prompt 直接使用。
  */
-export function getGatedFacts(npc: NPC): string[] {
+export function getGatedFacts(npc: NPC, session?: GameSession): string[] {
+  const chapterNum = session ? getChapterNum(session) : 4  // 无 session 时不限制章节
   const t = npc.trust
-  const facts = npc.knownFacts
-  if (t >= 7) return facts
-  if (t >= 5) return facts.slice(0, Math.min(8, facts.length))
-  if (t >= 3) return facts.slice(0, Math.min(6, facts.length))
-  if (t >= 1) return facts.slice(0, Math.min(4, facts.length))
-  if (t >= 0) return facts.slice(0, Math.min(2, facts.length))
+
+  // 第一层：章节门控 — 过滤掉 NPC 还不知道的情报
+  const knownThisChapter = npc.knownFacts.filter(f =>
+    typeof f === 'string' ? true : f.minChapter <= chapterNum
+  )
+
+  // 提取纯文本
+  const texts = knownThisChapter.map(f => typeof f === 'string' ? f : f.text)
+
+  // 第二层：信任度门控
+  if (t >= 7) return texts
+  if (t >= 5) return texts.slice(0, Math.min(8, texts.length))
+  if (t >= 3) return texts.slice(0, Math.min(6, texts.length))
+  if (t >= 1) return texts.slice(0, Math.min(4, texts.length))
+  if (t >= 0) return texts.slice(0, Math.min(2, texts.length))
   return []
 }
 
@@ -197,6 +230,10 @@ export function checkBrokenPromises(session: GameSession): TrustChangeEvent[] {
 // ─── 内部函数 ──────────────────────────────
 
 function cascadeReputation(session: GameSession, sourceNpc: string, event: TrustChangeEvent): void {
+  // Bond 连坐只传播负面信任（惩罚机制）
+  // 正面信任不传播：和叶绿关系好不代表格雷格自动喜欢你
+  if (event.delta >= 0) return
+
   const personality = getPersonality(sourceNpc)
   for (const bond of personality.bonds) {
     const cascadeDelta = Math.round(event.delta * bond.weight)
@@ -205,7 +242,7 @@ function cascadeReputation(session: GameSession, sourceNpc: string, event: Trust
       npcName: bond.npcName,
       channel: 'reputation',
       delta: cascadeDelta,
-      reason: `${sourceNpc}${event.delta < 0 ? '对你不满' : '因你好感增加'}`,
+      reason: `${sourceNpc}对你不满`,
       turn: event.turn,
       grudgeTag: event.grudgeTag,
     })

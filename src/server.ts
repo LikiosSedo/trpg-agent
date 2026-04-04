@@ -167,6 +167,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('game_over', { reason: ev.reason, canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
           send('system', { text: ev.text }); break
+        case 'system_message':
+          send('system_message', { text: ev.text }); break
         case 'item_acquired':
           send('item_acquired', { text: ev.text }); break
         case 'trade_proposal':
@@ -182,7 +184,7 @@ wss.on('connection', (ws: WebSocket, req) => {
           gameStarted = false
           break
         case 'sync':
-          send('sync', { session: ev.session, dossier: ev.dossier }); break
+          send('sync', { session: ev.session, dossier: ev.dossier, questHint: (ev as any).questHint }); break
       }
     }
   }
@@ -291,49 +293,60 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 交易执行（玩家点击交易确认卡片） ──
     if (msg.type === 'trade_execute') {
       if (!gameStarted || !engine) return
-      const items = msg.items || [{ name: msg.item, price: msg.gold, quantity: 1 }]
-      const npc = msg.npc
-      const results: string[] = []
-      let allSuccess = true
+      if (processing) { send('error', { text: '处理中...' }); return }
+      processing = true
+      try {
+        const items = msg.items || [{ name: msg.item, price: msg.gold, quantity: 1 }]
+        const npc = msg.npc
+        const results: string[] = []
+        let allSuccess = true
 
-      // 价格合理性校验：单价不能低于 shopPricing 的 50%（防止 DM 传离谱低价）
-      const shopNpc = engine.session.npcs.find((n: any) => n.name === npc)
-      for (const item of items) {
-        const basePrice = shopNpc?.shopPricing?.[item.name]
-        if (basePrice && item.price < basePrice * 0.5) {
-          item.price = Math.ceil(basePrice * 0.5)  // 强制底价 50%
+        // 价格合理性校验：单价不能低于 shopPricing 的 50%（防止 DM 传离谱低价）
+        const shopNpc = engine.session.npcs.find((n: any) => n.name === npc)
+        for (const item of items) {
+          const basePrice = shopNpc?.shopPricing?.[item.name]
+          if (basePrice && item.price < basePrice * 0.5) {
+            item.price = Math.ceil(basePrice * 0.5)  // 强制底价 50%
+          }
         }
-      }
 
-      // 检查总金额
-      const totalPrice = items.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
-      if (engine.session.player.gold < totalPrice) {
-        send('system', { text: `交易失败：金币不足（需要${totalPrice}，拥有${engine.session.player.gold}）` })
-        return
-      }
-
-      // 逐个物品执行
-      for (const item of items) {
-        const qty = item.quantity || 1
-        for (let i = 0; i < qty; i++) {
-          const result = await TransferItemTool.execute({
-            transferType: 'buy',
-            itemName: item.name,
-            sourceId: npc,
-            goldAmount: item.price,
-            itemType: item.type,
-            itemDescription: item.description || '',
-            itemBonus: item.bonus,
-            skipNightCheck: true,  // NPC 已通过 ProposeTradeAction 同意，跳过深夜限制
-          })
-          if (result.isError) { allSuccess = false; results.push(`❌ ${item.name}: ${result.output}`) }
-          else { results.push(`✅ ${item.name}`) }
+        // 检查总金额
+        const totalPrice = items.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
+        if (engine.session.player.gold < totalPrice) {
+          send('system', { text: `交易失败：金币不足（需要${totalPrice}，拥有${engine.session.player.gold}）` })
+          return
         }
-      }
 
-      send('item_acquired', { text: `交易完成：${results.join('、')}` })
-      send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
-      engine.clearBargain()
+        // 逐个物品执行
+        for (const item of items) {
+          const qty = item.quantity || 1
+          for (let i = 0; i < qty; i++) {
+            const result = await TransferItemTool.execute({
+              transferType: 'buy',
+              itemName: item.name,
+              sourceId: npc,
+              goldAmount: item.price,
+              itemType: item.type,
+              itemDescription: item.description || '',
+              itemBonus: item.bonus,
+              skipNightCheck: true,  // NPC 已通过 ProposeTradeAction 同意，跳过深夜限制
+            })
+            if (result.isError) { allSuccess = false; results.push(`❌ ${item.name}: ${result.output}`) }
+            else { results.push(`✅ ${item.name}`) }
+          }
+        }
+
+        send('item_acquired', { text: `交易完成：${results.join('、')}` })
+        send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
+        engine.clearBargain()
+
+        // 交易成功后自动触发 DM 叙事（NPC 交付物品的场景描写）
+        if (allSuccess) {
+          await streamEvents(engine.processTurn(`[交易完成] 玩家向${npc}购买了${items.map((i: any) => i.name).join('、')}，支付${totalPrice}金币`))
+        }
+      } finally {
+        processing = false
+      }
       return
     }
 

@@ -145,7 +145,7 @@ export class GameFactStore {
     const npc = this.session.npcs.find(n => n.name === name)
     if (!npc) throw new Error(`NPC not found: ${name}`)
     const promises = npc.playerPromises.length ? `玩家承诺: ${npc.playerPromises.join('；')}` : ''
-    const gatedFacts = getGatedFacts(npc)
+    const gatedFacts = getGatedFacts(npc, this.session)
     const facts = gatedFacts.length ? `可透露情报: ${gatedFacts.join('；')}` : '不会透露任何有用信息'
     const log = (npc.interactionLog ?? []).length
       ? `最近交互: ${(npc.interactionLog ?? []).slice(-3).join('；')}`
