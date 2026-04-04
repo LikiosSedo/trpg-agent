@@ -1,7 +1,8 @@
 /**
- * 🔍 搜索工具
+ * 搜索工具
  *
  * 搜索当前区域寻找隐藏物品、暗门、线索。
+ * area/body 类型的物品由代码自动从产出表抽取并发放，DM 只负责叙事描写。
  */
 
 import { z } from 'zod'
@@ -10,6 +11,7 @@ import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { locations } from '../data/maps.js'
 import { ChapterManager } from '../chapter-manager.js'
+import { LOOT_TABLES, rollLootTable } from '../loot-tables.js'
 
 export const SearchTool: Tool = {
   name: 'Search',
@@ -18,7 +20,7 @@ export const SearchTool: Tool = {
 - "body": 搜索倒下的敌人/尸体，获取战利品
 - "container": 搜索箱子/抽屉/柜子等容器
 - "clue": Investigation 检定，寻找与任务相关的线索
-DM 根据检定结果决定发现什么。`,
+area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责叙事描写。`,
   inputSchema: z.object({
     type: z.enum(['area', 'body', 'container', 'clue']).describe('搜索类型'),
     target: z.string().optional().describe('搜索目标 (尸体名/容器名)。"area" 和 "clue" 可省略'),
@@ -39,14 +41,73 @@ DM 根据检定结果决定发现什么。`,
     const locId = session.worldState.currentLocation
     const loc = locations[locId]
 
+    // ── body：战后搜刮 NPC ──────────────────────────
     if (type === 'body') {
-      return { output: `搜索${target ?? '尸体'}。DM根据战斗结果决定掉落物品。如果发现物品，必须调用 TransferItem(transferType="loot") 来给予玩家。` }
+      const npcName = target ?? ''
+      const lootedFlag = `looted_${npcName}`
+
+      // 检查是否已搜过
+      if (session.worldState.flags[lootedFlag]) {
+        return { output: `${npcName ? npcName : '尸体'}已经搜过了，身上没有新东西了。` }
+      }
+
+      // 找到对应 NPC
+      const npc = npcName ? session.npcs.find(n => n.name === npcName) : null
+
+      if (!npc) {
+        return { output: `未找到目标"${npcName}"。DM根据战斗结果决定掉落物品，如需转移请调用 TransferItem(transferType="loot")。` }
+      }
+
+      // 确认 NPC 已昏迷
+      if (npc.condition !== 'unconscious') {
+        return { output: `${npcName}并未倒下，无法搜刮。` }
+      }
+
+      // 从 NPC 库存随机取 60-80%（每件物品 Math.random() < 0.7）
+      const takenItems = (npc.inventory ?? []).filter(() => Math.random() < 0.7)
+
+      // 从 NPC 库存中移除被拿走的物品
+      if (npc.inventory) {
+        const takenSet = new Set(takenItems)
+        npc.inventory = npc.inventory.filter(item => !takenSet.has(item))
+      }
+
+      // 将拿走的物品加入玩家背包
+      for (const item of takenItems) {
+        session.player.inventory.push({ ...item })
+      }
+
+      // 金币：根据 NPC 角色决定范围
+      const goldRanges: Record<string, [number, number]> = {
+        herbalist:    [10, 20],
+        blacksmith:   [15, 30],
+        guild_leader: [20, 40],
+        innkeeper:    [8, 18],
+        mayor:        [25, 50],
+        guard:        [5, 15],
+      }
+      const role = npc.role ?? 'general'
+      const [gMin, gMax] = goldRanges[role] ?? [3, 10]
+      const gold = gMin + Math.floor(Math.random() * (gMax - gMin + 1))
+      session.player.gold += gold
+
+      // 标记已搜刮
+      session.worldState.flags[lootedFlag] = true
+
+      // 输出
+      const itemNames = takenItems.map(i => i.name).join('、')
+      const itemStr = takenItems.length > 0 ? `物品：${itemNames}` : '没有发现有价值的物品'
+      return {
+        output: `搜刮${npcName}：${itemStr} + ${gold}金币【系统已完成，禁止重复调用 TransferItem】`,
+      }
     }
 
+    // ── container：容器搜索（DM 主导） ───────────────
     if (type === 'container') {
       return { output: `搜索${target ?? '容器'}。DM决定容器内容物。如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。` }
     }
 
+    // ── area：区域搜索 ───────────────────────────────
     if (type === 'area') {
       const mod = player.abilityModifiers.WIS + (player.skills.includes('perception') ? 2 : 0)
       // DC 根据场景动态调整
@@ -70,18 +131,73 @@ DM 根据检定结果决定发现什么。`,
         facts.addEvent(`发现${hiddenPois[0].nameZh}`)
       }
 
+      const checkLine = `察觉检定(搜索区域)：d20=${result.roll}, 修正+${mod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`
+
+      if (!result.success) {
+        return { output: checkLine }
+      }
+
+      // 成功：查找产出表
+      const tableId = subLoc || locId
+      const table = LOOT_TABLES.find(t => t.locationId === tableId)
+        ?? LOOT_TABLES.find(t => t.locationId === locId)
+
+      const poiLine = hiddenPois.length > 0
+        ? `发现隐藏地点：${hiddenPois[0].nameZh}(${hiddenPois[0].name})——${hiddenPois[0].description}`
+        : ''
+
+      if (!table) {
+        // 无产出表时回退到 DM 主导
+        return {
+          output: [
+            checkLine,
+            poiLine,
+            '仔细搜索后……如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。',
+          ].filter(Boolean).join('\n'),
+        }
+      }
+
+      // 抽取产出
+      const flagKey = tableId
+      const loot = rollLootTable(table, session, flagKey)
+
+      if (loot.alreadySearched) {
+        return {
+          output: [checkLine, poiLine, '这里已经被仔细搜过了，没有新的发现。'].filter(Boolean).join('\n'),
+        }
+      }
+
+      // 写入 flags
+      for (const flag of loot.flagsToSet) {
+        session.worldState.flags[flag] = true
+      }
+
+      // 将物品加入玩家背包
+      for (const item of loot.items) {
+        session.player.inventory.push({ ...item })
+      }
+
+      // 加入金币
+      session.player.gold += loot.gold
+
+      // 组装输出
+      const lootParts: string[] = []
+      if (loot.items.length > 0) {
+        lootParts.push(`物品：${loot.items.map(i => i.name).join('、')}`)
+      }
+      if (loot.gold > 0) {
+        lootParts.push(`${loot.gold}金币`)
+      }
+      const lootStr = lootParts.length > 0
+        ? `【系统已发放】找到：${lootParts.join(' + ')}。DM只需叙事描述玩家如何发现这些物品，禁止重复调用 TransferItem。`
+        : '仔细搜索后未发现有价值的物品。'
+
       return {
-        output: [
-          `察觉检定(搜索区域)：d20=${result.roll}, 修正+${mod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`,
-          result.success && hiddenPois.length > 0
-            ? `发现隐藏地点：${hiddenPois[0].nameZh}(${hiddenPois[0].name})——${hiddenPois[0].description}`
-            : result.success ? '仔细搜索后未发现新事物。' : '',
-          result.success ? '如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。' : '',
-        ].filter(Boolean).join('\n'),
+        output: [checkLine, poiLine, lootStr].filter(Boolean).join('\n'),
       }
     }
 
-    // clue
+    // ── clue：线索搜索 ──────────────────────────────
     const mod = player.abilityModifiers.INT + (player.skills.includes('investigation') ? 2 : 0)
     const dc = 12
     const result = skillCheck(mod, dc)
