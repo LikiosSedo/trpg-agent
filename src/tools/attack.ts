@@ -73,6 +73,14 @@ export const AttackTool: Tool = {
     const isNPCTarget = !!targetNpc && npcDb.some(n => n.name === targetId)
 
     if (isNPCTarget && !session.combat?.active) {
+      // 昏迷/重伤 NPC 不能再攻击
+      if (targetNpc!.condition === 'unconscious') {
+        return { output: `${targetId}已经昏迷倒地了，无法再攻击。`, isError: true }
+      }
+      if (targetNpc!.condition === 'recovering') {
+        return { output: `${targetId}正在恢复中，处于虚弱状态。`, isError: true }
+      }
+
       // 攻击 NPC → 信任暴跌 + 关系网连坐
       const personality = getPersonality(targetId)
       const grudgeTag = targetId === '小莉' ? 'harm_小莉' : undefined
