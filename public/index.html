@@ -1984,8 +1984,13 @@ function handleWsMessage(e) {
         currentDmDiv._fullText = ''
         container.appendChild(currentDmDiv)
       }
-      currentDmDiv.textContent += msg.text
       currentDmDiv._fullText += msg.text
+      // 实时检测：如果累积文本出现脏数据标记，只显示标记前的部分
+      {
+        const full = currentDmDiv._fullText
+        const dirtyIdx = full.indexOf('(Empty response:')
+        currentDmDiv.textContent = dirtyIdx !== -1 ? full.substring(0, dirtyIdx) : full
+      }
       container.scrollTop = container.scrollHeight
       break
 
