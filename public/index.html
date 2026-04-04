@@ -50,6 +50,11 @@
     color: #ff8c42 !important; font-size: 13px;
     background: #2a1a0e; border-left: 3px solid #ff8c42; padding: 8px 12px;
     border-radius: 4px;
+    animation: combatFadeIn 0.4s ease-out;
+  }
+  .msg.combat-divider {
+    color: #ff8c42 !important; font-size: 11px; text-align: center;
+    padding: 4px 0; opacity: 0.6;
   }
   .msg.combat-status {
     color: #888 !important; font-size: 12px;
@@ -423,6 +428,10 @@
   .map-cell.current {
     border: 2px solid #e6b800 !important;
     animation: mapPulse 2s ease-in-out infinite;
+  }
+  @keyframes combatFadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
   }
   @keyframes mapPulse {
     0%, 100% { box-shadow: 0 0 6px rgba(230,184,0,0.2); }
@@ -1617,7 +1626,11 @@ function handleWsMessage(e) {
       break
 
     case 'combat_monster':
-      appendMsg(msg.text, 'combat-monster')
+      // 怪物回合延迟显示（让玩家先看到自己的结果）
+      setTimeout(() => {
+        appendMsg('── 敌方回合 ──', 'combat-divider')
+        setTimeout(() => appendMsg(msg.text, 'combat-monster'), 400)
+      }, 800)
       break
 
     case 'combat_status':
