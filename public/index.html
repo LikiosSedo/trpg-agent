@@ -1756,7 +1756,12 @@ function handleWsMessage(e) {
           updateCombatPanel()
           showCombatPortraits(snap.combat.monsters)
         } else {
-          // 非战斗 → 确保 HUD 从 localStorage 兜底
+          // 非战斗 → 恢复上一轮的选项按钮
+          try {
+            const savedActions = JSON.parse(localStorage.getItem('trpg_last_actions') || 'null')
+            if (savedActions) showSceneActions(savedActions)
+          } catch {}
+          // HUD 兜底
           const s = getSavedSession()
           if (s) updateHUD(s)
         }
@@ -1928,6 +1933,11 @@ function showSceneActions(actions) {
   const container = document.getElementById('messages')
   const existing = container.querySelector('.actions')
   if (existing) existing.remove()
+
+  // 保存最新选项到 localStorage（刷新后恢复用）
+  if (actions) {
+    try { localStorage.setItem('trpg_last_actions', JSON.stringify(actions)) } catch {}
+  }
 
   const details = actions?.details || []
   const suggestions = actions?.suggestions || ['四处看看', '继续前进']
