@@ -127,6 +127,8 @@ export interface NPC {
   mobility?: NPCMobility        // 移动能力
   trackedPromises?: TrackedPromise[]
   permanentGrudge?: boolean
+  condition?: 'normal' | 'wounded' | 'unconscious' | 'recovering'
+  conditionTurn?: number
 }
 
 // ─── 任务 ──────────────────────────────────────

@@ -33,6 +33,58 @@ import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
+import { readFileSync } from 'fs'
+
+// ─── NPC 战斗数据缓存（用于状态恢复系统） ─────────
+
+let _npcCombatDb: Array<{ name: string; recoveryTurns?: number }> | null = null
+function getNpcCombatDb(): Array<{ name: string; recoveryTurns?: number }> {
+  if (!_npcCombatDb) {
+    _npcCombatDb = JSON.parse(readFileSync('data/npc-combatants.json', 'utf-8'))
+  }
+  return _npcCombatDb!
+}
+
+// ─── NPC 状态恢复检查 ──────────────────────────────
+
+function checkNPCConditionRecovery(session: GameSession): void {
+  const npcCombatDb = getNpcCombatDb()
+  for (const npc of session.npcs) {
+    if (!npc.condition || npc.condition === 'normal') continue
+    if (npc.conditionTurn == null) continue
+
+    const combatData = npcCombatDb.find(c => c.name === npc.name)
+    const recoveryTurns = combatData?.recoveryTurns ?? 10
+    const elapsed = session.turnCount - npc.conditionTurn
+
+    if (npc.condition === 'unconscious' && elapsed >= recoveryTurns) {
+      npc.condition = 'recovering'
+      npc.conditionTurn = session.turnCount
+    } else if (npc.condition === 'recovering' && elapsed >= recoveryTurns) {
+      npc.condition = 'wounded'
+      npc.conditionTurn = session.turnCount
+    } else if (npc.condition === 'wounded' && elapsed >= recoveryTurns) {
+      npc.condition = 'normal'
+      npc.conditionTurn = undefined
+    }
+  }
+}
+
+// ─── 战斗结束后 NPC 状态同步 ──────────────────────
+
+function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array<{ name: string; hp: number; maxHp: number }>): void {
+  for (const monster of combatMonsters) {
+    const npc = session.npcs.find(n => n.name === monster.name)
+    if (!npc) continue
+    if (monster.hp <= 0) {
+      npc.condition = 'unconscious'
+      npc.conditionTurn = session.turnCount
+    } else if (monster.hp < monster.maxHp / 2) {
+      npc.condition = 'wounded'
+      npc.conditionTurn = session.turnCount
+    }
+  }
+}
 
 // ─── NPC 立绘映射 ──────────────────────────────
 
@@ -89,6 +141,7 @@ export type TurnEvent =
   | { type: 'combat_portraits'; monsters: Array<{ id: string; name: string; portrait: string; hp: number; maxHp: number }> }
   | { type: 'game_over'; reason: string; canContinue: boolean; continueHint?: string }
   | { type: 'narrative_warning'; text: string }
+  | { type: 'trade_confirm'; gold: number; npcName: string; itemHint?: string }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -544,6 +597,9 @@ export class GameEngine {
 
     session.turnCount++
 
+    // NPC 状态恢复检查
+    checkNPCConditionRecovery(session)
+
     // 检查过期承诺
     const brokenPromises = checkBrokenPromises(session)
     for (const bp of brokenPromises) {
@@ -657,6 +713,13 @@ export class GameEngine {
     const narrativeWarnings = validateNarrative(fullText, toolsCalled, session)
     if (narrativeWarnings.length) console.log(`[validator] 警告: ${narrativeWarnings.map(w => `${w.category}:${w.autoApplied ? '自动修正' : '仅警告'}`).join(', ')}`)
     for (const w of narrativeWarnings) {
+      if (w.category === 'trade') {
+        try {
+          const data = JSON.parse(w.description)
+          yield { type: 'trade_confirm', gold: data.gold, npcName: data.npcName || '', itemHint: '' }
+        } catch { /* skip malformed trade data */ }
+        continue
+      }
       if (w.autoApplied) {
         yield { type: 'npc_update', text: `[信任修正] ${w.description}` }
       } else {
@@ -741,11 +804,14 @@ export class GameEngine {
 
     // 怪物回合
     if (session.combat?.pendingMonsterTurn) {
+      // 保存怪物数据用于战后 NPC 状态同步（endCombat 会清空 combat）
+      const combatMonstersSnapshot = session.combat.monsters.map(m => ({ name: m.name, hp: m.hp, maxHp: m.maxHp }))
       const monsterResult = executeMonsterPhase(session)
       if (monsterResult.log.length > 0) {
         yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
       }
       if (monsterResult.ended) {
+        syncNPCConditionAfterCombat(session, combatMonstersSnapshot)
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
@@ -872,6 +938,10 @@ export class GameEngine {
       return
     }
 
+    // 保留 combat.monsters 引用，战后用于 NPC 状态同步
+    // （endCombat 只是把 session.combat 设为 null，不清空 monsters 数组）
+    const combatMonsters = combat.monsters
+
     // Execute player action
     let skipMonsterPhase = false
     if (action.action === 'flee') {
@@ -886,6 +956,7 @@ export class GameEngine {
       }
       if (result.ended) {
         combat.phase = 'ended'
+        syncNPCConditionAfterCombat(session, combatMonsters)
         yield { type: 'sync', session, dossier: this.dossier.toJSON() }
         return
       }
@@ -904,6 +975,7 @@ export class GameEngine {
 
       // executePlayerTurn already handles victory (endCombat + loot)
       if (turnResult.ended) {
+        syncNPCConditionAfterCombat(session, combatMonsters)
         // Combine round log + loot into a single ended message
         const lines = [...turnResult.roundLog]
         if (turnResult.result === 'victory' && turnResult.loot) {
@@ -929,6 +1001,7 @@ export class GameEngine {
       } else if (endCheck.result === 'defeat') {
         yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
       }
+      syncNPCConditionAfterCombat(session, combatMonsters)
       endCombat(session)
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
       yield { type: 'sync', session, dossier: this.dossier.toJSON() }
@@ -947,6 +1020,7 @@ export class GameEngine {
       // Check end after monster phase
       if (monsterResult.ended) {
         combat.phase = 'ended'
+        syncNPCConditionAfterCombat(session, combatMonsters)
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',

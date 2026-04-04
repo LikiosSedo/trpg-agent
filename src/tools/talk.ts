@@ -44,6 +44,11 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
     const npc = session.npcs.find(n => n.name === npcId)
     if (!npc) return { output: `NPC"${npcId}"不存在。`, isError: true }
 
+    // 昏迷检查：昏迷 NPC 无法对话
+    if (npc.condition === 'unconscious') {
+      return { output: `${npc.name}正处于昏迷状态，无法对话。`, isError: true }
+    }
+
     // 位置检查：玩家必须和 NPC 在同一地点
     if (npc.location !== session.worldState.currentLocation) {
       const locationNames: Record<string, string> = {

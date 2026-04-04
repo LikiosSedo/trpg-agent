@@ -2,7 +2,7 @@ import type { GameSession } from './types.js'
 import { changeTrust } from './trust-system.js'
 
 export interface NarrativeWarning {
-  category: 'trust' | 'damage' | 'item' | 'gold' | 'movement'
+  category: 'trust' | 'damage' | 'item' | 'gold' | 'movement' | 'trade'
   description: string
   autoApplied?: boolean
 }
@@ -146,6 +146,27 @@ export function validateNarrative(
             break
           }
         }
+      }
+    }
+  }
+
+  // 6. Trade detection — DM narrated a transaction happening
+  if (!toolNames.has('TransferItem')) {
+    const tradePatterns = [
+      /(\d+)\s*金币\s*(?:卖给|给)你/,
+      /(\d+)\s*金(?:币)?\s*(?:成交|就这么定)/,
+      /以\s*(\d+)\s*金(?:币)?.*(?:买|购|卖)/,
+    ]
+    for (const p of tradePatterns) {
+      const match = fullText.match(p)
+      if (match) {
+        const gold = parseInt(match[1], 10)
+        const npcName = findNearestNPC(fullText, match.index ?? 0, session)
+        warnings.push({
+          category: 'trade',
+          description: JSON.stringify({ gold, npcName }),
+        })
+        break
       }
     }
   }

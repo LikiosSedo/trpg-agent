@@ -59,6 +59,12 @@ export class GameFactStore {
       `=== 游戏状态（第${turnCount}轮） ===`,
       `位置: ${loc}${subLocName ? ' · ' + subLocName : ''} | 时间: ${time}`,
       `玩家: ${player.name}（等级${player.level}）生命:${player.hp}/${player.maxHp} 金币:${player.gold}`,
+      (() => {
+        const hpPct = player.hp / player.maxHp
+        if (hpPct < 0.25) return '[玩家重伤，急需休息或治疗]'
+        if (hpPct < 0.5) return '[玩家负伤]'
+        return ''
+      })(),
       player.equipped.weapon ? `武器: ${player.equipped.weapon.name}` : '',
       player.equipped.armor ? `护甲: ${player.equipped.armor.name}` : '',
       '',
@@ -66,7 +72,11 @@ export class GameFactStore {
       player.clues.length ? `已知线索: ${player.clues.join('；')}` : '',
       criticalEvents.length ? `关键事件:\n${criticalEvents.join('\n')}` : '',
       recentEvents.length ? `最近发生:\n${recentEvents.join('\n')}` : '',
-      npcs.length ? `NPC状态:\n${npcs.map(n => `- ${n.name}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）`).join('\n')}` : '',
+      npcs.length ? `NPC状态:\n${npcs.map(n => {
+        const conditionNames: Record<string, string> = { wounded: '负伤', unconscious: '昏迷', recovering: '恢复中' }
+        const condStr = n.condition && n.condition !== 'normal' ? `[${conditionNames[n.condition]}]` : ''
+        return `- ${n.name}${condStr}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）`
+      }).join('\n')}` : '',
       (() => {
         const shopNpcs = this.session.npcs.filter(n => n.shopPricing && (n.inventory ?? []).length > 0)
         if (!shopNpcs.length) return ''

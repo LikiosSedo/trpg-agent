@@ -8,7 +8,8 @@
     "description": "退役佣兵，碎盾亭酒馆老板。六尺二，右眉旧疤。二十年前的战斗本能仍在。",
     "loot": [],
     "nonlethal": true,
-    "combatBehavior": "subdue"
+    "combatBehavior": "subdue",
+    "recoveryTurns": 5
   },
   {
     "name": "艾琳娜",
@@ -19,7 +20,8 @@
     "description": "340岁高等精灵，冒险者公会会长。占卜魔法使她几乎无法被偷袭。",
     "loot": [],
     "nonlethal": false,
-    "combatBehavior": "call_reinforcements"
+    "combatBehavior": "call_reinforcements",
+    "recoveryTurns": 4
   },
   {
     "name": "韩猛",
@@ -30,7 +32,8 @@
     "description": "独臂战士，公会管理员。左手之力足以掰断桌腿。",
     "loot": [],
     "nonlethal": true,
-    "combatBehavior": "subdue"
+    "combatBehavior": "subdue",
+    "recoveryTurns": 6
   },
   {
     "name": "格罗姆",
@@ -41,7 +44,8 @@
     "description": "矮人铁匠，脾气火爆。铁锤在手，力大无穷。",
     "loot": [],
     "nonlethal": false,
-    "combatBehavior": "kill"
+    "combatBehavior": "kill",
+    "recoveryTurns": 7
   },
   {
     "name": "卡恩",
@@ -52,7 +56,8 @@
     "description": "游吟诗人外表下的暗影教团执行者。黑木琴是虚空法器。",
     "loot": ["Shadow Crystal"],
     "nonlethal": false,
-    "combatBehavior": "hidden_power"
+    "combatBehavior": "hidden_power",
+    "recoveryTurns": 5
   },
   {
     "name": "维克多",
@@ -63,7 +68,8 @@
     "description": "镇长，被暗影教团胁迫。憔悴无力，毫无战斗能力。",
     "loot": [],
     "nonlethal": false,
-    "combatBehavior": "flee"
+    "combatBehavior": "flee",
+    "recoveryTurns": 15
   },
   {
     "name": "陈妈",
@@ -74,7 +80,8 @@
     "description": "旅店老板娘，消息灵通。虽无战斗力但嗓门大到能震醒半个镇。",
     "loot": [],
     "nonlethal": false,
-    "combatBehavior": "call_reinforcements"
+    "combatBehavior": "call_reinforcements",
+    "recoveryTurns": 15
   },
   {
     "name": "叶绿",
@@ -85,7 +92,8 @@
     "description": "半精灵药剂师，知晓自然魔法。温柔但并非毫无自保之力。",
     "loot": ["Healing Potion"],
     "nonlethal": false,
-    "combatBehavior": "flee"
+    "combatBehavior": "flee",
+    "recoveryTurns": 10
   },
   {
     "name": "小莉",
@@ -96,6 +104,7 @@
     "description": "12岁灵视者。不会战斗，攻击她将触发格雷格永久仇恨。",
     "loot": [],
     "nonlethal": true,
-    "combatBehavior": "passive"
+    "combatBehavior": "passive",
+    "recoveryTurns": 20
   }
 ]
