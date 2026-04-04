@@ -296,8 +296,17 @@ wss.on('connection', (ws: WebSocket, req) => {
       const results: string[] = []
       let allSuccess = true
 
-      // 先检查总金额
-      const totalPrice = msg.totalPrice ?? items.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
+      // 价格合理性校验：单价不能低于 shopPricing 的 50%（防止 DM 传离谱低价）
+      const shopNpc = engine.session.npcs.find((n: any) => n.name === npc)
+      for (const item of items) {
+        const basePrice = shopNpc?.shopPricing?.[item.name]
+        if (basePrice && item.price < basePrice * 0.5) {
+          item.price = Math.ceil(basePrice * 0.5)  // 强制底价 50%
+        }
+      }
+
+      // 检查总金额
+      const totalPrice = items.reduce((s: number, i: any) => s + (i.price * (i.quantity || 1)), 0)
       if (engine.session.player.gold < totalPrice) {
         send('system', { text: `交易失败：金币不足（需要${totalPrice}，拥有${engine.session.player.gold}）` })
         return
