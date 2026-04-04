@@ -102,14 +102,16 @@ export const MoveTool: Tool = {
         .filter((p: any) => p.discovered && p.id !== session.worldState.currentSubLocation)
         .map((p: any) => p.nameZh)
 
-      // 区域遭遇检测：危险区域有概率触发战斗
+      // 区域遭遇检测（有冷却机制防止连续战斗）
       let encounterWarning = ''
-      if (destArea.monsterPool.length > 0 && destArea.dangerLevel !== 'safe') {
-        // 30% 概率遭遇怪物（首次进入区域更高）
-        const roll = Math.random()
+      const encounterCooldownKey = `encounter_cooldown_${destKey}`
+      const lastEncounterTurn = Number(session.worldState.flags[encounterCooldownKey] ?? 0)
+      const cooldownTurns = 3  // 战斗后 3 轮内不再触发遭遇
+      const onCooldown = session.turnCount - lastEncounterTurn < cooldownTurns
+
+      if (destArea.monsterPool.length > 0 && destArea.dangerLevel !== 'safe' && !onCooldown) {
         const threshold = 0.3
-        if (roll < threshold) {
-          // 从区域怪物池随机选 1-2 个
+        if (Math.random() < threshold) {
           const pool = destArea.monsterPool
           const count = Math.random() < 0.4 ? 2 : 1
           const picked: string[] = []
@@ -117,8 +119,8 @@ export const MoveTool: Tool = {
             picked.push(pool[Math.floor(Math.random() * pool.length)])
           }
           encounterWarning = `[遭遇] 你在前进途中遭遇了${picked.join('和')}！系统将自动触发战斗。`
-          // 标记遭遇到 session flags，engine 会读取并触发战斗
           session.worldState.flags['pending_encounter'] = picked.join(',')
+          session.worldState.flags[encounterCooldownKey] = session.turnCount
         }
       }
 
@@ -181,19 +183,25 @@ export const MoveTool: Tool = {
       const avoidMsg = avoidingNpcs.length
         ? `${avoidingNpcs.join('、')}看到你后匆匆离开了。` : ''
 
-      // 危险区域内移动也有遭遇概率（20%）
+      // 危险区域内移动遭遇（20%，共享冷却）
       let encounterWarning = ''
-      const currentArea = locations[current]
-      if (currentArea && currentArea.monsterPool.length > 0 && currentArea.dangerLevel !== 'safe') {
-        if (Math.random() < 0.2) {
-          const pool = currentArea.monsterPool
-          const count = Math.random() < 0.3 ? 2 : 1
-          const picked: string[] = []
-          for (let i = 0; i < count; i++) {
-            picked.push(pool[Math.floor(Math.random() * pool.length)])
+      {
+        const cooldownKey = `encounter_cooldown_${current}`
+        const lastTurn = Number(session.worldState.flags[cooldownKey] ?? 0)
+        const onCooldown = session.turnCount - lastTurn < 3
+        const area = locations[current]
+        if (area && area.monsterPool.length > 0 && area.dangerLevel !== 'safe' && !onCooldown) {
+          if (Math.random() < 0.2) {
+            const pool = area.monsterPool
+            const count = Math.random() < 0.3 ? 2 : 1
+            const picked: string[] = []
+            for (let i = 0; i < count; i++) {
+              picked.push(pool[Math.floor(Math.random() * pool.length)])
+            }
+            encounterWarning = `[遭遇] 你在途中遭遇了${picked.join('和')}！`
+            session.worldState.flags['pending_encounter'] = picked.join(',')
+            session.worldState.flags[cooldownKey] = session.turnCount
           }
-          encounterWarning = `[遭遇] 你在途中遭遇了${picked.join('和')}！`
-          session.worldState.flags['pending_encounter'] = picked.join(',')
         }
       }
 
