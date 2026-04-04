@@ -23,6 +23,8 @@ import { validateNarrative, type ToolCallRecord } from './narrative-validator.js
 import { consumeSpeakingNPCs } from './tools/talk.js'
 import { classifyIntent, formatActionResult, shouldPreExecute, type ActionResult } from './rules-agent.js'
 import { executeAction } from './action-executor.js'
+import { getActiveEffectsSummary } from './effect-manager.js'
+import { isBuffSpell } from './combat-manager.js'
 import {
   executeMonsterPhase, getCombatSummary, executePlayerTurn,
   attemptFlee, checkCombatEnd, awardLoot, endCombat,
@@ -198,7 +200,7 @@ export type TurnEvent =
   | { type: 'combat_monster'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
   | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[]; narrative?: string }
-  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[]; playerHp: number; playerMaxHp: number }
+  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[]; playerHp: number; playerMaxHp: number; activeEffects?: any[] }
   | { type: 'quest_completed'; questName: string; text: string }
   | { type: 'quest_progress'; questName: string; text: string; current?: number; required?: number }
   | { type: 'npc_unlock'; npcName: string; portrait: string; firstFacts: string[] }
@@ -548,6 +550,10 @@ export class GameEngine {
           })),
           skills: [...p.skills],
           inventory: p.inventory.map(i => ({ name: i.name, type: i.type, desc: i.description })),
+          activeEffects: (p.activeEffects ?? []).map(e => ({
+            name: e.name, type: e.type, value: e.value,
+            remaining: e.remainingTurns, source: e.source,
+          })),
           playerSummary: facts.getPlayerSummary(),
         },
       }
@@ -1065,9 +1071,16 @@ export class GameEngine {
             n.condition !== 'unconscious'
           )
           if (witnesses.length > 0) delay -= 3
-          // Civilian witness reports faster
           const { getPersonality } = await import('./npc-relationships.js')
+          // Civilian witness reports faster
           if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
+          // 受害者有亲近 NPC（bond>=1.0 的战斗型 NPC）→ 更快赶来
+          const hasBondedFighter = session.npcs.some(n => {
+            if (n.name === action.target || n.condition === 'unconscious') return false
+            const p = getPersonality(n.name)
+            return p.canFight && p.bonds.some(b => b.npcName === action.target && b.weight >= 1.0)
+          })
+          if (hasBondedFighter) delay -= 2
 
           delay = Math.max(1, delay)
 
@@ -1552,12 +1565,15 @@ export class GameEngine {
       targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
       spells: this.session.player.spells
         .filter(s => s.remaining > 0 || s.usesPerRest === 0)
-        .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0 })),
+        .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0, isBuff: isBuffSpell(s.name) })),
       items: this.session.player.inventory
         .filter(i => i.type === 'potion')
         .map(i => ({ name: i.name, desc: i.description })),
       playerHp: this.session.player.hp,
       playerMaxHp: this.session.player.maxHp,
+      activeEffects: (this.session.player.activeEffects ?? []).map(e => ({
+        name: e.name, type: e.type, remaining: e.remainingTurns, source: e.source,
+      })),
     }
   }
 
@@ -1798,11 +1814,14 @@ export class GameEngine {
         targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
         spells: session.player.spells
           .filter(s => s.remaining > 0 || s.usesPerRest === 0)
-          .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0 })),
+          .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0, isBuff: isBuffSpell(s.name) })),
         items: session.player.inventory
           .filter(i => i.type === 'potion')
           .map(i => ({ name: i.name, desc: i.description })),
         playerHp: session.player.hp, playerMaxHp: session.player.maxHp,
+        activeEffects: (session.player.activeEffects ?? []).map(e => ({
+          name: e.name, type: e.type, remaining: e.remainingTurns, source: e.source,
+        })),
       }
       yield {
         type: 'combat_portraits',
