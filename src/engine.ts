@@ -618,12 +618,9 @@ export class GameEngine {
           else if (elapsed === alert.delay - 1) {
             yield { type: 'narrative_warning', text: '⚠️ 远处传来急促的脚步声和喊叫声，有人正在赶来！' }
           }
-          // Response time
-          else if (elapsed >= alert.delay) {
+          // 阶段 1：响应者到达（注入 DM 叙事上下文，不直接战斗）
+          else if (elapsed === alert.delay && !alert.arrivedResponder) {
             const { getPersonality: getP } = await import('./npc-relationships.js')
-
-            // Find a combat-capable NPC who is hostile to the player
-            // Priority: 韩猛 (law enforcement) first, then others
             const candidates = session.npcs.filter(n =>
               n.name !== alert.victimName &&
               n.condition !== 'unconscious' &&
@@ -637,32 +634,39 @@ export class GameEngine {
             })[0] ?? null
 
             if (responder) {
-              alert.responded = true
-              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-
-              // Move responder to the scene
+              // 移动响应者到现场
               const { moveNPC } = await import('./npc-mobility.js')
               moveNPC(responder, alert.subLocation, session)
+              alert.arrivedResponder = responder.name
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] ${responder.name} 到达现场，下一轮将发起战斗`)
+              // 这一轮只叙事到达，不触发战斗
+            } else {
+              alert.responded = true
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              yield { type: 'narrative_warning', text: '镇民发现了你的暴行，消息正在传开...' }
+            }
+          }
+          // 阶段 2：下一轮自动触发战斗（DM 已经叙事了到达过程）
+          else if (elapsed > alert.delay && alert.arrivedResponder && !alert.responded) {
+            alert.responded = true
+            session.worldState.flags['violence_alert'] = JSON.stringify(alert)
 
-              // Trigger combat with responder
+            const responderNpc = session.npcs.find(n => n.name === alert.arrivedResponder)
+            if (responderNpc && responderNpc.condition !== 'unconscious') {
               const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
               const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
               const allDb = [...monstersJson, ...npcCombatJson]
               const { startCombat } = await import('./combat-manager.js')
 
               try {
-                startCombat(session, [responder.name], allDb as any)
-                console.log(`[consequence] ${responder.name} 赶到现场，发起战斗！`)
-                yield { type: 'narrative_warning', text: `⚔️ ${responder.name}赶到了现场！` }
+                startCombat(session, [alert.arrivedResponder], allDb as any)
+                console.log(`[consequence] ${alert.arrivedResponder} 发起战斗！`)
+                yield { type: 'narrative_warning', text: `⚔️ ${alert.arrivedResponder}向你发起了攻击！` }
                 yield* this.emitCombatStart()
               } catch (err) {
                 console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
               }
-            } else {
-              // No fighter available, but reputation damage
-              alert.responded = true
-              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              yield { type: 'narrative_warning', text: '镇民发现了你的暴行，你的名声在破晓镇已经臭名昭著。' }
             }
           }
         }
@@ -702,6 +706,10 @@ export class GameEngine {
           const remaining = alert.delay - (session.turnCount - alert.triggerTurn)
           if (remaining > 0 && remaining <= 3) {
             parts.push(`[世界事件：${alert.victimName}的遭遇即将被发现，约${remaining}轮后有人赶到]`)
+          }
+          // 响应者已到达但还没战斗 → 让 DM 叙事到达过程
+          if (alert.arrivedResponder && !alert.responded) {
+            parts.push(`[世界事件：${alert.arrivedResponder}已经赶到了${alert.victimName}所在的地方！请描写${alert.arrivedResponder}到达的场景——他的愤怒、他的气势、他对玩家的质问或警告。下一轮将自动触发战斗。]`)
           }
         }
       } catch { /* ignore malformed */ }
