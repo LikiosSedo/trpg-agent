@@ -17,7 +17,7 @@
   }
   #header {
     background: #16213e; padding: 12px 16px; border-bottom: 1px solid #0f3460;
-    text-align: center;
+    text-align: center; flex-shrink: 0; position: sticky; top: 0; z-index: 50;
   }
   #header h1 { color: #e6b800; font-size: 18px; margin-bottom: 4px; }
   #header .sub { color: #888; font-size: 12px; }
@@ -46,6 +46,12 @@
     border-radius: 16px; font-size: 13px; cursor: pointer;
   }
   .action-btn:hover { color: #e6b800; border-color: #e6b800; }
+  .msg.combat-player-result {
+    color: #4ecdc4 !important; font-size: 13px;
+    background: #0e2a2a; border-left: 3px solid #4ecdc4; padding: 8px 12px;
+    border-radius: 4px;
+    animation: combatFadeIn 0.4s ease-out;
+  }
   .msg.combat-monster {
     color: #ff8c42 !important; font-size: 13px;
     background: #2a1a0e; border-left: 3px solid #ff8c42; padding: 8px 12px;
@@ -1648,7 +1654,11 @@ function handleWsMessage(e) {
       break
 
     case 'combat_status':
-      appendMsg(msg.text, 'combat-status')
+      // 玩家回合也延迟显示 + 分隔线
+      appendMsg('── 你的回合 ──', 'combat-divider')
+      setTimeout(() => {
+        appendMsg(msg.text, 'combat-player-result')
+      }, 300)
       if (msg.ended) {
         combatMode = false
         combatTargets = []
