@@ -1225,6 +1225,8 @@ export class GameEngine {
       for await (const event of dmRespond(prompt)) {
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
+          // 过滤 SDK bug：thinking-only 响应
+          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
           yield { type: 'dm_text_delta', text }
           fullText += text
         }
