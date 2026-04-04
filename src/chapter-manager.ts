@@ -113,6 +113,13 @@ export class ChapterManager {
       ch.worldContext,
     ]
 
+    // 注入本章 DM 秘密（逐章解锁的世界真相）
+    if (ch.dmSecrets) {
+      parts.push('')
+      parts.push('[章节剧本·世界秘密]（仅DM可知，不可直接告知玩家，只能通过NPC互动和玩家发现逐步揭示）')
+      parts.push(ch.dmSecrets)
+    }
+
     // 交付 auto beat 暂存的 facts（触发后首轮必须传达）
     if (this.state.pendingFacts && this.state.pendingFacts.length > 0) {
       parts.push('')
