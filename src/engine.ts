@@ -1260,6 +1260,36 @@ export class GameEngine {
       actions,
     }
 
+    // 剧情保底遭遇：章节需要战斗但玩家运气差一直没遇到，强制触发
+    if (!session.combat?.active && !session.worldState.flags['pending_encounter'] && session.chapter) {
+      const ch = session.chapter
+      const loc = session.worldState.currentLocation
+      const locData = locations[loc]
+      // 定义需要战斗保底的场景：{ beatId, 所需区域, 前置beat, 保底轮数 }
+      const guaranteedEncounters: Array<{ beatId: string; location: string; requires: string; turnsInArea: number }> = [
+        { beatId: 'ch2_forest_combat', location: 'twilight-woods', requires: 'ch2_enter_forest', turnsInArea: 5 },
+      ]
+      for (const ge of guaranteedEncounters) {
+        if (ch.completedBeats.includes(ge.beatId)) continue  // 已完成
+        if (!ch.completedBeats.includes(ge.requires)) continue  // 前置未完成
+        if (loc !== ge.location) continue
+        // 检查在该区域待了多少轮
+        const entryKey = `area_entry_turn_${ge.location}`
+        if (!session.worldState.flags[entryKey]) session.worldState.flags[entryKey] = session.turnCount
+        const turnsInArea = session.turnCount - Number(session.worldState.flags[entryKey])
+        if (turnsInArea >= ge.turnsInArea && locData) {
+          const pool = locData.monsterPool as string[]
+          if (pool.length > 0) {
+            const count = Math.random() < 0.5 ? 2 : 1
+            const picked: string[] = []
+            for (let i = 0; i < count; i++) picked.push(pool[Math.floor(Math.random() * pool.length)])
+            session.worldState.flags['pending_encounter'] = picked.join(',')
+            console.log(`[combat] 剧情保底遭遇触发（${ge.beatId}）：${picked.join(',')}，在${ge.location}待了${turnsInArea}轮`)
+          }
+        }
+      }
+    }
+
     // 原地待机遭遇：危险区域内不移动，每 3 轮检查一次（15% 概率）
     if (!session.combat?.active && !session.worldState.flags['pending_encounter']) {
       const loc = locations[session.worldState.currentLocation]
@@ -1358,16 +1388,17 @@ export class GameEngine {
     }
 
     // NPC 档案更新（只有同一位置的 NPC 被提到才解锁，避免车夫提到格雷格就解锁）
+    const chapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
     const spokeTo = new Set(speakers) // Talk 工具调用的 NPC 一定解锁
     for (const npc of session.npcs) {
       if (input.includes(npc.name) || fullText.includes(npc.name)) {
         // 必须同区域才解锁（Talk 工具调过的除外——那是真正见面了）
         const sameArea = npc.location === session.worldState.currentLocation
         if (sameArea || spokeTo.has(npc.name)) {
-          const unlock = this.dossier.unlock(npc.name, session.turnCount)
+          const unlock = this.dossier.unlock(npc.name, session.turnCount, chapterNum)
           if (unlock) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
         }
-        const update = this.dossier.onInteraction(npc.name, npc.trust, session.turnCount)
+        const update = this.dossier.onInteraction(npc.name, npc.trust, session.turnCount, chapterNum)
         if (update) yield { type: 'npc_update', text: update }
       }
     }
@@ -1912,9 +1943,10 @@ export class GameEngine {
     yield { type: 'dm_end', combat: false, pendingMonster: false, actions }
 
     // 开场 NPC 解锁（只有同区域的 NPC 才解锁——车夫提到格雷格不算见面）
+    const openChapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
     for (const npc of session.npcs) {
       if (fullText.includes(npc.name) && npc.location === session.worldState.currentLocation) {
-        const notice = this.dossier.unlock(npc.name, 0)
+        const notice = this.dossier.unlock(npc.name, 0, openChapterNum)
         if (notice) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
       }
     }

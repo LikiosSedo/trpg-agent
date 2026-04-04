@@ -66,6 +66,8 @@ export const MoveTool: Tool = {
       }
 
       session.worldState.currentLocation = destKey
+      // 记录进入区域时间（用于剧情保底遭遇计时）
+      session.worldState.flags[`area_entry_turn_${destKey}`] = session.turnCount
       // Set sub-location to area's default entrance
       const defaultPoi = destArea.pointsOfInterest.find((p: any) => p.isDefault)
       session.worldState.currentSubLocation = defaultPoi?.id ?? destArea.pointsOfInterest[0]?.id
