@@ -117,7 +117,7 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '艾琳娜',
       trust: 0,
-      knownFacts: ['矿道失踪事件的详细情报', '卡恩的文件太完美——有遮蔽', '小莉身上有微弱的天赋波动', '200年前读到过虚空棱镜的残篇'],
+      knownFacts: ['冒险者公会近期任务激增，人手不够', '矿道失踪事件的详细情报', '卡恩的文件太完美——有遮蔽', '小莉身上有微弱的天赋波动', '200年前读到过虚空棱镜的残篇'],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -134,7 +134,7 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '维克多',
       trust: 0,
-      knownFacts: ['女儿索菲亚被暗影教团绑架', '壁炉暗格里藏着石碑的被删记录', '卡恩是教团的传话人'],
+      knownFacts: ['最近精神状态很差，签文件手都在抖', '曾经是个好镇长，承诺改善矿工条件', '半年前开始回避与人交流', '卡恩是教团的传话人', '女儿索菲亚被暗影教团绑架', '壁炉暗格里藏着石碑的被删记录'],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
@@ -150,7 +150,7 @@ export function createInitialNPCs(): NPC[] {
     {
       name: '卡恩',
       trust: 0,
-      knownFacts: ['暗影教团的全部计划', '维克多被控制的细节', '怀疑酒馆帮工女孩是灵视者', '独立破译了棱镜激活咒语'],
+      knownFacts: ['自称来自东方的游吟诗人，琴艺精湛', '对破晓镇的历史了如指掌，比本地人还熟', '怀疑酒馆帮工女孩是灵视者', '维克多被控制的细节', '暗影教团的全部计划', '独立破译了棱镜激活咒语'],
       playerPromises: [],
       interactionLog: [],
       location: 'dawnbreak-town',
