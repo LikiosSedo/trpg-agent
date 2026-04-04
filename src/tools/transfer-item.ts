@@ -62,6 +62,17 @@ export const TransferItemTool: Tool = {
       return { output: `物品"${itemName}"不在注册表中。新物品需要提供 itemType 和 itemDescription。`, isError: true }
     }
 
+    // 金币不能作为物品——应该直接加到 player.gold
+    if (/金币|银币|铜币|金子|银子/.test(itemName)) {
+      const goldMatch = itemDescription?.match(/(\d+)/) || itemName.match(/(\d+)/)
+      const amount = goldMatch ? parseInt(goldMatch[1], 10) : 0
+      if (amount > 0 && amount <= 200) {
+        session.player.gold += amount
+        return { output: `获得${amount}金币（现有${session.player.gold}金币）。金币直接加入钱包，不占背包。` }
+      }
+      return { output: `金币应通过交易系统处理，不能作为物品。请使用 goldAmount 参数。`, isError: true }
+    }
+
     // 深夜商店关门检查
     if ((transferType === 'buy' || transferType === 'sell') && session.worldState.timeOfDay === 'night') {
       const shopNpc = sourceId ? session.npcs.find(n => n.name === sourceId) : null

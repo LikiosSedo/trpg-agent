@@ -623,6 +623,13 @@ export class GameEngine {
           fullText += text
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
+          // 物品/金币变化时在聊天栏显示系统通知
+          if (event.name === 'TransferItem' && event.output && !event.isError) {
+            const out = String(event.output)
+            if (out.includes('获得物品') || out.includes('支付') || out.includes('获得') || out.includes('交给')) {
+              yield { type: 'narrative_warning', text: `📦 ${out}` }
+            }
+          }
         }
       }
       clearTimeout(timer)
