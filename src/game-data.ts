@@ -25,7 +25,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     skills: ['athletics', 'intimidation'],
     maxHp: 38,
     spells: [
-      { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 1, remaining: 1 },
+      { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 3, remaining: 3 },
     ],
   },
   mage: {
@@ -48,7 +48,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     maxHp: 34,
     spells: [
       { name: "Hunter's Mark", description: '猎人印记', effect: '标记目标，对其攻击额外1d6伤害。持续1小时。', usesPerRest: 3, remaining: 3 },
-      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 2, remaining: 2 },
+      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 3, remaining: 3 },
     ],
   },
   cleric: {

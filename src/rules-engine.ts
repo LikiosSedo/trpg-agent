@@ -92,6 +92,14 @@ export function shortRest(player: PlayerCharacter): void {
   // Restore HP: roll 1d8 + CON mod
   const heal = rollDice('1d8').total + player.abilityModifiers.CON
   player.hp = Math.min(player.maxHp, player.hp + Math.max(1, heal))
+
+  // Restore 50% of spell uses (rounded up) — keeps spells viable across multiple encounters
+  for (const spell of player.spells) {
+    if (spell.usesPerRest > 0) {
+      const restore = Math.ceil(spell.usesPerRest / 2)
+      spell.remaining = Math.min(spell.usesPerRest, spell.remaining + restore)
+    }
+  }
 }
 
 export function longRest(player: PlayerCharacter): void {
