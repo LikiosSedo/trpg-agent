@@ -617,6 +617,8 @@ export class GameEngine {
         }
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
+          // 过滤 SDK bug：thinking-only 响应的原始 JSON 被当文本输出
+          if (text.includes("'content': [") || text.startsWith('(Empty response:')) continue
           yield { type: 'dm_text_delta', text }
           fullText += text
         } else if (event.type === 'tool_result' && event.name) {
