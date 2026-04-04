@@ -1683,7 +1683,10 @@ function renderNPCCard(npc, npcLocs, isHere) {
     ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='👤'">`
     : esc(npc.avatar || '👤')}</div>`
   html += `<div class="npc-info" onclick="viewNPCDetail('${esc(shortName)}')">`
-  html += `<div class="npc-name">${esc(npc.name)} <span style="font-size:11px;color:#555">▶</span></div>`
+  const conditionLabels = { wounded: '负伤', unconscious: '昏迷', recovering: '恢复中' }
+  const conditionColors = { wounded: '#e89b3e', unconscious: '#c05050', recovering: '#8888aa' }
+  const cond = npc.condition && npc.condition !== 'normal' ? npc.condition : null
+  html += `<div class="npc-name">${esc(npc.name)} ${cond ? `<span style="font-size:11px;color:${conditionColors[cond]};margin-left:4px;font-weight:600">[${conditionLabels[cond]}]</span>` : ''} <span style="font-size:11px;color:#555">▶</span></div>`
   if (npc.title) html += `<div class="npc-role">${esc(npc.title)}</div>`
   if (!isHere && loc) {
     html += `<div style="font-size:11px;color:#888;margin-top:2px">📍 ${esc(loc.subLocationZh || loc.locationZh)}</div>`
@@ -1691,11 +1694,16 @@ function renderNPCCard(npc, npcLocs, isHere) {
   html += `<div class="bar-label"><span>信任度</span><span>${trust > 0 ? '+' : ''}${trust}</span></div>`
   html += `<div class="bar-track"><div class="bar-fill" style="width:${trustPct}%;background:${trustColor}"></div></div>`
   html += `</div>`
-  // 右侧：交谈按钮（仅在场 NPC）
+  // 右侧：交谈按钮（仅在场且非昏迷/恢复中的 NPC）
   if (isHere) {
+    const canTalk = !cond || cond === 'wounded'  // 负伤可以对话，昏迷/恢复中不行
     html += `<div style="flex-shrink:0;margin-left:8px">`
-    html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
-    html += `style="background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
+    if (canTalk) {
+      html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
+      html += `style="background:#533483;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">💬 交谈</button>`
+    } else {
+      html += `<button disabled style="background:#333;color:#666;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:not-allowed;white-space:nowrap">💬 交谈</button>`
+    }
     html += `</div>`
   }
   html += `</div>`

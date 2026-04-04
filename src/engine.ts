@@ -677,7 +677,10 @@ export class GameEngine {
       return {
         type: 'npc_list',
         data: {
-          npcs: this.dossier.toListData(trustMap),
+          npcs: this.dossier.toListData(trustMap).map(n => ({
+            ...n,
+            condition: session.npcs.find(npc => npc.name === n.name)?.condition ?? 'normal',
+          })),
           npcLocations,
           playerLocation: session.worldState.currentLocation,
           playerSubLocation: session.worldState.currentSubLocation,
