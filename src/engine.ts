@@ -591,13 +591,30 @@ export class GameEngine {
 
     parts.push(input)
 
-    // DM 流式响应
+    // Rules Agent 调完后等一下再调 DM，避免 API 限流
+    if (action.type !== 'NARRATIVE') {
+      console.log(`[dm] Rules Agent 用了 API，等 1.5s 再调 DM...`)
+      await new Promise(r => setTimeout(r, 1500))
+    }
+
+    // DM 流式响应（带超时保护）
+    console.log(`[dm] 调用 DM API...`)
+    const dmStart = Date.now()
     let fullText = ''
     const toolsCalled: ToolCallRecord[] = actionResult
       ? actionResult.toolsCalled.map(t => ({ toolName: t }))
       : []
     try {
+      const timeoutMs = 60000 // 60 秒超时
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
+
       for await (const event of dmRespond(parts.join('\n\n'))) {
+        if (timedOut) {
+          console.error(`[dm] DM 响应超时 (${timeoutMs}ms)`)
+          yield { type: 'dm_error', message: 'DM 响应超时，请重试。' }
+          break
+        }
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
           yield { type: 'dm_text_delta', text }
@@ -606,7 +623,10 @@ export class GameEngine {
           toolsCalled.push({ toolName: event.name })
         }
       }
+      clearTimeout(timer)
+      console.log(`[dm] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
+      console.error(`[dm] DM 错误:`, (err as Error).message)
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }
 
