@@ -1454,6 +1454,8 @@ export class GameEngine {
     const combatMonsters = combat.monsters
     const enemyNames = combatMonsters.map(m => m.id).join('、')
 
+    let skipMonsterPhase = false
+
     // 先攻顺序：敌方先攻 > 玩家 → 每轮怪物先出手
     const playerInit = combat.initiativeOrder.find(e => e.isPlayer)?.initiative ?? 0
     const firstEnemyInit = combat.initiativeOrder.find(e => !e.isPlayer)?.initiative ?? 0
@@ -1490,13 +1492,11 @@ export class GameEngine {
           }
           return
         }
-        // 怪物打完，轮到玩家——不 return，继续往下走到 player action
-        combat.phase = 'player_turn'
-      }
+      // 怪物打完，轮到玩家——不 return，继续往下走到 player action
+      combat.phase = 'player_turn'
     }
 
     // Execute player action
-    let skipMonsterPhase = false
     if (action.action === 'flee') {
       const result = attemptFlee(session)
       yield {
