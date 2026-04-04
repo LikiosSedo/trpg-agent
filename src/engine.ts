@@ -221,11 +221,28 @@ export type TurnEvent =
 function buildFallbackActions(session: GameSession): SceneActions {
   const loc = session.worldState.currentLocation
   const subLoc = session.worldState.currentSubLocation
+  const time = session.worldState.timeOfDay
+  const isNight = time === 'night'
+  const inCombatAftermath = session.npcs.some(n =>
+    n.condition === 'unconscious' && n.location === loc &&
+    (n.subLocation ?? n.homeBase) === subLoc
+  )
   const npcsHere = session.npcs.filter(n =>
     n.location === loc && (n.subLocation ?? n.homeBase) === subLoc
     && n.condition !== 'unconscious' && n.condition !== 'recovering'
   )
   const suggestions: string[] = []
+
+  // 场景优先：刚打完仗 → 搜索/离开
+  if (inCombatAftermath) {
+    suggestions.push('搜索周围')
+    const area = locations[loc]
+    if (area) {
+      const otherPoi = area.pointsOfInterest.find((p: any) => p.discovered !== false && p.id !== subLoc)
+      if (otherPoi) suggestions.push(`前往${(otherPoi as any).nameZh}`)
+    }
+    return { details: [], suggestions: suggestions.slice(0, 3) }
+  }
 
   // 章节感知：优先推荐能推进主线的操作
   if (session.chapter) {
@@ -238,19 +255,37 @@ function buildFallbackActions(session: GameSession): SceneActions {
 
         const [type, target] = beat.trigger.split(':')
         if (type === 'talk' && target) {
-          // 只推荐在场的 NPC
           const npc = npcsHere.find(n => n.name === target)
           if (npc && !suggestions.includes(`和${target}交谈`)) {
             suggestions.push(`和${target}交谈`)
           }
         } else if (type === 'arrive' && target) {
+          // 深夜不推荐去危险区域
           const destArea = locations[target]
           if (destArea && target !== loc) {
-            suggestions.push(`前往${destArea.nameZh}`)
+            if (isNight && (target === 'twilight-woods' || target === 'greyspine-mines' || target === 'shatterstone-wastes')) {
+              // 夜间替换为更合理的建议
+            } else {
+              suggestions.push(`前往${destArea.nameZh}`)
+            }
           }
         }
-        if (suggestions.length >= 2) break  // 最多 2 条主线推荐
+        if (suggestions.length >= 2) break
       }
+    }
+  }
+
+  // 深夜特殊建议
+  if (isNight && suggestions.length === 0) {
+    // 深夜在酒馆 → 休息或和格雷格聊
+    if (subLoc === 'shattered-shield-tavern') {
+      const greg = npcsHere.find(n => n.name === '格雷格')
+      if (greg) suggestions.push('和格雷格交谈')
+      suggestions.push('休息到天亮')
+    }
+    // 深夜在其他地方 → 回酒馆
+    else if (loc === 'dawnbreak-town') {
+      suggestions.push('回碎盾亭酒馆')
     }
   }
 
@@ -260,12 +295,16 @@ function buildFallbackActions(session: GameSession): SceneActions {
     if (!suggestions.includes(s) && suggestions.length < 3) suggestions.push(s)
   }
 
-  // 补充：其他子地点
+  // 补充：其他子地点（深夜不推荐商店/公会）
   const area = locations[loc]
   if (area && suggestions.length < 3) {
-    const otherPois = area.pointsOfInterest.filter(
-      (p: any) => p.discovered !== false && p.id !== subLoc
-    )
+    const otherPois = area.pointsOfInterest.filter((p: any) => {
+      if (p.id === subLoc) return false
+      if (p.discovered === false) return false
+      // 深夜不推荐商店类地点
+      if (isNight && (p.id === 'sturdy-anvil' || p.id === 'adventurer-guild' || p.id === 'silver-scale-guild')) return false
+      return true
+    })
     if (otherPois.length) suggestions.push(`前往${(otherPois[0] as any).nameZh}`)
   }
 
