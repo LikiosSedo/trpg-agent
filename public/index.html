@@ -119,6 +119,20 @@
     height: 100%; border-radius: 2px; background: #f44336;
     transition: width 0.3s;
   }
+  /* ─── Trade confirmation card ─── */
+  .trade-card {
+    background: #1a2a3e; border: 1px solid #e6b800; border-radius: 10px;
+    padding: 12px 16px; margin: 6px 0; display: inline-block;
+  }
+  .trade-card .trade-title { color: #e6b800; font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+  .trade-card .trade-info { color: #ccc; font-size: 13px; line-height: 1.6; }
+  .trade-card .trade-btns { display: flex; gap: 8px; margin-top: 10px; }
+  .trade-card .trade-btn {
+    padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; border: none;
+  }
+  .trade-card .trade-btn.confirm { background: #4caf50; color: white; }
+  .trade-card .trade-btn.cancel { background: #333; color: #888; border: 1px solid #555; }
+
   #input-area {
     background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
     display: flex; gap: 8px;
@@ -1709,9 +1723,17 @@ function handleWsMessage(e) {
       appendMsg(`⚔ ${msg.quest}: ${msg.text}`, 'system')
       break
 
+    // ─── 死亡 ───
+    case 'death':
+      appendMsg(msg.text, 'error')
+      clearSave()
+      showGameOver({ reason: msg.text, canContinue: false })
+      break
+
     // ─── 游戏终局 ───
     case 'game_over':
       showGameOver(msg)
+      if (!msg.canContinue) clearSave()
       break
 
     // ─── NPC 立绘 ───
@@ -1727,6 +1749,11 @@ function handleWsMessage(e) {
     // ─── NPC 角色卡 ───
     case 'npc_card':
       showNPCCard(msg)
+      break
+
+    // ─── 交易确认卡片 ───
+    case 'trade_confirm':
+      showTradeCard(msg)
       break
 
     // ─── 音频 ───
@@ -2029,6 +2056,31 @@ function showNPCCard(data) {
 
 function closeNPCCard() {
   document.getElementById('npc-card-overlay').classList.remove('open')
+}
+
+// ─── 交易确认卡片 ───
+function showTradeCard(data) {
+  const container = document.getElementById('messages')
+  const card = document.createElement('div')
+  card.className = 'trade-card'
+  card.innerHTML = `
+    <div class="trade-title">📦 交易确认</div>
+    <div class="trade-info">
+      卖家: ${esc(data.npcName || '未知')}<br>
+      价格: ${data.gold} 金币
+    </div>
+    <div class="trade-btns">
+      <button class="trade-btn confirm" onclick="executeTrade(this, ${data.gold}, '${esc(data.npcName || '')}')">✅ 确认交易</button>
+      <button class="trade-btn cancel" onclick="this.closest('.trade-card').remove()">❌ 取消</button>
+    </div>`
+  container.appendChild(card)
+  container.scrollTop = container.scrollHeight
+}
+
+function executeTrade(btn, gold, npc) {
+  const item = prompt('确认购买的物品名称：') || 'unknown'
+  ws.send(JSON.stringify({ type: 'trade_execute', gold, npc, item }))
+  btn.closest('.trade-card').innerHTML = '<div style="color:#4caf50;font-size:13px">✅ 交易已执行</div>'
 }
 
 // ─── NPC 立绘显示 ───

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url'
 import { timingSafeEqual, createHash } from 'crypto'
 import { initItemRegistry, getFacts } from './game-state.js'
 import { GameEngine, type TurnEvent, type CommandResult } from './engine.js'
+import { TransferItemTool } from './tools/transfer-item.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -164,12 +165,14 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('game_over', { reason: ev.reason, canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
           send('system', { text: ev.text }); break
+        case 'trade_confirm':
+          send('trade_confirm', { gold: ev.gold, npcName: ev.npcName, itemHint: ev.itemHint }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
         case 'auto_save':
           break // silent
         case 'death':
-          send('system', { text: '💀 你倒下了……意识逐渐远去。\n游戏结束。刷新页面重新开始。' })
+          send('death', { text: '💀 你倒下了……意识逐渐远去。' })
           gameStarted = false
           break
         case 'sync':
@@ -276,6 +279,20 @@ wss.on('connection', (ws: WebSocket, req) => {
       } finally {
         processing = false
       }
+      return
+    }
+
+    // ── 交易执行（玩家点击交易确认卡片） ──
+    if (msg.type === 'trade_execute') {
+      if (!gameStarted || !engine) return
+      const result = await TransferItemTool.execute({
+        transferType: 'buy',
+        itemName: msg.item || 'unknown',
+        sourceId: msg.npc,
+        goldAmount: msg.gold,
+      })
+      send('system', { text: result.isError ? `交易失败：${result.output}` : `📦 ${result.output}` })
+      send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
       return
     }
 
