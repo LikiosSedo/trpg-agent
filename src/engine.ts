@@ -269,9 +269,6 @@ function buildFallbackActions(session: GameSession): SceneActions {
     if (otherPois.length) suggestions.push(`前往${(otherPois[0] as any).nameZh}`)
   }
 
-  // 兜底
-  if (suggestions.length < 3) suggestions.push('四处看看')
-
   return { details: [], suggestions: suggestions.slice(0, 3) }
 }
 
@@ -1178,7 +1175,7 @@ export class GameEngine {
 
     // DM 结束 + 场景选项
     const dmActions = consumeActions()
-    const actions = dmActions ?? { details: [], suggestions: [] }
+    const actions = dmActions ?? buildFallbackActions(session)
     // 过滤无效选项：不能和昏迷/死亡 NPC 交互
     if (actions.suggestions) {
       const invalidNpcs = session.npcs
@@ -1418,7 +1415,7 @@ export class GameEngine {
 
     // 场景选项
     const dmActions = consumeActions()
-    const actions = dmActions ?? { details: [], suggestions: [] }
+    const actions = dmActions ?? buildFallbackActions(session)
     yield {
       type: 'dm_end',
       combat: false,
