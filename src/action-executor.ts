@@ -112,10 +112,19 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'BUY': {
+        // 如果 Rules Agent 没识别出商人，自动匹配当前位置的商店 NPC
+        let shopNpc = action.npc
+        if (!shopNpc) {
+          const loc = session.worldState.currentLocation
+          const shop = session.npcs.find(n =>
+            n.shopPricing && (n.inventory ?? []).length > 0 && n.location === loc
+          )
+          shopNpc = shop?.name ?? ''
+        }
         const result = await TransferItemTool.execute({
           transferType: 'buy',
           itemName: action.item,
-          sourceId: action.npc,
+          sourceId: shopNpc,
         })
         return {
           action, success: !result.isError,
@@ -124,10 +133,18 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'SELL': {
+        let sellNpc = action.npc
+        if (!sellNpc) {
+          const loc = session.worldState.currentLocation
+          const shop = session.npcs.find(n =>
+            n.shopPricing && n.location === loc
+          )
+          sellNpc = shop?.name ?? ''
+        }
         const result = await TransferItemTool.execute({
           transferType: 'sell',
           itemName: action.item,
-          sourceId: action.npc,
+          sourceId: sellNpc,
         })
         return {
           action, success: !result.isError,
