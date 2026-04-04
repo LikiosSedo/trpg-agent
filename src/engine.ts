@@ -917,6 +917,11 @@ export class GameEngine {
                 yield { type: 'narrative_warning', text: `⚔️ ${alert.arrivedResponder}向你发起了攻击！` }
                 yield* this.emitCombatStart(`${alert.arrivedResponder}怒声呵斥，向你冲来！`)
                 yield* this.combatDMNarrative(`${alert.arrivedResponder}因为你对${alert.victimName}的暴行而冲上来与你战斗。场景在${getSubLocationName(alert.subLocation)}。请描写战斗开场的紧张氛围。`)
+                // 暴力后果触发战斗后直接 return——事件优先于玩家行动，玩家输入被中断
+                console.log(`[consequence] 战斗已触发，跳过本轮玩家输入: "${input}"`)
+                session.dmMessages = getDMMessages()
+                yield { type: 'sync', session, dossier: this.dossier.toJSON() }
+                return
               } catch (err) {
                 console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
               }
