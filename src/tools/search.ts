@@ -50,16 +50,17 @@ DM 根据检定结果决定发现什么。`,
     if (type === 'area') {
       const mod = player.abilityModifiers.WIS + (player.skills.includes('perception') ? 2 : 0)
       // DC 根据场景动态调整
-      let dc = 15
-      // 有昏迷 NPC 在场（战后搜刮）→ 容易得多
+      let dc = 15  // 野外/矿道默认：找隐藏物品
+      const subLoc = session.worldState.currentSubLocation ?? ''
+      // 有昏迷 NPC 在场（战后搜刮）→ 几乎自动成功
       const hasUnconsciousNpc = session.npcs.some(n =>
         n.condition === 'unconscious' &&
         n.location === locId &&
-        (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation
+        (n.subLocation ?? n.homeBase) === subLoc
       )
-      if (hasUnconsciousNpc) dc = 8  // 战后搜刮，东西散落一地
-      // 商店/建筑内搜索（有货架的地方）→ 中等
-      else if (['greenleaf-apothecary', 'sturdy-anvil', 'dawns-rest-inn', 'silver-scale-guild'].includes(session.worldState.currentSubLocation ?? '')) dc = 10
+      if (hasUnconsciousNpc) dc = 5  // 战后搜刮，东西就在眼前
+      // 建筑内搜索（商店、旅店、公会）→ 容易
+      else if (['greenleaf-apothecary', 'sturdy-anvil', 'dawns-rest-inn', 'silver-scale-guild', 'mayor-office'].includes(subLoc)) dc = 8
       const result = skillCheck(mod, dc)
 
       // Discover hidden POIs on success
