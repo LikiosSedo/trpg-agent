@@ -793,18 +793,29 @@
     z-index: 100;
     font-size: 12px;
     overflow: hidden;
+    touch-action: none;
   }
   .thinking-panel.collapsed .thinking-content { display: none; }
   .thinking-header {
     padding: 8px 12px;
     background: #16213e;
-    cursor: pointer;
+    cursor: grab;
     color: #8888aa;
     font-size: 11px;
     user-select: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .thinking-header:active { cursor: grabbing; }
+  /* 移动端：改为更小尺寸，默认定位不遮挡输入框 */
+  @media (max-width: 768px) {
+    .thinking-panel {
+      width: calc(100vw - 24px);
+      right: 12px;
+      bottom: 120px;
+      max-height: 250px;
+    }
   }
   .thinking-content {
     max-height: 350px;
@@ -1040,6 +1051,52 @@ function toggleThinking() {
   panel.classList.toggle('collapsed')
   toggle.textContent = panel.classList.contains('collapsed') ? '▶' : '▼'
 }
+
+// 思考面板拖动（桌面 + 移动端触摸）
+;(function initThinkingDrag() {
+  const panel = document.getElementById('dm-thinking-panel')
+  const header = panel?.querySelector('.thinking-header')
+  if (!panel || !header) return
+
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0
+
+  function onStart(clientX, clientY) {
+    dragging = true
+    const rect = panel.getBoundingClientRect()
+    startX = clientX; startY = clientY
+    origX = rect.left; origY = rect.top
+    panel.style.transition = 'none'
+  }
+  function onMove(clientX, clientY) {
+    if (!dragging) return
+    const dx = clientX - startX, dy = clientY - startY
+    let newX = origX + dx, newY = origY + dy
+    // 边界限制
+    newX = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, newX))
+    newY = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, newY))
+    panel.style.left = newX + 'px'
+    panel.style.top = newY + 'px'
+    panel.style.right = 'auto'
+    panel.style.bottom = 'auto'
+  }
+  function onEnd() { dragging = false; panel.style.transition = '' }
+
+  // 鼠标事件
+  header.addEventListener('mousedown', e => { if (e.target.closest('#thinking-toggle')) return; onStart(e.clientX, e.clientY) })
+  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY))
+  document.addEventListener('mouseup', onEnd)
+
+  // 触摸事件
+  header.addEventListener('touchstart', e => {
+    if (e.target.closest('#thinking-toggle')) return
+    const t = e.touches[0]; onStart(t.clientX, t.clientY)
+  }, { passive: true })
+  document.addEventListener('touchmove', e => {
+    if (!dragging) return
+    const t = e.touches[0]; onMove(t.clientX, t.clientY)
+  }, { passive: true })
+  document.addEventListener('touchend', onEnd)
+})()
 
 // ─── 密码认证 + 存档检查 ───
 ;(async function checkAuth() {
