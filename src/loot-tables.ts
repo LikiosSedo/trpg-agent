@@ -335,4 +335,94 @@ export const LOOT_TABLES: LocationLootTable[] = [
     maxItemsPerSearch: 3,
     repeatable: false,
   },
+
+  // ── 碎盾亭酒馆 ────────────────────────────────
+  {
+    locationId: 'shattered-shield-tavern',
+    items: [
+      { name: '火把', type: 'misc', description: '普通火把，燃烧1小时。', probability: 0.6, quantity: [1, 2] },
+      { name: '麻绳', type: 'misc', description: '50尺坚韧的麻绳。', probability: 0.35, quantity: [1, 1] },
+      { name: '达里安的日志', type: 'quest', description: '一本破旧的日志，记录了20年前矿道深处的发现。封面有烧焦的痕迹。', probability: 0.85, quantity: [1, 1], condition: 'beat_done:ch3_mine_quest', oneTime: true },
+    ],
+    gold: [0, 5],
+    maxItemsPerSearch: 2,
+    repeatable: false,
+  },
+
+  // ── 冒险者公会 ────────────────────────────────
+  {
+    locationId: 'adventurer-guild',
+    items: [
+      { name: '火把', type: 'misc', description: '普通火把，燃烧1小时。', probability: 0.7, quantity: [1, 3] },
+      { name: '公会任务告示', type: 'misc', description: '公告板上的最新悬赏任务列表，标注了几个近期失联的矿工名字。', probability: 0.9, quantity: [1, 1], oneTime: true },
+      { name: '矿道通行证', type: 'quest', description: '授权持有者进入灰脊矿道中层的官方文件。', probability: 0.6, quantity: [1, 1], condition: 'beat_done:ch2_report_elena', oneTime: true },
+    ],
+    gold: [0, 8],
+    maxItemsPerSearch: 2,
+    repeatable: false,
+  },
+
+  // ── 镇长府 ────────────────────────────────────
+  {
+    locationId: 'mayor-office',
+    items: [
+      { name: '壁炉半烧文件', type: 'quest', description: '半烧毁的文件——教团胁迫维克多签署的"特别勘探许可"和矿道通行记录。', probability: 0.85, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+      { name: '镇长私人日记', type: 'quest', description: '维克多记录了女儿索菲亚失踪前后的情绪变化，某些名字被划掉。', probability: 0.5, quantity: [1, 1], condition: 'chapter>=3', oneTime: true },
+      { name: '石碑拓片', type: 'quest', description: '维克多私藏的晨光石碑被删去的铭文拓印。', probability: 0.7, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+    ],
+    gold: [10, 25],
+    maxItemsPerSearch: 2,
+    repeatable: false,
+  },
+
+  // ── 破晓旅店 ──────────────────────────────────
+  {
+    locationId: 'dawns-rest-inn',
+    items: [
+      { name: '火把', type: 'misc', description: '普通火把。', probability: 0.5, quantity: [1, 2] },
+      { name: '陌生人的留言', type: 'misc', description: '塞在桌缝里的折叠纸片，写着"月圆之夜，北门，子时"。', probability: 0.5, quantity: [1, 1], condition: 'chapter>=3', oneTime: true },
+    ],
+    gold: [0, 8],
+    maxItemsPerSearch: 1,
+    repeatable: true,
+  },
+
+  // ── 银鳞商会 ──────────────────────────────────
+  {
+    locationId: 'silver-scale-guild',
+    items: [
+      { name: '矿产账册', type: 'quest', description: '记录了过去六个月矿石产量骤降及异常交易记录，某些条目被涂改。', probability: 0.7, quantity: [1, 1], condition: 'chapter>=3', oneTime: true },
+    ],
+    gold: [12, 25],
+    maxItemsPerSearch: 1,
+    repeatable: false,
+  },
+
+  // ── 碎石荒原 ──────────────────────────────────
+  {
+    locationId: 'shatterstone-wastes',
+    items: [
+      { name: '骨骼碎片', type: 'misc', description: '一块附魔骨骸碎片，散发残余的死灵能量。', probability: 0.5, quantity: [1, 2] },
+      { name: '食尸鬼爪', type: 'misc', description: '食尸鬼断爪，带有麻痹残留物。', probability: 0.4, quantity: [1, 1] },
+      { name: '教团控制符文', type: 'quest', description: '绑在兽人萨满颈上的符文牌，刻有蚀目者标记。', probability: 0.8, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+      { name: '古代文书残页', type: 'quest', description: '墓冢中的文书残页，记载了虚空棱镜被封印的经过。', probability: 0.65, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+    ],
+    gold: [5, 15],
+    maxItemsPerSearch: 2,
+    repeatable: true,
+  },
+
+  // ── 灰脊矿道下层（深渊祭坛） ─────────────────
+  {
+    locationId: 'abyss-altar',
+    items: [
+      { name: '暗影防护药水', type: 'potion', description: '银色液体，饮用后10分钟内对死灵伤害有抗性。', probability: 0.6, quantity: [1, 2] },
+      { name: '暗影精华', type: 'misc', description: '封存于玻璃小瓶内的凝缩暗影。', probability: 0.5, quantity: [1, 2] },
+      { name: '教团仪式手册', type: 'quest', description: '蚀目者仪式的完整步骤手册，记录了虚空棱镜的激活方法。', probability: 0.85, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+      { name: '虚空碎片', type: 'quest', description: '结晶虚空能量碎片，散发黑暗力量的脉动。', probability: 0.5, quantity: [1, 1], condition: 'chapter>=4', oneTime: true },
+    ],
+    gold: [20, 50],
+    maxItemsPerSearch: 3,
+    repeatable: false,
+  },
 ]
