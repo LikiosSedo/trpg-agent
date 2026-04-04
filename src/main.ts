@@ -268,6 +268,9 @@ function renderTurnEvent(event: TurnEvent): void {
       break
     case 'audio':
       break // CLI 不播放音频
+    case 'item_acquired':
+      console.log(chalk.green(`\n  📦 ${event.text}`))
+      break
     case 'auto_save':
       console.log(chalk.dim('\n  [自动存档]'))
       break

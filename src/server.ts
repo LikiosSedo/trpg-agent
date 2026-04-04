@@ -167,6 +167,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('system', { text: ev.text }); break
         case 'trade_confirm':
           send('trade_confirm', { gold: ev.gold, npcName: ev.npcName, itemHint: ev.itemHint }); break
+        case 'item_acquired':
+          send('item_acquired', { text: ev.text }); break
         case 'audio':
           send('audio', { bgm: ev.bgm, ambient: ev.ambient }); break
         case 'auto_save':

@@ -125,6 +125,18 @@
     height: 100%; border-radius: 2px; background: #f44336;
     transition: width 0.3s;
   }
+  /* ─── Item notification ─── */
+  .item-notification {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #1a2e1a 0%, #1a3a1a 100%);
+    border: 1px solid #4caf50; border-radius: 10px;
+    padding: 10px 14px; margin: 6px 0;
+    animation: combatFadeIn 0.4s ease-out;
+    transition: opacity 1s;
+  }
+  .item-notif-icon { font-size: 24px; }
+  .item-notif-text { color: #4caf50; font-size: 13px; line-height: 1.4; }
+
   /* ─── Trade confirmation card ─── */
   .trade-card {
     background: #1a2a3e; border: 1px solid #e6b800; border-radius: 10px;
@@ -1773,6 +1785,11 @@ function handleWsMessage(e) {
       showNPCCard(msg)
       break
 
+    // ─── 物品获取通知 ───
+    case 'item_acquired':
+      showItemNotification(msg.text)
+      break
+
     // ─── 交易确认卡片 ───
     case 'trade_confirm':
       showTradeCard(msg)
@@ -2081,6 +2098,17 @@ function closeNPCCard() {
 }
 
 // ─── 交易确认卡片 ───
+function showItemNotification(text) {
+  const container = document.getElementById('messages')
+  const card = document.createElement('div')
+  card.className = 'item-notification'
+  card.innerHTML = `<span class="item-notif-icon">📦</span><span class="item-notif-text">${esc(text)}</span>`
+  container.appendChild(card)
+  container.scrollTop = container.scrollHeight
+  // 5秒后淡出
+  setTimeout(() => { card.style.opacity = '0.5' }, 5000)
+}
+
 function showTradeCard(data) {
   const container = document.getElementById('messages')
   const card = document.createElement('div')

@@ -142,6 +142,7 @@ export type TurnEvent =
   | { type: 'game_over'; reason: string; canContinue: boolean; continueHint?: string }
   | { type: 'narrative_warning'; text: string }
   | { type: 'trade_confirm'; gold: number; npcName: string; itemHint?: string }
+  | { type: 'item_acquired'; text: string }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any }
 
@@ -805,11 +806,11 @@ export class GameEngine {
           fullText += text
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
-          // 物品/金币变化时在聊天栏显示系统通知
+          // 物品/金币变化时发送专门的物品通知事件
           if (event.name === 'TransferItem' && event.output && !event.isError) {
             const out = String(event.output)
-            if (out.includes('获得物品') || out.includes('支付') || out.includes('获得') || out.includes('交给')) {
-              yield { type: 'narrative_warning', text: `📦 ${out}` }
+            if (out.includes('获得物品') || out.includes('获得') || out.includes('支付')) {
+              yield { type: 'item_acquired', text: out }
             }
           }
         }
