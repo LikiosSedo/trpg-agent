@@ -103,7 +103,11 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
         || (approach === 'deceive' && session.player.skills.includes('deception'))
         || (approach === 'intimidate' && session.player.skills.includes('intimidation'))
       const totalMod = mod + (proficient ? 2 : 0)
-      const dc = 10 + Math.max(0, -npc.trust) // Higher DC if NPC distrusts player
+      // Per-NPC social DC from combat data + trust penalty
+      const npcCombatData = (await import('../../data/npc-combatants.json', { with: { type: 'json' } })).default
+      const npcEntry = npcCombatData.find((n: any) => n.name === npcId)
+      const baseDC = npcEntry?.socialDC ?? 10
+      const dc = baseDC + Math.max(0, -npc.trust)
       const result = skillCheck(totalMod, dc)
 
       const approachZh = { persuade: '说服', deceive: '欺骗', intimidate: '威吓' }
