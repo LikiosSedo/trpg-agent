@@ -209,7 +209,7 @@ const REVELATION_LAYERS: Record<string, RevelationLayer[]> = {
     { trustRequired: 3, fact: '北方矮人古矿志中记载过"虚空矿脉"——矿石变黑、工匠做噩梦、矿道自行延伸——和现在的情况惊人相似', category: '线索' },
     { trustRequired: 4, fact: '悄悄保留了几块黑色晶体样本，怀疑跟矿道深处的异变有关', category: '秘密' },
     { trustRequired: 4, fact: '古矿志最后一页写着：虚空矿脉的尽头都会有一件"棱形神器"，矮人先祖称之为"深渊之眼"', category: '线索' },
-    { trustRequired: 5, fact: '他一直在秘密锻造一批注入银粉的特殊武器——古矿志记载银能灼伤暗影生物', category: '秘密' },
+    { trustRequired: 5, fact: '[NPC应主动提出] 他秘密锻造了注入银粉的特殊武器——银能灼伤暗影生物。如果玩家带回一块暗影晶体，他愿意为玩家锻造一把银刃武器', category: '秘密' },
   ],
   '叶绿': [
     { trustRequired: 0, fact: '半精灵药剂师，总是带着草药的清香', category: '背景' },
@@ -221,7 +221,7 @@ const REVELATION_LAYERS: Record<string, RevelationLayer[]> = {
     { trustRequired: 3, fact: '助手符号纸上有一个"眼睛被斜线划过"的标记——和做噩梦的矿工描述的梦中图案一模一样', category: '线索' },
     { trustRequired: 4, fact: '怀疑助手加入了某种秘密组织，但不敢声张', category: '秘密' },
     { trustRequired: 4, fact: '她祖母留下的药典中记载了一种用银莲花和月光露调配的药剂，能暂时抵御暗影侵蚀', category: '秘密' },
-    { trustRequired: 5, fact: '药典最后几页记录了一个古老的净化仪式——需要在晨光石碑前以银莲花为引，可以封印位面裂隙', category: '秘密' },
+    { trustRequired: 5, fact: '[NPC应主动提出] 药典记载了古老的净化仪式——在晨光石碑前以银莲花为引可以封印位面裂隙。她愿意教玩家这个仪式，但需要先找到银莲花', category: '秘密' },
   ],
   '韩猛': [
     { trustRequired: 0, fact: '退役战士，右臂在一次讨伐中失去', category: '背景' },
@@ -233,7 +233,7 @@ const REVELATION_LAYERS: Record<string, RevelationLayer[]> = {
     { trustRequired: 3, fact: '最后一支小队的斥候在失联前传回一张速写——墙壁上密密麻麻的符文在移动，像活物一样', category: '线索' },
     { trustRequired: 4, fact: '从失联小队最后的报告中发现了暗影教团的蛛丝马迹', category: '秘密' },
     { trustRequired: 4, fact: '艾琳娜私下告诉他这不是普通塌方，让他做好"撤离全镇"的最坏准备', category: '关系' },
-    { trustRequired: 5, fact: '第二支失联小队的队长奇迹般爬出矿道后死在他怀里，临终前塞给他一张手绘的矿道下层地图', category: '秘密' },
+    { trustRequired: 5, fact: '[NPC应主动提出] 失联队长临终前塞给他一张手绘的矿道下层地图。他一直在等一个值得信赖的人把地图交出去', category: '秘密' },
   ],
 }
 
