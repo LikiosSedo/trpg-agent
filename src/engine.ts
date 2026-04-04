@@ -1262,7 +1262,7 @@ export class GameEngine {
         .filter(m => m.hp > 0)
         .map(m => ({
           id: m.id, name: m.name,
-          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+          portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
           hp: m.hp, maxHp: m.maxHp,
         }))
       if (monsterPortraits.length) {
@@ -1528,7 +1528,7 @@ export class GameEngine {
       type: 'combat_init',
       monsters: aliveMonsters.map(m => ({
         id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp,
-        portrait: MONSTER_PORTRAITS[m.name] ?? '',
+        portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
       })),
       round: combat.round,
       initiative: combat.initiativeOrder,
@@ -1795,7 +1795,7 @@ export class GameEngine {
         type: 'combat_portraits',
         monsters: aliveMonsters.map(m => ({
           id: m.id, name: m.name,
-          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+          portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
           hp: m.hp, maxHp: m.maxHp,
         })),
       }
@@ -1904,7 +1904,7 @@ export class GameEngine {
         round: session.combat.round,
         monsters: alive.map(m => ({
           id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp,
-          portrait: MONSTER_PORTRAITS[m.name] ?? '',
+          portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
         })),
         spells: session.player.spells.filter(s => s.remaining > 0 || s.usesPerRest === 0),
         items: session.player.inventory.filter(i => i.type === 'potion'),
