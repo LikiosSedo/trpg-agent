@@ -107,7 +107,16 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
       const npcCombatData = (await import('../../data/npc-combatants.json', { with: { type: 'json' } })).default
       const npcEntry = npcCombatData.find((n: any) => n.name === npcId)
       const baseDC = npcEntry?.socialDC ?? 10
-      const dc = baseDC + Math.max(0, -npc.trust)
+      // 信任度分段影响说服难度
+      let trustMod = 0
+      if (npc.trust >= 7) trustMod = -4       // 挚友，几乎有求必应
+      else if (npc.trust >= 4) trustMod = -2  // 熟人，愿意帮忙
+      else if (npc.trust <= -7) {             // 极度敌对，拒绝沟通
+        return { output: `${npcId}完全拒绝和你交流。` }
+      }
+      else if (npc.trust <= -4) trustMod = 4  // 敌对，非常难说服
+      else if (npc.trust <= -1) trustMod = 2  // 不信任
+      const dc = baseDC + trustMod
       const result = skillCheck(totalMod, dc)
 
       const approachZh = { persuade: '说服', deceive: '欺骗', intimidate: '威吓' }
