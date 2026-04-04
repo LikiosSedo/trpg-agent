@@ -1275,7 +1275,7 @@ export class GameEngine {
         triggerAfterBeat: string; maxIdleTurns: number
         monsters?: string[]  // 指定怪物，不填则从区域池随机
       }> = [
-        { combatBeat: 'ch2_forest_combat', location: 'twilight-woods', triggerAfterBeat: 'ch2_enter_forest', maxIdleTurns: 8, monsters: ['Wolf', 'Wolf'] },
+        { combatBeat: 'ch2_forest_combat', location: 'twilight-woods', triggerAfterBeat: 'ch2_meet_hunter', maxIdleTurns: 10, monsters: ['Wolf', 'Wolf'] },
       ]
 
       for (const se of storyEncounters) {

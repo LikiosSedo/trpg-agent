@@ -214,6 +214,18 @@ export const CHAPTERS: ChapterDef[] = [
         ],
       },
       {
+        id: 'ch2_meet_hunter',
+        trigger: 'talk:老林',
+        requires: ['ch2_forest_quest'],
+        facts: [
+          '猎人老林蹲在石屋旁磨刀，听到脚步声抬起头，目光警惕',
+          '"公会派来的？"他打量你一眼，放下磨刀石',
+          '"最近林子不对劲，动物都在往南跑——它们在躲什么东西。往北走小心狼群，比以前凶多了。"',
+          '他指了指北面的小径："那条路过去就是狼群的地盘。你要去的话，准备好武器。"',
+        ],
+        optional: true,
+      },
+      {
         id: 'ch2_enter_forest',
         trigger: 'arrive:twilight-woods',
         facts: [
