@@ -163,7 +163,7 @@ export const twilightWoods: Location = {
   description: '镇子南面和东面环绕的茂密森林，越往深处光线越暗。',
   dangerLevel: 'medium',
   crRange: [0.25, 3],
-  monsterPool: ['wolf', 'giant-spider', 'cockatrice', 'goblin', 'bugbear', 'owlbear'],
+  monsterPool: ['Wolf', 'Giant Spider', 'Cockatrice', 'Goblin'],
   asciiMap: [
     'TTTTTTTTTTTTTTTT',
     'TT..TTT.TTTTTTT.',
@@ -227,10 +227,7 @@ export const greyspineMines: Location = {
   description: '镇子北面山体中的矿道网络，分为上层、中层和下层。',
   dangerLevel: 'high',
   crRange: [0.5, 2],
-  monsterPool: [
-    'skeleton', 'zombie', 'shadow', 'giant-wolf-spider',
-    'ghoul', 'mimic', 'cult-fanatic', 'imp',
-  ],
+  monsterPool: ['Skeleton', 'Shadow', 'Ghoul', 'Mimic', 'Giant Spider'],
   asciiMap: [
     '################',
     '###...####...###',
@@ -294,7 +291,7 @@ export const shatterstoneWastes: Location = {
   description: '镇子西面的干燥荒原，遍布碎裂灰色岩石，地形崎岖，常有浓雾。',
   dangerLevel: 'medium',
   crRange: [0.5, 3],
-  monsterPool: ['orc', 'hobgoblin', 'ghoul', 'ogre', 'skeleton', 'zombie'],
+  monsterPool: ['Orc Warrior', 'Ghoul', 'Skeleton', 'Eclipsed Beast'],
   asciiMap: [
     '................',
     '..##..........#.',

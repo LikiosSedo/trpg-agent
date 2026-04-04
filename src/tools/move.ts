@@ -181,12 +181,29 @@ export const MoveTool: Tool = {
       const avoidMsg = avoidingNpcs.length
         ? `${avoidingNpcs.join('、')}看到你后匆匆离开了。` : ''
 
+      // 危险区域内移动也有遭遇概率（20%）
+      let encounterWarning = ''
+      const currentArea = locations[current]
+      if (currentArea && currentArea.monsterPool.length > 0 && currentArea.dangerLevel !== 'safe') {
+        if (Math.random() < 0.2) {
+          const pool = currentArea.monsterPool
+          const count = Math.random() < 0.3 ? 2 : 1
+          const picked: string[] = []
+          for (let i = 0; i < count; i++) {
+            picked.push(pool[Math.floor(Math.random() * pool.length)])
+          }
+          encounterWarning = `[遭遇] 你在途中遭遇了${picked.join('和')}！`
+          session.worldState.flags['pending_encounter'] = picked.join(',')
+        }
+      }
+
       return {
         output: [
           targetPoi.arrivalText ?? `你来到了${targetPoi.nameZh}。`,
           targetPoi.description,
           remainingNpcs.length ? `这里有：${remainingNpcs.join('、')}。` : '',
           avoidMsg,
+          encounterWarning,
         ].filter(Boolean).join('\n'),
       }
     }
