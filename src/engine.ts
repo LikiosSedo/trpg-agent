@@ -12,6 +12,7 @@ import { GameFactStore } from './game-facts.js'
 import { DossierManager } from './dossier.js'
 import { QuestManager } from './quest-manager.js'
 import { ChapterManager } from './chapter-manager.js'
+import { getChapter } from './story-script.js'
 import { checkBrokenPromises, changeTrust } from './trust-system.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
@@ -29,7 +30,7 @@ import {
 import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
-import { WORLD_OVERVIEW, locations } from './data/maps.js'
+import { WORLD_OVERVIEW, locations, connections } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
@@ -222,17 +223,55 @@ function buildFallbackActions(session: GameSession): SceneActions {
   const subLoc = session.worldState.currentSubLocation
   const npcsHere = session.npcs.filter(n =>
     n.location === loc && (n.subLocation ?? n.homeBase) === subLoc
+    && n.condition !== 'unconscious' && n.condition !== 'recovering'
   )
   const suggestions: string[] = []
-  if (npcsHere.length) suggestions.push(`和${npcsHere[0].name}交谈`)
+
+  // 章节感知：优先推荐能推进主线的操作
+  if (session.chapter) {
+    const chapterDef = getChapter(session.chapter.currentChapter)
+    if (chapterDef) {
+      for (const beat of chapterDef.beats) {
+        if (session.chapter.completedBeats.includes(beat.id)) continue
+        if (beat.requires && !beat.requires.every((r: string) => session.chapter!.completedBeats.includes(r))) continue
+        if (beat.trigger === 'auto') continue
+
+        const [type, target] = beat.trigger.split(':')
+        if (type === 'talk' && target) {
+          // 只推荐在场的 NPC
+          const npc = npcsHere.find(n => n.name === target)
+          if (npc && !suggestions.includes(`和${target}交谈`)) {
+            suggestions.push(`和${target}交谈`)
+          }
+        } else if (type === 'arrive' && target) {
+          const destArea = locations[target]
+          if (destArea && target !== loc) {
+            suggestions.push(`前往${destArea.nameZh}`)
+          }
+        }
+        if (suggestions.length >= 2) break  // 最多 2 条主线推荐
+      }
+    }
+  }
+
+  // 补充：在场 NPC（非主线已推荐的）
+  for (const npc of npcsHere) {
+    const s = `和${npc.name}交谈`
+    if (!suggestions.includes(s) && suggestions.length < 3) suggestions.push(s)
+  }
+
+  // 补充：其他子地点
   const area = locations[loc]
-  if (area) {
+  if (area && suggestions.length < 3) {
     const otherPois = area.pointsOfInterest.filter(
       (p: any) => p.discovered !== false && p.id !== subLoc
     )
     if (otherPois.length) suggestions.push(`前往${(otherPois[0] as any).nameZh}`)
   }
-  suggestions.push('四处看看')
+
+  // 兜底
+  if (suggestions.length < 3) suggestions.push('四处看看')
+
   return { details: [], suggestions: suggestions.slice(0, 3) }
 }
 
@@ -528,6 +567,15 @@ export class GameEngine {
 
     if (input === '/map') {
       const currentLoc = locations[session.worldState.currentLocation]
+      // 计算从当前区域可达的相邻区域
+      const reachableAreas = connections
+        .filter(c => c.from === session.worldState.currentLocation || c.to === session.worldState.currentLocation)
+        .map(c => {
+          const destId = c.from === session.worldState.currentLocation ? c.to : c.from
+          const dest = locations[destId]
+          return dest ? { id: destId, nameZh: dest.nameZh, description: c.description } : null
+        })
+        .filter(Boolean)
       return {
         type: 'map',
         data: {
@@ -547,6 +595,7 @@ export class GameEngine {
                   (n.subLocation ?? n.homeBase) === p.id)
                 .map(n => n.name),
             })) ?? [],
+          reachableAreas,
         },
       }
     }
@@ -573,9 +622,30 @@ export class GameEngine {
     if (input === '/npc' || input === '/npc ') {
       const trustMap: Record<string, number> = {}
       for (const npc of session.npcs) trustMap[npc.name] = npc.trust
+      // 附带 NPC 位置信息，供前端渲染"交谈"按钮和灰显不在场 NPC
+      const LOC_NAMES: Record<string, string> = {
+        'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
+        'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
+      }
+      const npcLocations: Record<string, { location: string; subLocation: string; locationZh: string; subLocationZh: string }> = {}
+      for (const npc of session.npcs) {
+        const sub = npc.subLocation ?? npc.homeBase ?? ''
+        const subName = getSubLocationName(sub)
+        npcLocations[npc.name] = {
+          location: npc.location,
+          subLocation: sub,
+          locationZh: LOC_NAMES[npc.location] ?? npc.location,
+          subLocationZh: subName,
+        }
+      }
       return {
         type: 'npc_list',
-        data: { npcs: this.dossier.toListData(trustMap) },
+        data: {
+          npcs: this.dossier.toListData(trustMap),
+          npcLocations,
+          playerLocation: session.worldState.currentLocation,
+          playerSubLocation: session.worldState.currentSubLocation,
+        },
       }
     }
 
