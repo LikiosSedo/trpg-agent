@@ -1260,32 +1260,48 @@ export class GameEngine {
       actions,
     }
 
-    // 剧情保底遭遇：章节需要战斗但玩家运气差一直没遇到，强制触发
+    // 剧情保底遭遇：关键探索节点完成后，下次移动 100% 触发战斗
+    // 双保险：如果玩家不移动，8 轮后也强制触发（防止卡住）
     if (!session.combat?.active && !session.worldState.flags['pending_encounter'] && session.chapter) {
       const ch = session.chapter
       const loc = session.worldState.currentLocation
       const locData = locations[loc]
-      // 定义需要战斗保底的场景：{ beatId, 所需区域, 前置beat, 保底轮数 }
-      const guaranteedEncounters: Array<{ beatId: string; location: string; requires: string; turnsInArea: number }> = [
-        { beatId: 'ch2_forest_combat', location: 'twilight-woods', requires: 'ch2_enter_forest', turnsInArea: 5 },
+
+      // 定义剧情保底配置：
+      // triggerAfterBeat: 这个 beat 完成后，下次移动保证遭遇
+      // maxIdleTurns: 如果不移动，等这么多轮后强制触发
+      const storyEncounters: Array<{
+        combatBeat: string; location: string
+        triggerAfterBeat: string; maxIdleTurns: number
+        monsters?: string[]  // 指定怪物，不填则从区域池随机
+      }> = [
+        { combatBeat: 'ch2_forest_combat', location: 'twilight-woods', triggerAfterBeat: 'ch2_enter_forest', maxIdleTurns: 8, monsters: ['Wolf', 'Wolf'] },
       ]
-      for (const ge of guaranteedEncounters) {
-        if (ch.completedBeats.includes(ge.beatId)) continue  // 已完成
-        if (!ch.completedBeats.includes(ge.requires)) continue  // 前置未完成
-        if (loc !== ge.location) continue
-        // 检查在该区域待了多少轮
-        const entryKey = `area_entry_turn_${ge.location}`
-        if (!session.worldState.flags[entryKey]) session.worldState.flags[entryKey] = session.turnCount
-        const turnsInArea = session.turnCount - Number(session.worldState.flags[entryKey])
-        if (turnsInArea >= ge.turnsInArea && locData) {
-          const pool = locData.monsterPool as string[]
-          if (pool.length > 0) {
-            const count = Math.random() < 0.5 ? 2 : 1
-            const picked: string[] = []
-            for (let i = 0; i < count; i++) picked.push(pool[Math.floor(Math.random() * pool.length)])
-            session.worldState.flags['pending_encounter'] = picked.join(',')
-            console.log(`[combat] 剧情保底遭遇触发（${ge.beatId}）：${picked.join(',')}，在${ge.location}待了${turnsInArea}轮`)
-          }
+
+      for (const se of storyEncounters) {
+        if (ch.completedBeats.includes(se.combatBeat)) continue
+        if (!ch.completedBeats.includes(se.triggerAfterBeat)) continue
+        if (loc !== se.location) continue
+
+        const flagKey = `story_encounter_armed_${se.combatBeat}`
+
+        // 标记"已就绪"——triggerAfterBeat 完成后设置
+        if (!session.worldState.flags[flagKey]) {
+          session.worldState.flags[flagKey] = session.turnCount
+          console.log(`[combat] 剧情遭遇已就绪: ${se.combatBeat}，等待玩家移动或${se.maxIdleTurns}轮后触发`)
+        }
+
+        const armedTurn = Number(session.worldState.flags[flagKey])
+        const turnsWaiting = session.turnCount - armedTurn
+
+        // 触发条件：玩家移动了 OR 等太久了
+        const shouldTrigger = action.type === 'MOVE' || turnsWaiting >= se.maxIdleTurns
+
+        if (shouldTrigger && locData) {
+          const picked = se.monsters ?? [(locData.monsterPool as string[])[0]]
+          session.worldState.flags['pending_encounter'] = picked.join(',')
+          delete session.worldState.flags[flagKey]
+          console.log(`[combat] 剧情保底遭遇触发（${se.combatBeat}）：${picked.join(',')}，${action.type === 'MOVE' ? '玩家移动触发' : `等待${turnsWaiting}轮触发`}`)
         }
       }
     }
