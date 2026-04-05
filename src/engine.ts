@@ -16,7 +16,7 @@ import { getChapter } from './story-script.js'
 import { checkBrokenPromises, changeTrust } from './trust-system.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
-import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages } from './dm-agent.js'
+import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages, muteDMTools, unmuteDMTools } from './dm-agent.js'
 import { consumeActions, type SceneActions } from './tools/set-actions.js'
 import { consumeTrustChanges } from './tools/change-trust.js'
 import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
@@ -27,7 +27,7 @@ import { getActiveEffectsSummary } from './effect-manager.js'
 import { isBuffSpell } from './combat-manager.js'
 import {
   executeMonsterPhase, getCombatSummary, executePlayerTurn,
-  attemptFlee, checkCombatEnd, awardLoot, endCombat,
+  attemptFlee, checkCombatEnd, awardLoot, endCombat, startCombat,
 } from './combat-manager.js'
 import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
@@ -140,6 +140,64 @@ function checkNPCConditionRecovery(session: GameSession): void {
   }
 }
 
+// ─── 自动检测敌对 NPC ──────────────────────────
+
+/**
+ * 检测是否有 NPC 达到敌对阈值，返回需要触发的 NPC 列表
+ *
+ * 检测条件：
+ * - 信任度 ≤ combat 阈值
+ * - 在同一位置
+ * - 状态正常（非昏迷/恢复中）
+ * - 冷却时间已过（3 轮）
+ * - 当前不在战斗中
+ */
+async function checkHostileNPCs(session: GameSession): Promise<Array<{ npc: string; response: string }>> {
+  if (session.combat?.active) return []
+
+  const { evaluateResponse } = await import('./trust-system.js')
+  const { getPersonality } = await import('./npc-relationships.js')
+
+  const playerLoc = session.worldState.currentLocation
+  const playerSub = session.worldState.currentSubLocation
+
+  // 初始化冷却记录
+  if (!session.npcHostileCooldowns) {
+    session.npcHostileCooldowns = new Map()
+  }
+
+  const hostileNPCs: Array<{ npc: string; response: string }> = []
+
+  for (const npc of session.npcs) {
+    // 1. 检查位置
+    if (npc.location !== playerLoc) continue
+    const npcSub = npc.subLocation ?? npc.homeBase
+    if (npcSub !== playerSub) continue
+
+    // 2. 检查状态
+    if (npc.condition === 'unconscious' || npc.condition === 'recovering') continue
+
+    // 3. 检查信任度
+    const response = evaluateResponse(npc)
+    if (response.type !== 'combat_trigger') continue
+
+    // 4. 检查冷却
+    const lastTrigger = session.npcHostileCooldowns.get(npc.name)
+    if (lastTrigger !== undefined) {
+      const cooldownRemaining = 3 - (session.turnCount - lastTrigger)
+      if (cooldownRemaining > 0) continue
+    }
+
+    // 5. 获取响应类型
+    const personality = getPersonality(npc.name)
+    const combatResponse = response.combatResponse ?? personality.combatResponse
+
+    hostileNPCs.push({ npc: npc.name, response: combatResponse })
+  }
+
+  return hostileNPCs
+}
+
 // ─── 战斗结束后 NPC 状态同步 ──────────────────────
 
 function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array<{ name: string; hp: number; maxHp: number }>): void {
@@ -211,11 +269,13 @@ export type TurnEvent =
   | { type: 'combat_portraits'; monsters: Array<{ id: string; name: string; portrait: string; hp: number; maxHp: number }> }
   | { type: 'game_over'; reason: string; canContinue: boolean; continueHint?: string }
   | { type: 'narrative_warning'; text: string }
+  | { type: 'important_warning'; title: string; text: string }
   | { type: 'item_acquired'; text: string }
   | { type: 'trade_proposal'; npc: string; items: any[]; totalPrice: number; canBargain: boolean }
   | { type: 'death' }
   | { type: 'sync'; session: GameSession; dossier: any; questHint: QuestHint | null }
   | { type: 'combat_narrative'; text: string }
+  | { type: 'combat_narrative_actions'; actions: SceneActions }
   | { type: 'dm_thinking'; text: string }
   | { type: 'system_message'; text: string }
 
@@ -639,6 +699,45 @@ export class GameEngine {
     setSession(this.session)
   }
 
+  /**
+   * 判断是否可以跨区域追踪
+   * @param fromLocation 追踪起点区域
+   * @param toLocation 追踪目标区域
+   * @param toSubLocation 追踪目标子区域
+   * @returns 是否可以追踪
+   */
+  private async canTrackAcrossLocations(
+    fromLocation: string,
+    toLocation: string,
+    toSubLocation?: string
+  ): Promise<boolean> {
+    // 同区域内总是可以追踪
+    if (fromLocation === toLocation) return true
+
+    // 矿道中层/下层不可追踪（太危险，地形复杂）
+    if (toLocation === 'greyspine-mines' && toSubLocation) {
+      const untrackableSubLocations = ['abandoned-barracks', 'abyss-altar', 'void-prism']
+      if (untrackableSubLocations.includes(toSubLocation)) {
+        console.log(`[tracking] 目标区域不可追踪: ${toLocation}/${toSubLocation}`)
+        return false
+      }
+    }
+
+    // 检查是否有连接路径（直接或间接）
+    const hasConnection = connections.some(
+      conn => (conn.from === fromLocation && conn.to === toLocation) ||
+              (conn.from === toLocation && conn.to === fromLocation)
+    )
+
+    if (!hasConnection) {
+      console.log(`[tracking] 区域间无连接: ${fromLocation} -> ${toLocation}`)
+      return false
+    }
+
+    console.log(`[tracking] 可以追踪: ${fromLocation} -> ${toLocation}`)
+    return true
+  }
+
   // ─── 生命周期 ────────────────────────────
 
   /** 创建新游戏 */
@@ -1036,6 +1135,9 @@ export class GameEngine {
     // NPC 状态恢复检查
     checkNPCConditionRecovery(session)
 
+    // 暴力后果战斗打断标记（阶段2不再直接 return，让 DM 先叙事再触发）
+    let pendingCombatInterrupt: { responderName: string; victimName: string; subLocation: string; immediate: boolean } | null = null
+
     // 暴力后果检查
     const alertJson = session.worldState.flags['violence_alert'] as string | undefined
     if (alertJson && !session.combat?.active) {
@@ -1045,89 +1147,195 @@ export class GameEngine {
           const elapsed = session.turnCount - alert.triggerTurn
           console.log(`[consequence] 暴力后果检查: turn=${session.turnCount}, trigger=${alert.triggerTurn}, elapsed=${elapsed}/${alert.delay}, victim=${alert.victimName}, arrived=${alert.arrivedResponder || '无'}`)
 
-          // Player fled the area — discovery happens but no combat
+          // Player fled the area — check if tracking is possible
           if (session.worldState.currentLocation !== alert.location) {
-            alert.responded = true
-            session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-            yield { type: 'narrative_warning', text: `你离开了${alert.location}，但${alert.victimName}的遭遇很快会被发现...` }
-          }
-          // Pre-warning (1 turn before response)
-          else if (elapsed === alert.delay - 1) {
-            yield { type: 'narrative_warning', text: '⚠️ 远处传来急促的脚步声和喊叫声，有人正在赶来！' }
-          }
-          // 阶段 1：响应者到达（注入 DM 叙事上下文，不直接战斗）
-          else if (elapsed === alert.delay && !alert.arrivedResponder) {
-            const { getPersonality: getP } = await import('./npc-relationships.js')
-            // 暴力事件：任何能战斗的 NPC 都会来响应（不需要达到敌对信任度）
-            // 谋杀是公共事件，不是个人恩怨
-            const candidates = session.npcs.filter(n =>
-              n.name !== alert.victimName &&
-              n.condition !== 'unconscious' &&
-              n.condition !== 'recovering' &&
-              getP(n.name).canFight
+            // 检查是否有追踪者且目标区域可追踪
+            const canTrackToNewLocation = await this.canTrackAcrossLocations(
+              alert.location,
+              session.worldState.currentLocation,
+              session.worldState.currentSubLocation
             )
-            // 排序：同子地点 > 与受害者有 bond > 守卫韩猛 > 其他
-            const responder = candidates.sort((a, b) => {
-              let scoreA = 0, scoreB = 0
-              // 同一子地点距离近
-              const subLoc = alert.subLocation
-              if ((a.subLocation ?? a.homeBase) === subLoc) scoreA += 10
-              if ((b.subLocation ?? b.homeBase) === subLoc) scoreB += 10
-              // 与受害者有 bond 关系
-              const bondsA = getP(a.name).bonds ?? []
-              const bondsB = getP(b.name).bonds ?? []
-              if (bondsA.some((bd: any) => bd.npcName === alert.victimName)) scoreA += 5
-              if (bondsB.some((bd: any) => bd.npcName === alert.victimName)) scoreB += 5
-              // 守卫优先
-              if (a.role === 'guard') scoreA += 3
-              if (b.role === 'guard') scoreB += 3
-              return scoreB - scoreA
-            })[0] ?? null
 
-            console.log(`[consequence] 阶段1: 候选响应者=${candidates.map(c => c.name).join(',') || '无'}`)
-            if (responder) {
-              // 移动响应者到现场
-              const { moveNPC } = await import('./npc-mobility.js')
-              moveNPC(responder, alert.subLocation, session)
-              alert.arrivedResponder = responder.name
+            if (canTrackToNewLocation && !alert.trackingAttempted) {
+              // 尝试跨区域追踪
+              alert.trackingAttempted = true
+              alert.delay += 2  // 跨区域追踪额外延迟 +2 轮
+              alert.location = session.worldState.currentLocation  // 更新追踪目标位置
+              alert.subLocation = session.worldState.currentSubLocation
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              console.log(`[consequence] ${responder.name} 到达现场，下一轮将发起战斗`)
+              console.log(`[consequence] 玩家逃离，追踪者将追踪到新区域: ${alert.location}，额外延迟+2轮`)
+              yield { type: 'narrative_warning', text: `你逃离了现场，但你能感觉到身后有人在追踪你的足迹...` }
+            } else if (alert.trackingAttempted && canTrackToNewLocation) {
+              // 已经在追踪中，玩家再次移动
+              const additionalDelay = 2
+              alert.delay = (alert.triggerTurn + alert.delay - session.turnCount) + additionalDelay
+              alert.triggerTurn = session.turnCount
+              alert.location = session.worldState.currentLocation
+              alert.subLocation = session.worldState.currentSubLocation
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] 玩家再次移动，追踪延迟增加: +${additionalDelay}轮`)
+              yield { type: 'narrative_warning', text: `你继续逃跑，但追踪者不会放弃...` }
             } else {
+              // 追踪失败（目标区域不可追踪或没有追踪能力的响应者）
               alert.responded = true
+              alert.trackingFailed = true
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              console.log(`[consequence] 无人响应（所有能战斗的NPC都不可用）`)
-              yield { type: 'narrative_warning', text: '镇民发现了你的暴行，消息正在传开...' }
+              console.log(`[consequence] 追踪失败：目标区域不可追踪或无追踪者`)
+              yield { type: 'narrative_warning', text: `你逃进了更深处，暂时甩掉了追踪...` }
             }
           }
-          // 阶段 2：下一轮自动触发战斗（DM 已经叙事了到达过程）
-          else if (elapsed > alert.delay && alert.arrivedResponder && !alert.responded) {
+          // Pre-warning (仅 delay>=2 时，提前 1 轮预警)
+          else if (alert.delay >= 2 && elapsed === alert.delay - 1) {
+            // 个性化追踪预警
+            if (alert.trackingAttempted && alert.arrivedResponder) {
+              const trackerName = alert.arrivedResponder
+              const personalizedWarnings: Record<string, string> = {
+                '韩猛': '⚠️ 你听到韩猛的怒吼声从远处传来："站住！懦夫！"',
+                '艾琳娜': '⚠️ 森林中的鸟雀突然惊飞，一个冷静的声音在身后响起："跑不掉的。"',
+                '格雷格': '⚠️ 沉重的脚步声越来越近，你感觉到一股压迫性的杀意...',
+                '卡恩': '⚠️ 你感到背后一阵寒意，仿佛有双眼睛在黑暗中注视着你...',
+              }
+              const warning = personalizedWarnings[trackerName] || '⚠️ 远处传来急促的脚步声，追踪者正在接近！'
+              yield { type: 'narrative_warning', text: warning }
+            } else {
+              yield { type: 'narrative_warning', text: '⚠️ 远处传来急促的脚步声和喊叫声，有人正在赶来！' }
+            }
+          }
+          // 阶段 1：响应者确定（到达或当场目击）
+          else if (elapsed >= alert.delay && !alert.arrivedResponder) {
+            const { getPersonality: getP } = await import('./npc-relationships.js')
+
+            let responder = null
+            let alreadyOnSite = false
+
+            // 如果有强制指定的响应者（call_guards），直接使用
+            if (alert.forceResponder) {
+              const forcedNpc = session.npcs.find(n => n.name === alert.forceResponder)
+              if (forcedNpc &&
+                  forcedNpc.condition !== 'unconscious' &&
+                  forcedNpc.condition !== 'recovering' &&
+                  getP(forcedNpc.name).canFight) {
+                responder = forcedNpc
+                alreadyOnSite = (forcedNpc.subLocation ?? forcedNpc.homeBase) === alert.subLocation
+                console.log(`[consequence] 使用强制指定的响应者: ${alert.forceResponder}`)
+              } else {
+                console.log(`[consequence] 强制响应者 ${alert.forceResponder} 不可用，回退到自动选择`)
+              }
+            }
+
+            // 自动选择
+            if (!responder) {
+              const candidates = session.npcs.filter(n =>
+                n.name !== alert.victimName &&
+                n.condition !== 'unconscious' &&
+                n.condition !== 'recovering' &&
+                getP(n.name).canFight
+              )
+
+              // 如果是跨区域追踪，只选择有追踪能力的 NPC
+              const trackingCandidates = alert.trackingAttempted
+                ? candidates.filter(n => getP(n.name).canTrack)
+                : candidates
+
+              responder = trackingCandidates.sort((a, b) => {
+                let scoreA = 0, scoreB = 0
+                const subLoc = alert.subLocation
+                if ((a.subLocation ?? a.homeBase) === subLoc) scoreA += 10
+                if ((b.subLocation ?? b.homeBase) === subLoc) scoreB += 10
+                const bondsA = getP(a.name).bonds ?? []
+                const bondsB = getP(b.name).bonds ?? []
+                if (bondsA.some((bd: any) => bd.npcName === alert.victimName)) scoreA += 5
+                if (bondsB.some((bd: any) => bd.npcName === alert.victimName)) scoreB += 5
+                if (a.role === 'guard') scoreA += 3
+                if (b.role === 'guard') scoreB += 3
+                return scoreB - scoreA
+              })[0] ?? null
+              if (responder) {
+                alreadyOnSite = ((responder as any).subLocation ?? (responder as any).homeBase) === alert.subLocation
+              }
+              console.log(`[consequence] 阶段1: 候选响应者=${trackingCandidates.map(c => c.name).join(',') || '无'}, 追踪=${alert.trackingAttempted || false}, 当场=${alreadyOnSite}`)
+            }
+            if (responder) {
+              alert.arrivedResponder = responder.name
+              if (alreadyOnSite) {
+                // 当场目击 → 即时反应，跳过 moveNPC
+                alert.immediateResponse = true
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] ${responder.name} 就在当场，立即反应！`)
+              } else {
+                // 不在当场 → 移动过来，下一轮开打
+                const { moveNPC } = await import('./npc-mobility.js')
+                moveNPC(responder, alert.subLocation, session)
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] ${responder.name} 赶到现场，下一轮将发起战斗`)
+              }
+
+              // 触发信任度传播（响应者到达现场时）
+              if (!alert.trustCascadeTriggered) {
+                const { propagateViolenceTrust } = await import('./trust-system.js')
+                const cascadeResult = propagateViolenceTrust(
+                  session,
+                  alert.victimName,
+                  responder.name,
+                  alert.witnesses ?? [],
+                  `暴力事件：${alert.victimName}被攻击`
+                )
+                alert.trustCascadeTriggered = true
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[trust-cascade] ${cascadeResult.summary}`)
+                yield { type: 'narrative_warning', text: `💔 ${cascadeResult.summary}` }
+              }
+            } else {
+              alert.responded = true
+
+              // 检查是否是追踪失败（有追踪尝试但无追踪者）
+              if (alert.trackingAttempted) {
+                // 追踪失败的个性化叙事
+                const failedTrackerName = alert.forceResponder || '追踪者'
+                const trackingFailedNarratives: Record<string, string> = {
+                  '韩猛': `韩猛在矿道入口停下，盯着黑暗深处，拳头握得咯咯作响。"该死...那里连我都不敢进。"`,
+                  '艾琳娜': `艾琳娜站在矿道入口，琥珀色的眼睛闪过一丝复杂的情绪。"你选择了一条更危险的路。"`,
+                  '格雷格': `格雷格在矿道入口沉默地站了很久，最后转身离开，背影透着说不出的疲惫。`,
+                }
+                const narrative = trackingFailedNarratives[failedTrackerName] || `${failedTrackerName}在危险区域边缘停下，无法继续追踪。`
+                yield { type: 'narrative_warning', text: `🚫 ${narrative}` }
+              }
+
+              // 即使无人响应，也要触发信任度传播
+              if (!alert.trustCascadeTriggered) {
+                const { propagateViolenceTrust } = await import('./trust-system.js')
+                const cascadeResult = propagateViolenceTrust(
+                  session,
+                  alert.victimName,
+                  null,
+                  alert.witnesses ?? [],
+                  `暴力事件：${alert.victimName}被攻击`
+                )
+                alert.trustCascadeTriggered = true
+                console.log(`[trust-cascade] ${cascadeResult.summary}`)
+                yield { type: 'narrative_warning', text: `💔 ${cascadeResult.summary}` }
+              }
+
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] 无人响应（所有能战斗的NPC都不可用或追踪失败）`)
+              if (!alert.trackingAttempted) {
+                yield { type: 'narrative_warning', text: '镇民发现了你的暴行，消息正在传开...' }
+              }
+            }
+          }
+          // 阶段 2：标记战斗待触发（不直接 return，让 DM 先叙事玩家行动再打断）
+          // 注意：用 if 而非 else if，使当场目击时阶段1→2同轮串联
+          if (alert.arrivedResponder && !alert.responded && (elapsed > alert.delay || alert.immediateResponse)) {
             alert.responded = true
             alert.combatJustStarted = alert.arrivedResponder
             session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-
-            const responderNpc = session.npcs.find(n => n.name === alert.arrivedResponder)
-            if (responderNpc && responderNpc.condition !== 'unconscious') {
-              const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
-              const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
-              const allDb = [...monstersJson, ...npcCombatJson]
-              const { startCombat } = await import('./combat-manager.js')
-
-              try {
-                startCombat(session, [alert.arrivedResponder], allDb as any)
-                console.log(`[consequence] ${alert.arrivedResponder} 发起战斗！`)
-                yield { type: 'narrative_warning', text: `⚔️ ${alert.arrivedResponder}向你发起了攻击！` }
-                yield* this.emitCombatStart(`${alert.arrivedResponder}怒声呵斥，向你冲来！`)
-                yield* this.combatDMNarrative(`${alert.arrivedResponder}因为你对${alert.victimName}的暴行而冲上来与你战斗。场景在${getSubLocationName(alert.subLocation)}。请描写战斗开场的紧张氛围。`)
-                // 暴力后果触发战斗——事件打断玩家行动
-                yield { type: 'narrative_warning', text: `你还没来得及行动——${alert.arrivedResponder}已经冲到面前！` }
-                console.log(`[consequence] 战斗已触发，玩家行动被打断: "${input}"`)
-                session.dmMessages = getDMMessages()
-                yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
-                return
-              } catch (err) {
-                console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
-              }
+            pendingCombatInterrupt = {
+              responderName: alert.arrivedResponder,
+              victimName: alert.victimName,
+              subLocation: alert.subLocation,
+              immediate: !!alert.immediateResponse,
             }
+            console.log(`[consequence] ${alert.arrivedResponder} 准备发起战斗（等 DM 叙事后触发）`)
           }
         }
       } catch { /* malformed alert JSON, ignore */ }
@@ -1139,6 +1347,95 @@ export class GameEngine {
       const result = changeTrust(session, bp)
       if (result.applied) {
         yield { type: 'broken_promise', npcName: bp.npcName, reason: bp.reason }
+      }
+    }
+
+    // 自动检测敌对 NPC
+    const hostileNPCs = await checkHostileNPCs(session)
+    if (hostileNPCs.length > 0) {
+      console.log(`[hostile-npc] 检测到 ${hostileNPCs.length} 个敌对 NPC:`, hostileNPCs.map(h => `${h.npc}(${h.response})`).join(', '))
+
+      // 只处理第一个敌对 NPC（避免同时触发多个战斗）
+      const { npc: hostileNPC, response: combatResponse } = hostileNPCs[0]
+
+      // 记录冷却时间
+      if (!session.npcHostileCooldowns) {
+        session.npcHostileCooldowns = new Map()
+      }
+      session.npcHostileCooldowns.set(hostileNPC, session.turnCount)
+
+      // 根据响应类型执行
+      if (combatResponse === 'fight') {
+        // 直接战斗
+        yield { type: 'narrative_warning', text: `⚔️ ${hostileNPC}对你的敌意已经到达极限，发起了攻击！` }
+
+        const monstersJson = await import('../data/monsters.json', { with: { type: 'json' } })
+        const npcCombatJson = await import('../data/npc-combatants.json', { with: { type: 'json' } })
+        const allDb = [...monstersJson.default, ...npcCombatJson.default]
+
+        try {
+          const combat = startCombat(session, [hostileNPC], allDb)
+          yield* this.emitCombatStart(`${hostileNPC}向你发起攻击！`)
+          return
+        } catch (e: any) {
+          console.error(`[hostile-npc] 触发战斗失败:`, e)
+        }
+      } else if (combatResponse === 'call_guards') {
+        // 召唤守卫
+        yield { type: 'narrative_warning', text: `🚨 ${hostileNPC}大声呼救，召唤守卫！` }
+
+        const { getPersonality } = await import('./npc-relationships.js')
+        const personality = getPersonality(hostileNPC)
+        const guards = personality.bonds
+          .map(b => session.npcs.find(n => n.name === b.npcName))
+          .filter(n => n && getPersonality(n.name).canFight)
+
+        if (guards.length > 0) {
+          const guard = guards[0]!
+          yield { type: 'narrative_warning', text: `${guard.name}将在 2 轮后赶到。` }
+
+          // 收集目击者（当前位置所有其他 NPC）
+          const witnesses = session.npcs
+            .filter(n =>
+              n.name !== hostileNPC &&
+              n.location === session.worldState.currentLocation &&
+              (!session.worldState.currentSubLocation || n.subLocation === session.worldState.currentSubLocation)
+            )
+            .map(n => n.name)
+
+          // 创建 violence_alert（使用旧系统的 JSON 格式）
+          session.worldState.flags['violence_alert'] = JSON.stringify({
+            triggerTurn: session.turnCount,
+            victimName: hostileNPC,
+            location: session.worldState.currentLocation,
+            subLocation: session.worldState.currentSubLocation,
+            delay: 2,
+            responded: false,
+            forceResponder: guard.name,
+            witnesses,
+          })
+        }
+      } else if (combatResponse === 'flee') {
+        // 逃跑
+        const npc = session.npcs.find(n => n.name === hostileNPC)!
+        const safeLocation = npc.homeBase
+        const currentSub = npc.subLocation ?? npc.homeBase
+
+        if (safeLocation !== currentSub) {
+          npc.subLocation = safeLocation
+          yield { type: 'narrative_warning', text: `💨 ${hostileNPC}惊恐地逃到了${safeLocation}。` }
+        } else {
+          npc.subLocation = currentSub === 'tavern-main' ? 'tavern-kitchen' : 'tavern-main'
+          yield { type: 'narrative_warning', text: `💨 ${hostileNPC}惊恐地躲到了角落里。` }
+        }
+      } else if (combatResponse === 'plot_revenge') {
+        // 事后报复
+        yield { type: 'narrative_warning', text: `😈 ${hostileNPC}冷冷地看着你，眼中闪过一丝杀意...` }
+        session.worldState.flags[`${hostileNPC}_revenge`] = true
+      } else if (combatResponse === 'ban_from_location') {
+        // 禁入
+        yield { type: 'narrative_warning', text: `🚫 ${hostileNPC}愤怒地驱赶你："滚出去！你不再受欢迎！"` }
+        session.worldState.flags[`${hostileNPC}_banned`] = true
       }
     }
 
@@ -1302,19 +1599,28 @@ export class GameEngine {
             (n.subLocation ?? n.homeBase) === session.worldState.currentSubLocation &&
             n.condition !== 'unconscious'
           )
-          if (witnesses.length > 0) delay -= 3
           const { getPersonality } = await import('./npc-relationships.js')
-          // Civilian witness reports faster
-          if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
-          // 受害者有亲近 NPC（bond>=1.0 的战斗型 NPC）→ 更快赶来
-          const hasBondedFighter = session.npcs.some(n => {
-            if (n.name === action.target || n.condition === 'unconscious') return false
-            const p = getPersonality(n.name)
-            return p.canFight && p.bonds.some(b => b.npcName === action.target && b.weight >= 1.0)
-          })
-          if (hasBondedFighter) delay -= 2
+          // 同子地点且能战斗的 NPC → 当场目击，0轮立即反应
+          const onSiteFighters = witnesses.filter(n => getPersonality(n.name).canFight)
+          if (onSiteFighters.length > 0) {
+            delay = 0
+            console.log(`[consequence] 当场目击者(战斗型): ${onSiteFighters.map(n => n.name).join(',')} → 0轮立即反应`)
+          } else {
+            if (witnesses.length > 0) delay -= 3
+            // Civilian witness reports faster
+            if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
+            // 受害者有亲近 NPC（bond>=1.0 的战斗型 NPC）→ 更快赶来
+            const hasBondedFighter = session.npcs.some(n => {
+              if (n.name === action.target || n.condition === 'unconscious') return false
+              const p = getPersonality(n.name)
+              return p.canFight && p.bonds.some(b => b.npcName === action.target && b.weight >= 1.0)
+            })
+            if (hasBondedFighter) delay -= 2
+            delay = Math.max(1, delay)
+          }
 
-          delay = Math.max(1, delay)
+          // 收集目击者名称列表（用于信任度传播）
+          const witnessNames = witnesses.map(n => n.name)
 
           session.worldState.flags['violence_alert'] = JSON.stringify({
             triggerTurn: session.turnCount,
@@ -1323,7 +1629,9 @@ export class GameEngine {
             subLocation: session.worldState.currentSubLocation,
             delay,
             responded: false,
+            witnesses: witnessNames,
           })
+          console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应, 目击者: ${witnessNames.join(', ') || '无'}`)
           console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应`)
         }
       }
@@ -1516,6 +1824,47 @@ export class GameEngine {
         !invalidNpcs.some(name => s.includes(name) && (s.includes('交谈') || s.includes('对话') || s.includes('聊') || s.includes('问') || s.includes('说')))
       )
     }
+    // ─── 暴力后果战斗打断（DM 叙事完毕后触发） ───
+    if (pendingCombatInterrupt) {
+      const pci = pendingCombatInterrupt
+      const responderNpc = session.npcs.find(n => n.name === pci.responderName)
+      if (responderNpc && responderNpc.condition !== 'unconscious') {
+        const monstersJson = (await import('../data/monsters.json', { with: { type: 'json' } })).default
+        const npcCombatJson = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default
+        const allDb = [...monstersJson, ...npcCombatJson]
+        const { startCombat } = await import('./combat-manager.js')
+        try {
+          startCombat(session, [pci.responderName], allDb as any)
+          console.log(`[consequence] ${pci.responderName} 发起战斗！（DM 叙事后触发）`)
+
+          // 先发 dm_end 关闭上一段叙事，再触发战斗
+          yield {
+            type: 'dm_end',
+            combat: true,
+            pendingMonster: !!session.combat?.pendingMonsterTurn,
+            actions: null as any,
+          }
+
+          yield* this.emitCombatStart()
+          // 用 DM 生成有上下文的战斗开场叙事
+          const loc = getSubLocationName(pci.subLocation)
+          const playerAction = input.length > 20 ? input.substring(0, 20) + '…' : input
+          yield* this.combatDMNarrative(
+            `${pci.responderName}因为玩家对${pci.victimName}的暴行而冲上来与玩家战斗。` +
+            `玩家刚才正在"${playerAction}"。场景在${loc}。` +
+            (pci.immediate ? `${pci.responderName}就在旁边，当场目击了一切，立刻出手。` : `${pci.responderName}赶到现场，截住了玩家。`) +
+            `请描写这个被打断的戏剧性瞬间——先简短描写玩家当前行动的场景，然后急转直下，${pci.responderName}出现并发起攻击。用2-3句话，营造紧张感。`
+          )
+          session.dmMessages = getDMMessages()
+          yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+          return
+        } catch (err) {
+          console.error(`[consequence] 战斗触发失败:`, (err as Error).message)
+        }
+      }
+      pendingCombatInterrupt = null
+    }
+
     yield {
       type: 'dm_end',
       combat: !!session.combat?.active,
@@ -1605,7 +1954,7 @@ export class GameEngine {
         // Emit combat_init + combat_action_req for structured combat UI
         yield* this.emitCombatStart(`${monsterNames.join('和')}向你发起攻击！`)
         const loc = session.worldState.currentLocation === 'twilight-woods' ? '暮色森林' : session.worldState.currentLocation === 'greyspine-mines' ? '灰脊矿道' : '碎石荒原'
-        yield* this.combatDMNarrative(`在${loc}中，${monsterNames.join('和')}突然出现并向玩家发起攻击。请描写战斗开场的紧张氛围。`)
+        yield* this.combatDMNarrative(`${monsterNames.join('和')}从暗处现身，向玩家发起突袭！描写怪物出现的方式、它们的外貌和威胁感，以及战斗一触即发的紧迫氛围。`)
       } catch (err) {
         console.error(`[combat] 遭遇触发失败:`, (err as Error).message)
       }
@@ -1858,12 +2207,52 @@ export class GameEngine {
 
   // ─── 战斗 DM 叙事 ────────────────────────────
 
-  /** 调用 DM 生成 2-3 句战斗场景叙事（开场/结束/逃跑） */
+  /** 自动构建当前战斗上下文（地点、时间、玩家状态、敌人信息） */
+  private buildCombatContext(): string {
+    const session = this.session
+    const ws = session.worldState
+    const loc = getSubLocationName(ws.currentSubLocation ?? '') || ws.currentLocation
+    const timeMap: Record<string, string> = { morning: '清晨', noon: '正午', afternoon: '下午', evening: '傍晚', night: '深夜' }
+    const time = timeMap[ws.timeOfDay] ?? ws.timeOfDay
+    const player = session.player
+    const hpPct = Math.round((player.hp / player.maxHp) * 100)
+    const hpDesc = hpPct > 75 ? '状态良好' : hpPct > 40 ? '有些疲惫，身上带着伤' : hpPct > 15 ? '伤痕累累，摇摇欲坠' : '命悬一线'
+    const weapon = player.equipped?.weapon?.name ?? '徒手'
+    const armor = player.equipped?.armor?.name
+
+    const combat = session.combat
+    let enemyDesc = ''
+    if (combat?.monsters) {
+      const alive = combat.monsters.filter(m => m.hp > 0)
+      if (alive.length > 0) {
+        enemyDesc = alive.map(m => {
+          const ePct = Math.round((m.hp / m.maxHp) * 100)
+          const eState = ePct > 60 ? '' : ePct > 25 ? '（已受伤）' : '（重伤）'
+          return `${m.name}${eState}`
+        }).join('、')
+      }
+    }
+
+    let ctx = `[场景] ${loc}，${time}。`
+    const classId = Object.entries(CLASS_TEMPLATES).find(([, t]) =>
+      JSON.stringify(t.abilities) === JSON.stringify(player.abilities))?.[0] ?? ''
+    const className = CLASS_TEMPLATES[classId]?.nameZh ?? '冒险者'
+    ctx += ` 玩家${player.name}，${className}，装备${weapon}${armor ? `和${armor}` : ''}，${hpDesc}。`
+    if (enemyDesc) ctx += ` 对手：${enemyDesc}。`
+    return ctx
+  }
+
+  /** 调用 DM 生成 2-3 句战斗场景叙事（开场/结束/逃跑）
+   *  大部分工具被临时静音，只保留 SetActions 以便生成后续选项 */
   private async *combatDMNarrative(scene: string): AsyncGenerator<TurnEvent> {
+    const context = this.buildCombatContext()
     let fullText = ''
+    muteDMTools()  // 🔇 静音：只保留 SetActions
     try {
       for await (const event of dmRespond(
-        `[战斗叙事请求] ${scene}\n用2-3句话描写这个场景。不要调用任何工具，不要提及HP/AC/骰子等数值。只输出叙事文字。`
+        `[战斗叙事请求]\n${context}\n${scene}\n` +
+        `要求：用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。` +
+        `不要提及HP/AC/骰子等数值。先输出叙事文字，然后调用 SetActions 提供2-3个后续行动建议。`
       )) {
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
@@ -1876,10 +2265,16 @@ export class GameEngine {
       if (fullText.trim()) {
         yield { type: 'combat_narrative', text: fullText.trim() }
       }
+      // 如果 DM 调用了 SetActions 生成了选项，传出去
+      const narrativeActions = consumeActions()
+      if (narrativeActions) {
+        yield { type: 'combat_narrative_actions', actions: narrativeActions }
+      }
     } catch (err) {
       console.error('[combat-dm] 战斗叙事失败:', (err as Error).message?.slice(0, 80))
     } finally {
-      consumeActions() // 清空战斗叙事期间 DM 可能残留的 SetActions
+      unmuteDMTools()  // 🔊 恢复：后续 DM 调用恢复全部工具
+      consumeActions() // 兜底清理
     }
   }
 
@@ -1991,7 +2386,7 @@ export class GameEngine {
           combat.phase = 'ended'
           syncNPCConditionAfterCombat(session, combatMonsters)
           yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
-          yield* this.combatDMNarrative(`玩家在与${enemyNames}的战斗中倒下了。描写最后的时刻。`)
+          yield* this.combatDMNarrative(`${enemyNames}的猛攻势不可挡。描写致命一击如何落下，玩家倒地的最后瞬间，以及意识消散前最后看到的画面。`)
           yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
           if (session.player.hp <= 0) {
             session.dossierData = this.dossier.toJSON()
@@ -2036,7 +2431,7 @@ export class GameEngine {
           } catch { /* ignore */ }
         }
 
-        yield* this.combatDMNarrative(`玩家从与${enemyNames}的战斗中成功逃脱。描写逃跑的紧迫感和脱离战斗后的喘息。`)
+        yield* this.combatDMNarrative(`玩家抓住空隙从${enemyNames}的包围中逃脱！描写逃跑的慌乱瞬间——如何冲出包围，身后追兵的怒吼或脚步声，以及脱离危险后大口喘气的片刻安宁。`)
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
@@ -2080,8 +2475,10 @@ export class GameEngine {
         const isNpcFight = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
         yield* this.combatDMNarrative(
           turnResult.result === 'victory'
-            ? `玩家${isNpcFight ? '击倒' : '击败'}了${enemyNames}。${isNpcFight ? '对方失去意识倒在地上。' : ''}描写战斗胜利后的场景。`
-            : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
+            ? (isNpcFight
+                ? `玩家的最后一击将${enemyNames}击倒在地，对方失去意识。描写这个人与人对决的结局——胜利者站在倒下的对手面前，周围人的反应，以及这场冲突留下的紧张余韵。`
+                : `玩家一击制胜，${enemyNames}轰然倒下！描写最后致命一击的画面，战利品散落的场景，以及战斗后短暂的宁静。`)
+            : `${enemyNames}的攻势压垮了玩家。描写玩家倒下的最后时刻——是什么样的一击终结了战斗，意识模糊中最后的感知。`
         )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
@@ -2105,8 +2502,8 @@ export class GameEngine {
       endCombat(session)
       yield* this.combatDMNarrative(
         endCheck.result === 'victory'
-          ? `玩家击败了${enemyNames}。描写战斗胜利后的场景。`
-          : `玩家在与${enemyNames}的战斗中倒下了。描写失败的绝望氛围。`
+          ? `${enemyNames}终于倒下了！描写战场上恢复平静的瞬间，玩家擦去汗水或鲜血，审视这场胜利的余波。`
+          : `玩家在${enemyNames}的猛攻下再也支撑不住。描写最后的挣扎和倒下的瞬间，战场归于沉寂。`
       )
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
       yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
@@ -2151,8 +2548,8 @@ export class GameEngine {
         }
         yield* this.combatDMNarrative(
           monsterResult.result === 'victory'
-            ? `玩家击败了${enemyNames}。描写战斗胜利后的场景。`
-            : `玩家在与${enemyNames}的战斗中倒下了。描写最后的时刻。`
+            ? `在激烈的缠斗后，${enemyNames}终于倒下。描写最后一个敌人倒地的画面，战斗留下的痕迹，以及劫后余生的片刻喘息。`
+            : `${enemyNames}发动了致命攻击。描写玩家在最后一击下倒下的瞬间，世界在眼前逐渐模糊。`
         )
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         // endCombat already called by executeMonsterPhase for defeat

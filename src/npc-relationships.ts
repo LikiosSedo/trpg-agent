@@ -18,6 +18,13 @@ export interface NPCPersonality {
    * 设计原则：刚认识的人不可能一天交心，但做了重大事情（任务）仍可突破。
    */
   trustCeiling: Record<number, number>
+  /**
+   * 是否有跨区域追踪能力。
+   * 只有战斗能力强且有追踪经验的 NPC 才能跨区域追踪玩家。
+   * 追踪范围：地表区域（镇、森林、荒原）+ 矿道上层。
+   * 不可追踪：矿道中层/下层（太危险，地形复杂）。
+   */
+  canTrack: boolean
 }
 
 const DEFAULT_THRESHOLDS: TrustThresholds = {
@@ -37,6 +44,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: ['attack_小莉', 'harm_小莉'],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
+    canTrack: true,  // 前佣兵，有追踪经验
   },
   // ── 小莉：孩子，天真易信任，但也容易害怕 ──
   // 孩子对善意的人打开心扉很快，Ch1 就能到5
@@ -49,6 +57,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: [],
     trustCeiling: { 1: 5, 2: 7, 3: 9, 4: 10 },
+    canTrack: false,  // 孩子，没有追踪能力
   },
   // ── 艾琳娜：公会长，职业化，用数据说话 ──
   // Ch1 保持职业距离(3)，需要看到你的能力和忠诚才会逐步开放
@@ -63,6 +72,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: ['betray_guild'],
     trustCeiling: { 1: 3, 2: 5, 3: 7, 4: 10 },
+    canTrack: true,  // 高等精灵，感知敏锐，冒险者经验丰富
   },
   // ── 维克多：被胁迫的镇长，恐惧支配一切 ──
   // Ch1-2 几乎不可能打开心防，Ch3 绝望时才可能松口，Ch4 彻底崩溃
@@ -73,6 +83,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     bonds: [],
     permanentGrudges: [],
     trustCeiling: { 1: 2, 2: 4, 3: 6, 4: 10 },
+    canTrack: false,  // 文官，没有战斗和追踪能力
   },
   // ── 卡恩：教团卧底，极度伪装 ──
   // 表面友善但内心封闭，信任增长极慢且上限最低
@@ -84,6 +95,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     bonds: [],
     permanentGrudges: [],
     trustCeiling: { 1: 3, 2: 4, 3: 6, 4: 10 },
+    canTrack: true,  // 教团成员，有特殊能力（但不会轻易暴露）
   },
   // ── 陈妈：旅店大妈，八卦之王，最容易交心 ──
   // 天生健谈，Ch1 一碗热汤就能聊开(5)，但深层情报她自己也是慢慢发现的
@@ -96,6 +108,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: [],
     trustCeiling: { 1: 5, 2: 7, 3: 9, 4: 10 },
+    canTrack: false,  // 普通镇民，没有追踪能力
   },
   // ── 格罗姆：矮人铁匠，尊重行动不尊重嘴皮 ──
   // 需要用实际行动证明自己（买东西、帮忙、完成任务）才会认可你
@@ -106,6 +119,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     bonds: [],
     permanentGrudges: [],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
+    canTrack: false,  // 矮人铁匠，不会离开铺子追踪
   },
   // ── 叶绿：草药师，温和但心事重重 ──
   // 对客人友善(4)，但助手的事让她越来越焦虑，Ch2 后才开始向人倾诉
@@ -118,6 +132,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: [],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
+    canTrack: false,  // 草药师，没有战斗和追踪能力
   },
   // ── 韩猛：公会军官，纪律严明，忠于艾琳娜 ──
   // 跟着艾琳娜的节奏开放，但作为军人更看重行动
@@ -130,6 +145,7 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     ],
     permanentGrudges: [],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
+    canTrack: true,  // 退役战士，追踪专家
   },
 }
 
@@ -141,5 +157,6 @@ export function getPersonality(npcName: string): NPCPersonality {
     bonds: [],
     permanentGrudges: [],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
+    canTrack: false,
   }
 }
