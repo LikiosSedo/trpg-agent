@@ -1902,6 +1902,17 @@ export class GameEngine {
     yield { type: 'audio', bgm: combatAudio.bgm, ambient: combatAudio.ambient }
 
     const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+
+    // 发送战斗立绘（确保所有战斗触发路径都显示立绘）
+    yield {
+      type: 'combat_portraits',
+      monsters: aliveMonsters.map(m => ({
+        id: m.id, name: m.name,
+        portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
+        hp: m.hp, maxHp: m.maxHp,
+      })),
+    }
+
     yield {
       type: 'combat_init',
       monsters: aliveMonsters.map(m => ({
