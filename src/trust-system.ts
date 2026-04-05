@@ -128,6 +128,13 @@ export function evaluateResponse(npc: NPC): NPCResponse {
   }
 
   if (t <= personality.thresholds.avoidance) {
+    // 战斗型 NPC 不回避——他们会敌对质问，等信任度更低时攻击
+    if (personality.canFight) {
+      return {
+        type: 'hostile_dialogue',
+        description: `${npc.name}对你充满敌意，随时可能动手。`,
+      }
+    }
     return {
       type: 'avoidance',
       description: `${npc.name}看到你立刻转身离开，不愿和你有任何接触。`,
