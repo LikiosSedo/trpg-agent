@@ -461,16 +461,17 @@ export function executePlayerTurn(
     getFacts().addEvent('战斗胜利，获得战利品', 'critical')
     session.worldState.flags['combat_victories'] = (Number(session.worldState.flags['combat_victories'] ?? 0)) + 1
 
-    // 降低所有被击败NPC的信任度到-10
+    // 降低被击败NPC本人的信任度到-10
+    // 用 reputation channel 避免触发 cascadeReputation 连坐
+    // 全镇传播由 violence_alert 延迟后的 propagateViolenceTrust 统一处理
     for (const monster of combat.monsters) {
       if (monster.hp <= 0) {
-        // 检查是否是NPC（通过session.npcs查找）
         const npc = session.npcs.find(n => n.name === monster.name)
         if (npc) {
           changeTrust(session, {
             npcName: monster.name,
-            channel: 'combat',
-            delta: -10 - npc.trust, // 直接设置为-10（delta = 目标值 - 当前值）
+            channel: 'reputation',
+            delta: -10 - npc.trust,
             reason: '被你击败',
             turn: session.turnCount,
           })
