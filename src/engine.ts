@@ -820,10 +820,7 @@ export class GameEngine {
                 const here = session.npcs.filter(n =>
                   n.location === session.worldState.currentLocation &&
                   (n.subLocation ?? n.homeBase) === p.id)
-                const known = here.filter(n => this.dossier.isUnlocked(n.name)).map(n => n.name)
-                const unknownCount = here.length - known.length
-                if (unknownCount > 0) known.push(unknownCount === 1 ? '???' : `??? (+${unknownCount})`)
-                return known
+                return here.filter(n => this.dossier.isUnlocked(n.name)).map(n => n.name)
               })(),
             })) ?? [],
           reachableAreas,

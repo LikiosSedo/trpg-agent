@@ -198,9 +198,10 @@ wss.on('connection', (ws: WebSocket, req) => {
       case 'inventory':
       case 'recap':
       case 'chapter':
-      case 'help':
       case 'saves':
         send('panel', { panel: result.type, data: result.data }); break
+      case 'help':
+        send('open_guide', {}); break
       case 'npc_list':
         send('panel', { panel: 'npc', data: result.data }); break
       case 'npc_detail':
@@ -210,7 +211,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         else send('system', { text: '附近没有商店。' })
         break
       case 'world':
-        send('system', { text: renderWorldGuideText() }); break
+        send('open_guide', {}); break
       case 'save':
         send('system', { text: `游戏已保存: ${result.savePath}` }); break
       case 'load':
