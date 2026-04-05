@@ -2687,6 +2687,11 @@ function handleWsMessage(e) {
       appendMsg(msg.text, 'combat-narrative')
       break
 
+    case 'combat_narrative_actions':
+      // 战斗叙事后 DM 生成的后续行动建议
+      if (msg.actions && !combatMode) showSceneActions(msg.actions)
+      break
+
     case 'combat_monster':
       // 怪物回合延迟显示（让玩家先看到自己的结果）
       setTimeout(() => {
@@ -3588,7 +3593,7 @@ const SFX_MAP = {
   // ── 战斗：受击（敌方打玩家，沉闷肉感 + 铠甲重击混合） ──
   enemy_hit:      ['kenney-impact/impactSoft_heavy_000.ogg', 'kenney-impact/impactSoft_heavy_001.ogg', 'kenney-impact/impactSoft_heavy_002.ogg', 'kenney-impact/impactPlate_heavy_000.ogg', 'kenney-impact/impactPlate_heavy_001.ogg'],
   // ── 战斗：开始 / 结束 ──
-  combat_start:   ['kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg', 'kenney-rpg/drawKnife3.ogg'],
+  combat_start:   ['sword_unsheathe_01.wav', 'kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg'],
   creature_die:   ['creature_die_01.ogg'],
   victory:        ['item_gem_01.ogg', 'item_gem_02.ogg'],
   death:          ['creature_hurt_01.ogg'],
@@ -3601,7 +3606,7 @@ const SFX_MAP = {
   ui_tab:         ['kenney-rpg/cloth1.ogg', 'kenney-rpg/cloth2.ogg'],
   ui_send:        ['kenney-rpg/bookFlip1.ogg'],
   ui_coins:       ['kenney-rpg/handleCoins.ogg', 'kenney-rpg/handleCoins2.ogg'],
-  draw_weapon:    ['kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg'],
+  draw_weapon:    ['sword_unsheathe_01.wav', 'kenney-rpg/drawKnife1.ogg'],
   door:           ['kenney-rpg/doorOpen_1.ogg', 'kenney-rpg/doorOpen_2.ogg'],
   npc_card:       ['kenney-rpg/bookFlip2.ogg', 'kenney-rpg/bookFlip3.ogg'],
   item_acquire:   ['item_misc_01.ogg', 'item_misc_02.ogg'],
