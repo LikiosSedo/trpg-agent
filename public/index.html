@@ -3474,11 +3474,10 @@ function showImportantWarning(data) {
   overlay.style.zIndex = '300'
   overlay.innerHTML = `
     <div class="npc-card-popup" style="max-width:420px;text-align:center" onclick="event.stopPropagation()">
-      <div style="padding:40px 24px 24px">
-        <div style="font-size:42px;margin-bottom:16px">🎭</div>
-        <div style="font-size:18px;font-weight:bold;color:#ff9800;margin-bottom:16px">${esc(data.title)}</div>
-        <div style="font-size:14px;color:#ccc;line-height:1.8;margin-bottom:24px;white-space:pre-line">${esc(data.text)}</div>
-        <button onclick="this.closest('.npc-card-overlay').remove()" style="background:#533483;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:15px;cursor:pointer;width:100%">我明白了</button>
+      <div style="padding:48px 28px 28px">
+        <div style="font-size:15px;font-style:italic;color:#8a7eb5;letter-spacing:2px;margin-bottom:20px">${esc(data.title)}</div>
+        <div style="font-size:14px;color:#b0a8c8;line-height:2;margin-bottom:32px;white-space:pre-line">${esc(data.text)}</div>
+        <button onclick="this.closest('.npc-card-overlay').remove()" style="background:rgba(83,52,131,0.6);color:#b0a8c8;border:1px solid rgba(138,126,181,0.3);padding:10px 32px;border-radius:6px;font-size:13px;cursor:pointer;width:100%;letter-spacing:1px">. . .</button>
       </div>
     </div>`
   document.body.appendChild(overlay)

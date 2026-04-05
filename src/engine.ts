@@ -1585,7 +1585,7 @@ export class GameEngine {
       if (actionResult.firstInnocentKill) {
         yield {
           type: 'important_warning',
-          title: '⚠️ 谜语人的低语',
+          title: '低语',
           text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
         }
       }
@@ -2565,7 +2565,7 @@ export class GameEngine {
         if (turnResult.firstInnocentKill) {
           yield {
             type: 'important_warning',
-            title: '⚠️ 谜语人的低语',
+            title: '低语',
             text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
           }
         }
