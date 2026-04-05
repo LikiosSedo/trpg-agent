@@ -34,6 +34,7 @@ export async function executeAction(action: PlayerAction, session: GameSession):
         return {
           action, success: !result.isError,
           output: result.output, toolsCalled: ['Attack'],
+          firstInnocentKill: result.firstInnocentKill,
         }
       }
 

@@ -1231,6 +1231,14 @@ export class GameEngine {
       console.log(`[rules-agent] 预执行: ${action.type} → 成功:${actionResult.success} 工具:${actionResult.toolsCalled.join(',')}`)
       console.log(`[rules-agent] 结果: ${actionResult.output.slice(0, 200)}`)
       parts.push(formatActionResult(actionResult))
+
+      // 首次击败无辜NPC提示
+      if (actionResult.firstInnocentKill) {
+        yield {
+          type: 'system_message',
+          text: '⚠️ 刀刃所向，非善非恶...只是选择。但选择，终将塑造你。',
+        }
+      }
     } else {
       console.log(`[rules-agent] 跳过预执行: ${action.type} (TALK/NARRATIVE 交给 DM)`)
     }

@@ -234,6 +234,7 @@ export const AttackTool: Tool = {
         output: [
           ...round.roundLog,
         ].filter(Boolean).join('\n'),
+        firstInnocentKill: round.firstInnocentKill,
       }
     } catch (e: any) {
       return { output: e.message, isError: true }

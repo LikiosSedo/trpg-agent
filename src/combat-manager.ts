@@ -434,6 +434,7 @@ export function executePlayerTurn(
   isCritical?: boolean
   killed?: boolean
   targetName?: string
+  firstInnocentKill?: boolean
 } {
   const combat = session.combat!
   const roundLog: string[] = []
@@ -453,11 +454,23 @@ export function executePlayerTurn(
     if (loot.gold > 0) roundLog.push(`获得金币: ${loot.gold}`)
     getFacts().addEvent('战斗胜利，获得战利品', 'critical')
     session.worldState.flags['combat_victories'] = (Number(session.worldState.flags['combat_victories'] ?? 0)) + 1
+
+    // 检查是否首次击败无辜NPC
+    let firstInnocentKill = false
+    if (!session.worldState.flags['first_innocent_kill']) {
+      const target = session.combat?.monsters.find(m => m.id === targetId)
+      if (target?.nonlethal) {
+        session.worldState.flags['first_innocent_kill'] = true
+        firstInnocentKill = true
+      }
+    }
+
     endCombat(session)
     return {
       roundLog, ended: true, result: 'victory', loot,
       hit: attackResult.hit, isCritical: attackResult.isCritical,
       killed: attackResult.killed, targetName: targetId,
+      firstInnocentKill,
     }
   }
 

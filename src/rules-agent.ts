@@ -35,6 +35,7 @@ export interface ActionResult {
   success: boolean
   output: string
   toolsCalled: string[]
+  firstInnocentKill?: boolean  // 首次击败无辜NPC标记
 }
 
 // ─── 第一级：快速正则匹配 ────────────────────

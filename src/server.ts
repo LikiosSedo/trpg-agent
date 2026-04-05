@@ -138,7 +138,6 @@ app.get('/api/debug/session', (_req, res) => {
     res.json({
       player: {
         name: session.player.name,
-        class: session.player.class,
         hp: session.player.hp,
         maxHp: session.player.maxHp,
         gold: session.player.gold,

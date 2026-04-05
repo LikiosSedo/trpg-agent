@@ -88,6 +88,7 @@ export interface MonsterInstance {
   specialAbility: string
   loot: string[]
   conditions: string[]  // 状态效果，如 'paralyzed'
+  nonlethal?: boolean   // 是否为无辜NPC（击败后会恢复）
 }
 
 /** 先攻序列中的一个条目 */
