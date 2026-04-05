@@ -2535,7 +2535,7 @@ function showThinking() {
   div.id = 'thinking-indicator'
   div.innerHTML = 'DM 正在思考<span class="dots"><span>·</span><span>·</span><span>·</span></span>'
   container.appendChild(div)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
   thinkingTimer = setTimeout(() => {
     const el = document.getElementById('thinking-indicator')
     if (el) el.innerHTML = 'DM 还在思考，请稍候<span class="dots"><span>·</span><span>·</span><span>·</span></span>'
@@ -2546,6 +2546,38 @@ function hideThinking() {
   if (thinkingTimer) { clearTimeout(thinkingTimer); thinkingTimer = null }
   const el = document.getElementById('thinking-indicator')
   if (el) el.remove()
+}
+
+// ─── 智能滚动控制 ───
+let userIsScrollingUp = false
+let scrollCheckTimeout = null
+
+function setupSmartScroll() {
+  const container = document.getElementById('messages')
+
+  container.addEventListener('scroll', () => {
+    clearTimeout(scrollCheckTimeout)
+
+    // 检测用户是否滚动到接近底部（50px 容差）
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
+
+    if (isNearBottom) {
+      userIsScrollingUp = false
+    } else {
+      userIsScrollingUp = true
+      // 3秒后如果用户没有继续滚动，自动恢复跟随
+      scrollCheckTimeout = setTimeout(() => {
+        userIsScrollingUp = false
+      }, 3000)
+    }
+  })
+}
+
+function smartScrollToBottom() {
+  if (!userIsScrollingUp) {
+    const container = document.getElementById('messages')
+    container.scrollTop = container.scrollHeight
+  }
 }
 
 // ─── WebSocket 连接 ───
@@ -2569,6 +2601,8 @@ function startGame() {
   const gameScreen = document.getElementById('game-screen')
   gameScreen.style.display = 'flex'
   document.getElementById('tab-bar').style.display = 'flex'
+
+  setupSmartScroll()
 
   connectWs((ws) => {
     ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))
@@ -2595,7 +2629,7 @@ function handleWsMessage(e) {
         const dirtyIdx = full.indexOf('(Empty response:')
         currentDmDiv.textContent = dirtyIdx !== -1 ? full.substring(0, dirtyIdx) : full
       }
-      container.scrollTop = container.scrollHeight
+      smartScrollToBottom()
       break
 
     case 'dm_end':
@@ -2800,7 +2834,7 @@ function handleWsMessage(e) {
       sysDiv.style.cssText = 'text-align:center;color:#b8860b;font-size:13px;padding:8px 0;opacity:0.9;font-style:italic;'
       sysDiv.textContent = msg.text
       document.getElementById('messages').appendChild(sysDiv)
-      sysDiv.scrollIntoView({ behavior: 'smooth' })
+      smartScrollToBottom()
       break
     }
 
@@ -2926,7 +2960,7 @@ function appendMsg(text, cls) {
   }
   const container = document.getElementById('messages')
   container.appendChild(div)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
 }
 
 // ─── 战斗面板 ───
@@ -3103,8 +3137,7 @@ function updateQuestHint(hint) {
   // 首次出现时滚动到底部，避免遮挡已有文本
   if (wasHidden) {
     requestAnimationFrame(() => {
-      const msgs = document.getElementById('messages')
-      if (msgs?.lastElementChild) msgs.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+      smartScrollToBottom()
     })
   }
 
@@ -3158,7 +3191,7 @@ function showSceneActions(actions) {
       expand.textContent = d.content
       // Insert after the actions bar
       div.parentNode.insertBefore(expand, div.nextSibling)
-      container.scrollTop = container.scrollHeight
+      smartScrollToBottom()
     }
     div.appendChild(btn)
   }
@@ -3179,7 +3212,7 @@ function showSceneActions(actions) {
   }
 
   container.appendChild(div)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
 }
 
 // ─── NPC 角色卡弹窗 ───
@@ -3270,7 +3303,7 @@ function showItemNotification(text) {
   }
   card.innerHTML = `<div class="item-notif-row"><span class="item-notif-icon"><i class="ra ra-ammo-bag" style="font-size:24px"></i></span><span class="item-notif-text">${esc(text)}</span></div>${compareHtml}`
   container.appendChild(card)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
   setTimeout(() => { card.style.opacity = '0.5' }, 5000)
 }
 
@@ -3314,7 +3347,7 @@ function showTradeProposal(data) {
       <button class="trade-btn trade-btn-cancel" onclick="this.closest('.trade-proposal-card').remove()">取消</button>
     </div>`
   container.appendChild(card)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
 }
 
 function tradeConfirm(btn) {
@@ -3361,7 +3394,7 @@ function showNPCPortrait(npcName, portraitSrc) {
     `style="margin-left:auto;background:#0f3460;color:#8ab;border:1px solid #445;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;flex-shrink:0">` +
     `<i class="ra ra-speech-bubble"></i> 交谈</button>`
   container.appendChild(bar)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
 }
 
 // ─── 游戏终局弹窗 ───
@@ -3415,7 +3448,7 @@ function showCombatPortraits(monsters) {
   }
 
   container.appendChild(panel)
-  container.scrollTop = container.scrollHeight
+  smartScrollToBottom()
 }
 
 // ─── 常驻 HUD ───
@@ -3521,19 +3554,17 @@ let sfxIndex = 0
 
 // 精选音效映射（每个 key 对应一组可随机选的文件）
 const SFX_MAP = {
-  // ── 战斗：玩家攻击 ──
-  attack_swing:   ['sword_swing_01.wav', 'sword_swing_02.wav', 'blade_01.ogg', 'blade_02.ogg'],
-  attack_hit:     ['sword_hit_01.wav', 'sword_hit_02.wav', 'sword_hit_03.wav'],
-  heavy_swing:    ['heavy_sword_swing_01.wav'],
+  // ── 战斗：玩家攻击（挥砍用重剑，命中用重击） ──
+  attack_swing:   ['heavy_sword_swing_01.wav', 'sword_swing_01.wav', 'sword_swing_02.wav'],
+  attack_hit:     ['heavy_hit_01.wav', 'heavy_hit_02.wav', 'heavy_hit_03.wav'],
   // ── 战斗：法术 ──
   spell_cast:     ['spell_launch_01.wav', 'spell_01.ogg', 'spell_02.ogg'],
   spell_hit:      ['spell_impact_01.wav', 'spell_fire_01.ogg'],
   healing:        ['healing_01.wav', 'healing_02.wav'],
   // ── 战斗：防御 ──
   shield:         ['shield_01.wav', 'shield_02.wav'],
-  // ── 战斗：受击（怪物攻击玩家） ──
-  enemy_hit:      ['kenney-impact/impactPunch_heavy_000.ogg', 'kenney-impact/impactPunch_heavy_001.ogg', 'kenney-impact/impactPunch_heavy_002.ogg'],
-  enemy_metal:    ['kenney-impact/impactMetal_heavy_000.ogg', 'kenney-impact/impactMetal_heavy_001.ogg'],
+  // ── 战斗：受击（敌方打玩家，沉闷肉感 + 铠甲重击混合） ──
+  enemy_hit:      ['kenney-impact/impactSoft_heavy_000.ogg', 'kenney-impact/impactSoft_heavy_001.ogg', 'kenney-impact/impactSoft_heavy_002.ogg', 'kenney-impact/impactPlate_heavy_000.ogg', 'kenney-impact/impactPlate_heavy_001.ogg'],
   // ── 战斗：开始 / 结束 ──
   combat_start:   ['kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg', 'kenney-rpg/drawKnife3.ogg'],
   creature_die:   ['creature_die_01.ogg'],
