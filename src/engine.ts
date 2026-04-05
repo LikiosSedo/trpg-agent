@@ -1287,14 +1287,20 @@ export class GameEngine {
               responder = trackingCandidates.sort((a, b) => {
                 let scoreA = 0, scoreB = 0
                 const subLoc = alert.subLocation
+                // 同一子地点（当场目击）→ 最高优先
                 if ((a.subLocation ?? a.homeBase) === subLoc) scoreA += 10
                 if ((b.subLocation ?? b.homeBase) === subLoc) scoreB += 10
-                const bondsA = getP(a.name).bonds ?? []
-                const bondsB = getP(b.name).bonds ?? []
-                if (bondsA.some((bd: any) => bd.npcName === alert.victimName)) scoreA += 5
-                if (bondsB.some((bd: any) => bd.npcName === alert.victimName)) scoreB += 5
+                // 受害者的 bond NPC 优先，bond weight 越高越优先
+                const bondA = (getP(a.name).bonds ?? []).find((bd: any) => bd.npcName === alert.victimName)
+                const bondB = (getP(b.name).bonds ?? []).find((bd: any) => bd.npcName === alert.victimName)
+                if (bondA) scoreA += 5 + bondA.weight * 3  // 艾琳娜(1.5)=9.5, 格罗姆(0.5)=6.5
+                if (bondB) scoreB += 5 + bondB.weight * 3
+                // 守卫
                 if (a.role === 'guard') scoreA += 3
                 if (b.role === 'guard') scoreB += 3
+                // 有追踪能力的 NPC 更快察觉
+                if (getP(a.name).canTrack) scoreA += 2
+                if (getP(b.name).canTrack) scoreB += 2
                 return scoreB - scoreA
               })[0] ?? null
               if (responder) {
