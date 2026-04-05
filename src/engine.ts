@@ -869,6 +869,10 @@ export class GameEngine {
           subLocationZh: subName,
         }
       }
+      console.log(`[npc-panel] player at: ${session.worldState.currentLocation}/${session.worldState.currentSubLocation}`)
+      for (const [name, loc] of Object.entries(npcLocations)) {
+        console.log(`[npc-panel] ${name}: ${loc.location}/${loc.subLocation}`)
+      }
       return {
         type: 'npc_list',
         data: {
@@ -1339,7 +1343,7 @@ export class GameEngine {
           if (thinking) yield { type: 'dm_thinking', text: thinking }
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
-          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
           // <think> 标签分离：思考→dm_thinking，叙事→dm_text_delta
           const parsed = thinkParser.process(text)
           if (parsed.thinking) yield { type: 'dm_thinking', text: parsed.thinking }
@@ -1368,6 +1372,8 @@ export class GameEngine {
       // Post-hoc 清理：streaming 分片可能绕过逐 chunk 过滤
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
+      // 过滤 DM 泄漏的调试/元信息行
+      fullText = fullText.split('\n').filter(line => !line.startsWith('[DEBUG]')).join('\n')
       console.log(`[dm] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[dm] DM 错误:`, (err as Error).message)
@@ -1642,21 +1648,25 @@ export class GameEngine {
       yield { type: 'quest_progress', questName: p.questName, text: p.text, current: p.current, required: p.required }
     }
 
-    // NPC 档案更新（只有同一位置的 NPC 被提到才解锁，避免车夫提到格雷格就解锁）
+    // NPC 档案更新 — 先同步执行所有解锁（避免用户在 yield 间隙查询到旧状态），再 yield 通知
     const chapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
     const spokeTo = new Set(speakers) // Talk 工具调用的 NPC 一定解锁
+    const npcUnlocks: Array<{ npcName: string; portrait: string; firstFacts: string[] }> = []
+    const npcUpdates: string[] = []
     for (const npc of session.npcs) {
       if (input.includes(npc.name) || fullText.includes(npc.name)) {
-        // 必须同区域才解锁（Talk 工具调过的除外——那是真正见面了）
         const sameArea = npc.location === session.worldState.currentLocation
         if (sameArea || spokeTo.has(npc.name)) {
           const unlock = this.dossier.unlock(npc.name, session.turnCount, chapterNum)
-          if (unlock) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
+          if (unlock) npcUnlocks.push({ npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) })
         }
         const update = this.dossier.onInteraction(npc.name, npc.trust, session.turnCount, chapterNum)
-        if (update) yield { type: 'npc_update', text: update }
+        if (update) npcUpdates.push(update)
       }
     }
+    // 解锁已完成，现在 yield 通知前端
+    for (const u of npcUnlocks) yield { type: 'npc_unlock', npcName: u.npcName, portrait: u.portrait, firstFacts: u.firstFacts }
+    for (const t of npcUpdates) yield { type: 'npc_update', text: t }
 
     // 章节推进
     if (session.chapter) {
@@ -1739,7 +1749,7 @@ export class GameEngine {
           if (thinking) yield { type: 'dm_thinking', text: thinking }
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
-          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
           yield { type: 'dm_text_delta', text }
           fullText += text
         } else if (event.type === 'tool_result' && event.name) {
@@ -2174,7 +2184,7 @@ export class GameEngine {
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
           // 过滤 SDK bug：thinking-only 响应
-          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
           yield { type: 'dm_text_delta', text }
           fullText += text
         }

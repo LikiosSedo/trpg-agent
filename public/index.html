@@ -2390,19 +2390,14 @@ function showAttackConfirm(name) {
   overlay.className = 'attack-confirm-overlay'
   overlay.innerHTML = `
     <div class="attack-confirm-dialog">
-      <div class="attack-confirm-icon"><i class="ra ra-sword ra-3x"></i></div>
-      <div class="attack-confirm-title">确定要攻击 ${esc(name)} 吗？</div>
+      <div class="attack-confirm-icon"><i class="ra ra-skull ra-3x"></i></div>
+      <div class="attack-confirm-title">对 ${esc(name)} 动手？</div>
       <div class="attack-confirm-warning">
-        <div><i class="ra ra-skull"></i> 这将产生严重后果</div>
-        <ul>
-          <li>信任度暴跌（-5 及关系网连坐）</li>
-          <li>NPC 可能还击或召唤护卫</li>
-          <li>镇民会追捕你</li>
-        </ul>
+        <div style="color:#cc6666;line-height:1.7;font-size:12px">每一个选择都有代价。这个世界会记住你做的一切。</div>
       </div>
       <div class="attack-confirm-btns">
-        <button class="attack-confirm-cancel" onclick="this.closest('.attack-confirm-overlay').remove()">取消</button>
-        <button class="attack-confirm-yes" onclick="executeNpcAttack('${esc(name)}')">拔剑</button>
+        <button class="attack-confirm-cancel" onclick="this.closest('.attack-confirm-overlay').remove()">…冷静一下</button>
+        <button class="attack-confirm-yes" onclick="executeNpcAttack('${esc(name)}')">动手</button>
       </div>
     </div>`
   document.body.appendChild(overlay)

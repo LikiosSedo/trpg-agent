@@ -100,6 +100,11 @@ export async function executeAction(action: PlayerAction, session: GameSession):
       }
 
       case 'GIVE': {
+        // 目标 NPC 必须存在且在同一区域，否则交给 DM 叙事
+        const giveTarget = session.npcs.find(n => n.name === action.target)
+        if (!giveTarget || giveTarget.location !== session.worldState.currentLocation) {
+          return { action: { type: 'NARRATIVE' }, success: true, output: '', toolsCalled: [] }
+        }
         const result = await TransferItemTool.execute({
           transferType: 'player_to_npc',
           itemName: action.item,
