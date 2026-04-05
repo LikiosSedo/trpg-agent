@@ -476,11 +476,12 @@ export class DossierManager {
 
   /** Structured list data for panel rendering */
   toListData(trustMap: Record<string, number>): Array<{
-    name: string; title: string; trust: number;
+    key: string; name: string; title: string; trust: number;
     totalLayers: number; knownLayers: number; unlocked: boolean
   }> {
     return Array.from(this.entries).map(([key, entry]) => ({
-      name: entry.name,
+      key,            // 短名（和 session.npcs[].name 一致）
+      name: entry.name, // 全名（显示用）
       title: entry.title,
       trust: trustMap[key] ?? 0,
       totalLayers: (REVELATION_LAYERS[key] ?? []).length,
@@ -491,18 +492,20 @@ export class DossierManager {
 
   /** Structured profile data for panel rendering */
   toProfileData(name: string, trust?: number): {
-    name: string; title: string; appearance: string; trust: number;
+    key: string; name: string; title: string; appearance: string; trust: number;
     discovered: Array<{ fact: string; category: string }>;
     portrait: string[]; locked: number
   } | null {
-    const key = Array.from(this.entries.keys()).find(k => k.includes(name) || name.includes(k))
+    // 精确匹配优先，fuzzy 兜底
+    let key = this.entries.has(name) ? name : Array.from(this.entries.keys()).find(k => k.includes(name) || name.includes(k))
     const entry = key ? this.entries.get(key) : undefined
-    if (!entry) return null
+    if (!entry || !key) return null
 
-    const total = (REVELATION_LAYERS[key!] ?? []).length
+    const total = (REVELATION_LAYERS[key] ?? []).length
     const known = entry.discovered.length
 
     return {
+      key,
       name: entry.name,
       title: entry.title,
       appearance: entry.appearance,
@@ -511,6 +514,12 @@ export class DossierManager {
       portrait: PORTRAITS[key!] ?? [],
       locked: total - known,
     }
+  }
+
+  /** 获取 NPC 已解锁的 facts 数量（用于 beat requiredFacts 检查） */
+  getUnlockedFactCount(name: string): number {
+    const entry = this.entries.get(name)
+    return entry ? entry.discovered.length : 0
   }
 
   isUnlocked(name: string): boolean { return this.entries.has(name) }

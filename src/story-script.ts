@@ -19,6 +19,8 @@ export interface Beat {
   facts: string[]
   /** true = 非必须，不影响章节推进 */
   optional?: boolean
+  /** 完成条件：trigger NPC 在 dossier 中需要解锁的最少 facts 数。未设置时 trigger 即完成（向后兼容） */
+  requiredFacts?: number
 }
 
 export interface Discovery {
@@ -126,6 +128,7 @@ export const CHAPTERS: ChapterDef[] = [
           '他指了指东边的方向',
           '格雷格提供免费住宿——"后头有空房，今晚先歇着"',
         ],
+        requiredFacts: 2,
       },
       {
         id: 'ch1_night_event',
@@ -212,6 +215,7 @@ export const CHAPTERS: ChapterDef[] = [
           '她建议先去铁砧铺找格罗姆看看装备——"别拿着生锈的铁片就往森林跑"',
           '韩猛在一旁补充了简要的森林地形信息',
         ],
+        requiredFacts: 2,
       },
       {
         id: 'ch2_meet_hunter',
@@ -254,6 +258,7 @@ export const CHAPTERS: ChapterDef[] = [
           '她在任务记录簿上写下几笔，抬头看着玩家："从今天起，你算公会的正式成员了。"',
           '韩猛拍了拍玩家肩膀，语气里多了几分认真："欢迎入队。别死太早。"',
         ],
+        requiredFacts: 4,
       },
     ],
 
@@ -322,6 +327,7 @@ export const CHAPTERS: ChapterDef[] = [
           '失踪的不只是矿工——公会派去的搜救队也失联了',
           '韩猛补充：最后一支小队报告矿道中层异常寒冷，墙壁上有会动的符文',
         ],
+        requiredFacts: 4,
       },
       {
         id: 'ch3_enter_mines',
@@ -353,6 +359,7 @@ export const CHAPTERS: ChapterDef[] = [
           '"蚀目者……"她低声重复这个名字，像是在回忆什么尘封的记忆',
           '韩猛握紧了独臂的拳头："那帮人到底想干什么？"',
         ],
+        requiredFacts: 6,
       },
     ],
 
@@ -423,6 +430,7 @@ export const CHAPTERS: ChapterDef[] = [
           '她推测和矿道中的教团活动有关联',
           '"去调查兽人营地和东北的废弃瞭望塔。之前有冒险者在那留下了调查笔记。"',
         ],
+        requiredFacts: 6,
       },
       {
         id: 'ch4_enter_wasteland',
@@ -454,6 +462,7 @@ export const CHAPTERS: ChapterDef[] = [
           '"它能撕裂位面壁垒。如果教团拿到它——"她没说完，但所有人都明白了',
           '韩猛站起身，语气决然："不能让他们得逞。我们得在蚀月之前阻止他们。"',
         ],
+        requiredFacts: 8,
       },
     ],
 

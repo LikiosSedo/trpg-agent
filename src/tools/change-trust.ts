@@ -5,6 +5,9 @@ import { changeTrust } from '../trust-system.js'
 
 const trustChangesThisTurn: Array<{ npcName: string; delta: number }> = []
 
+/** dialogue 通道正面信任冷却：记录每个 NPC 上次 dialogue +信任的轮次，2 轮内不重复生效 */
+const lastDialogueTrustTurn: Map<string, number> = new Map()
+
 export function consumeTrustChanges(): Array<{ npcName: string; delta: number }> {
   const result = [...trustChangesThisTurn]
   trustChangesThisTurn.length = 0
@@ -45,10 +48,23 @@ delta 限制 -3 到 +3（日常对话通常 ±1，显著事件 ±2~3）。
       return { output: `${npcName}不在当前位置。`, isError: true }
     }
 
+    // dialogue 通道正面信任冷却：同一 NPC 每 2 轮最多生效 1 次正面变化
+    if (clampedDelta > 0) {
+      const lastTurn = lastDialogueTrustTurn.get(npcName)
+      if (lastTurn != null && session.turnCount - lastTurn < 2) {
+        return { output: `${npcName}对话信任冷却中（上次生效：第${lastTurn}轮，需间隔2轮）。`, isError: true }
+      }
+    }
+
     const result = changeTrust(session, {
       npcName, channel: 'dialogue', delta: clampedDelta, reason, turn: session.turnCount,
     })
     if (!result.applied) return { output: `信任变化未执行：${result.reason}`, isError: true }
+
+    // 记录正面 dialogue 信任生效轮次
+    if (clampedDelta > 0) {
+      lastDialogueTrustTurn.set(npcName, session.turnCount)
+    }
 
     trustChangesThisTurn.push({ npcName, delta: clampedDelta })
     return { output: `${npcName}信任：${result.oldTrust}→${result.newTrust}（${reason}）` }

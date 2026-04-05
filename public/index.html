@@ -1630,6 +1630,7 @@ document.getElementById('player-name').addEventListener('input', () => {
 
 // ─── Bottom Sheet ───
 function openPanel(panelId, title, contentHtml) {
+  playSfx('ui_open', 0.25)
   currentPanelId = panelId
   document.getElementById('panel-title').textContent = title
   document.getElementById('panel-body').innerHTML = contentHtml
@@ -1642,6 +1643,7 @@ function openPanel(panelId, title, contentHtml) {
 }
 
 function closePanel() {
+  playSfx('ui_close', 0.2)
   currentPanelId = null
   document.getElementById('panel-overlay').classList.remove('open')
   document.getElementById('panel-sheet').classList.remove('open')
@@ -2292,10 +2294,10 @@ function renderNPCListPanel(data) {
   const playerLoc = data.playerLocation || ''
   const playerSub = data.playerSubLocation || ''
 
-  // 分组：在场（同子地点） vs 不在场
+  // 分组：在场（同子地点） vs 不在场。用 key（短名）匹配 npcLocs
   const here = [], away = []
   for (const npc of npcs) {
-    const loc = npcLocs[npc.name]
+    const loc = npcLocs[npc.key || npc.name]
     const sameArea = loc && loc.location === playerLoc
     const sameSub = sameArea && loc.subLocation === playerSub
     if (sameSub) here.push(npc)
@@ -2323,18 +2325,17 @@ function renderNPCCard(npc, npcLocs, isHere) {
   const trust = npc.trust ?? 0
   const trustPct = ((trust + 10) / 20) * 100
   const trustColor = trust > 0 ? '#4caf50' : trust < 0 ? '#f44336' : '#888'
-  const portrait = NPC_PORTRAIT_MAP[npc.name] ||
-    Object.entries(NPC_PORTRAIT_MAP).find(([k]) => npc.name.includes(k))?.[1]
-  const shortName = Object.keys(NPC_PORTRAIT_MAP).find(k => npc.name.includes(k)) || npc.name
-  const loc = npcLocs[npc.name]
+  const npcKey = npc.key || npc.name  // key=短名（lookup用），name=全名（显示用）
+  const portrait = NPC_PORTRAIT_MAP[npcKey]
+  const loc = npcLocs[npcKey]
   const opacity = isHere ? '1' : '0.5'
 
   let html = `<div class="npc-card" style="cursor:pointer;opacity:${opacity}">`
   // 左侧：头像（点击看详情）
-  html += `<div class="npc-avatar" onclick="viewNPCDetail('${esc(shortName)}')">${portrait
+  html += `<div class="npc-avatar" onclick="viewNPCDetail('${esc(npcKey)}')">${portrait
     ? `<img src="${portrait}" alt="${esc(npc.name)}" onerror="this.outerHTML='<i class=&quot;ra ra-knight-helmet&quot; style=&quot;font-size:32px&quot;></i>'">`
     : '<i class="ra ra-knight-helmet" style="font-size:32px"></i>'}</div>`
-  html += `<div class="npc-info" onclick="viewNPCDetail('${esc(shortName)}')">`
+  html += `<div class="npc-info" onclick="viewNPCDetail('${esc(npcKey)}')">`
   const conditionLabels = { wounded: '负伤', unconscious: '昏迷', recovering: '恢复中' }
   const conditionColors = { wounded: '#e89b3e', unconscious: '#c05050', recovering: '#8888aa' }
   const cond = npc.condition && npc.condition !== 'normal' ? npc.condition : null
@@ -2352,13 +2353,13 @@ function renderNPCCard(npc, npcLocs, isHere) {
     const canAttack = cond !== 'unconscious' && cond !== 'recovering'  // 昏迷/恢复中不能攻击
     html += `<div style="flex-shrink:0;margin-left:8px;display:flex;flex-direction:column;gap:4px">`
     if (canTalk) {
-      html += `<button onclick="event.stopPropagation();npcTalk('${esc(shortName)}')" `
+      html += `<button onclick="event.stopPropagation();npcTalk('${esc(npcKey)}')" `
       html += `style="background:#533483;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap"><i class="ra ra-speech-bubble"></i> 交谈</button>`
     } else {
       html += `<button disabled style="background:#333;color:#666;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap"><i class="ra ra-speech-bubble"></i> 交谈</button>`
     }
     if (canAttack) {
-      html += `<button onclick="event.stopPropagation();npcAttack('${esc(shortName)}')" `
+      html += `<button onclick="event.stopPropagation();npcAttack('${esc(npcKey)}')" `
       html += `style="background:#8b1a1a;color:#ff4444;border:1px solid #aa2020;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;font-weight:600"><i class="ra ra-sword"></i> 攻击</button>`
     } else {
       html += `<button disabled style="background:#222;color:#555;border:1px solid #333;padding:5px 10px;border-radius:6px;font-size:11px;cursor:not-allowed;white-space:nowrap"><i class="ra ra-sword"></i> 攻击</button>`
@@ -2383,6 +2384,7 @@ function npcAttack(name) {
 }
 
 function showAttackConfirm(name) {
+  playSfx('draw_weapon', 0.35)
   // 移除旧弹窗
   document.querySelectorAll('.attack-confirm-overlay').forEach(el => el.remove())
 
@@ -2407,6 +2409,7 @@ function showAttackConfirm(name) {
 
 function executeNpcAttack(name) {
   document.querySelectorAll('.attack-confirm-overlay').forEach(el => el.remove())
+  playSfx('attack_swing', 0.45)
   const input = document.getElementById('input')
   input.value = `攻击${name}`
   switchTab('game')
@@ -2443,8 +2446,7 @@ function renderInventoryPanel(data) {
 function renderNPCDetailPanel(data) {
   if (!data || !data.name) return `<div class="panel-card"><div style="color:#888;padding:20px;">未找到该人物信息</div></div>`
 
-  const portrait = NPC_PORTRAIT_MAP[data.name] ||
-    Object.entries(NPC_PORTRAIT_MAP).find(([k]) => data.name.includes(k))?.[1]
+  const portrait = NPC_PORTRAIT_MAP[data.key || data.name]
 
   let html = ''
   // 大幅立绘（类似首次解锁卡片风格）
@@ -2550,10 +2552,7 @@ function connectWs(onOpen) {
   ws.onopen = () => { if (onOpen) onOpen(ws) }
   ws.onmessage = handleWsMessage
   ws.onclose = handleWsClose
-  ws.onerror = () => {
-    sending = false
-    document.getElementById('send').disabled = false
-  }
+  ws.onerror = () => { unlockInput() }
 }
 
 // ─── 游戏启动 ───
@@ -2617,8 +2616,7 @@ function handleWsMessage(e) {
       if (msg.pendingMonster) {
         combatMode = true
       } else {
-        sending = false
-        document.getElementById('send').disabled = false
+        unlockInput()
         combatMode = !!msg.combat
         updateCombatPanel()
         if (!combatMode) showSceneActions(msg.actions)
@@ -2631,6 +2629,7 @@ function handleWsMessage(e) {
       combatTargets = (msg.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
       updateCombatPanel()
       if (msg.narrative) appendMsg(msg.narrative, 'combat-monster')
+      playSfx('combat_start', 0.5)
       break
 
     case 'combat_action_req':
@@ -2639,8 +2638,7 @@ function handleWsMessage(e) {
       combatSpells = msg.spells || []
       combatItems = msg.items || []
       window._combatActiveEffects = msg.activeEffects || []
-      sending = false
-      document.getElementById('send').disabled = false
+      unlockInput()
       setCombatButtonsEnabled(true)
       hideCombatSelector()
       updateCombatPanel()
@@ -2654,7 +2652,10 @@ function handleWsMessage(e) {
       // 怪物回合延迟显示（让玩家先看到自己的结果）
       setTimeout(() => {
         appendMsg('── 敌方回合 ──', 'combat-divider')
-        setTimeout(() => appendMsg(msg.text, 'combat-monster'), 400)
+        setTimeout(() => {
+          playSfx('enemy_hit', 0.45)
+          appendMsg(msg.text, 'combat-monster')
+        }, 400)
       }, 800)
       break
 
@@ -2662,15 +2663,19 @@ function handleWsMessage(e) {
       // 玩家回合也延迟显示 + 分隔线
       appendMsg('── 你的回合 ──', 'combat-divider')
       setTimeout(() => {
+        playSfx('attack_hit', 0.35)
         appendMsg(msg.text, 'combat-player-result')
       }, 300)
       if (msg.ended) {
+        // 战斗结束音效
+        if (msg.result === 'victory' || msg.result === 'win') playSfx('victory', 0.5)
+        else if (msg.result === 'defeat' || msg.result === 'death') playSfx('death', 0.5)
+        else playSfx('creature_die', 0.4)
         combatMode = false
         combatTargets = []
         combatSpells = []
         combatItems = []
-        sending = false
-        document.getElementById('send').disabled = false
+        unlockInput()
         document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
         updateCombatPanel()
         // 战斗结束 → 切回场景 BGM（从当前会话状态推导）
@@ -2691,8 +2696,7 @@ function handleWsMessage(e) {
 
     case 'panel': {
       // Server sends structured panel data → render in bottom sheet
-      sending = false
-      document.getElementById('send').disabled = false
+      unlockInput()
       const panelId = msg.panel || 'info'
       const PANEL_TITLES = { status: '角色状态', quest: '任务', map: '地图', npc: '人物', inventory: '背包', shop: '商店', recap: '故事回顾', chapter: '章节进度', help: '帮助', saves: '存档列表', npc_detail: '人物详情' }
       const title = msg.title || PANEL_TITLES[panelId] || '信息'
@@ -2730,16 +2734,14 @@ function handleWsMessage(e) {
 
     case 'system':
       // System command text output → render as panel fallback
-      sending = false
-      document.getElementById('send').disabled = false
+      unlockInput()
       saveMessage('system', msg.text)
       openPanel('info', '系统', `<div class="panel-card"><div style="white-space:pre-wrap;color:#e6b800">${esc(msg.text)}</div></div>`)
       break
 
     case 'error':
       appendMsg('⚠ ' + msg.text, 'error')
-      sending = false
-      document.getElementById('send').disabled = false
+      unlockInput()
       break
 
     case 'prologue':
@@ -2752,6 +2754,7 @@ function handleWsMessage(e) {
 
     // ─── 死亡 ───
     case 'death':
+      playSfx('death', 0.5)
       appendMsg(msg.text, 'error')
       clearSave()
       showGameOver({ reason: msg.text, canContinue: false })
@@ -2775,11 +2778,13 @@ function handleWsMessage(e) {
 
     // ─── NPC 角色卡 ───
     case 'npc_card':
+      playSfx('npc_card', 0.35)
       showNPCCard(msg)
       break
 
     // ─── 物品获取通知 ───
     case 'item_acquired':
+      playSfx('item_acquire', 0.35)
       showItemNotification(msg.text)
       break
 
@@ -2800,6 +2805,7 @@ function handleWsMessage(e) {
 
     // ─── 交易提案（DM 驱动的完整交易卡片） ───
     case 'trade_proposal':
+      playSfx('ui_coins', 0.3)
       showTradeProposal(msg)
       break
 
@@ -2888,8 +2894,7 @@ function handleWsMessage(e) {
 }
 
 function handleWsClose() {
-  sending = false
-  document.getElementById('send').disabled = false
+  unlockInput()
   // 只在游戏界面可见时重连（不是在角色创建/恢复界面）
   const gameVisible = document.getElementById('game-screen').style.display !== 'none'
   if (!gameVisible) return
@@ -3001,6 +3006,16 @@ function sendCombatAction(action, targetId, spellId, itemId) {
   if (spell) desc += `（${spell.name}）`
   if (item) desc += `（${item.name}）`
   appendMsg(desc, 'player')
+  // 战斗动作音效
+  if (action === 'attack') playSfx('attack_swing', 0.45)
+  else if (action === 'spell') {
+    const s = spell || (spellId ? combatSpells.find(s => s.name === spellId) : null)
+    if (s && s.isBuff) playSfx('healing', 0.4)
+    else playSfx('spell_cast', 0.45)
+  }
+  else if (action === 'defend') playSfx('shield', 0.4)
+  else if (action === 'flee') playSfx('flee', 0.4)
+  else if (action === 'item') playSfx('item_acquire', 0.35)
   ws.send(JSON.stringify({ type: 'combat_action', action, targetId, spellId, itemId }))
   sending = true
   setCombatButtonsEnabled(false)
@@ -3488,12 +3503,72 @@ function switchAudio(bgm, ambient) {
 document.addEventListener('click', unlockAudio, { once: true })
 document.addEventListener('touchstart', unlockAudio, { once: true })
 
+// ─── SFX 音效引擎 ───
+const SFX_BASE = 'audio/sfx/'
+const SFX_POOL_SIZE = 4  // 同时可播放的音效数
+const sfxPool = []
+for (let i = 0; i < SFX_POOL_SIZE; i++) {
+  const a = new Audio()
+  a.volume = 0.4
+  sfxPool.push(a)
+}
+let sfxIndex = 0
+
+// 精选音效映射（每个 key 对应一组可随机选的文件）
+const SFX_MAP = {
+  // ── 战斗：玩家攻击 ──
+  attack_swing:   ['sword_swing_01.wav', 'sword_swing_02.wav', 'blade_01.ogg', 'blade_02.ogg'],
+  attack_hit:     ['sword_hit_01.wav', 'sword_hit_02.wav', 'sword_hit_03.wav'],
+  heavy_swing:    ['heavy_sword_swing_01.wav'],
+  // ── 战斗：法术 ──
+  spell_cast:     ['spell_launch_01.wav', 'spell_01.ogg', 'spell_02.ogg'],
+  spell_hit:      ['spell_impact_01.wav', 'spell_fire_01.ogg'],
+  healing:        ['healing_01.wav', 'healing_02.wav'],
+  // ── 战斗：防御 ──
+  shield:         ['shield_01.wav', 'shield_02.wav'],
+  // ── 战斗：受击（怪物攻击玩家） ──
+  enemy_hit:      ['kenney-impact/impactPunch_heavy_000.ogg', 'kenney-impact/impactPunch_heavy_001.ogg', 'kenney-impact/impactPunch_heavy_002.ogg'],
+  enemy_metal:    ['kenney-impact/impactMetal_heavy_000.ogg', 'kenney-impact/impactMetal_heavy_001.ogg'],
+  // ── 战斗：开始 / 结束 ──
+  combat_start:   ['kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg', 'kenney-rpg/drawKnife3.ogg'],
+  creature_die:   ['creature_die_01.ogg'],
+  victory:        ['item_gem_01.ogg', 'item_gem_02.ogg'],
+  death:          ['creature_hurt_01.ogg'],
+  // ── 战斗：逃跑 ──
+  flee:           ['kenney-impact/footstep_wood_000.ogg', 'kenney-impact/footstep_wood_001.ogg', 'kenney-impact/footstep_grass_000.ogg'],
+  // ── UI 交互 ──
+  ui_click:       ['kenney-rpg/metalClick.ogg'],
+  ui_open:        ['kenney-rpg/bookOpen.ogg'],
+  ui_close:       ['kenney-rpg/bookClose.ogg'],
+  ui_tab:         ['kenney-rpg/cloth1.ogg', 'kenney-rpg/cloth2.ogg'],
+  ui_send:        ['kenney-rpg/bookFlip1.ogg'],
+  ui_coins:       ['kenney-rpg/handleCoins.ogg', 'kenney-rpg/handleCoins2.ogg'],
+  draw_weapon:    ['kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg'],
+  door:           ['kenney-rpg/doorOpen_1.ogg', 'kenney-rpg/doorOpen_2.ogg'],
+  npc_card:       ['kenney-rpg/bookFlip2.ogg', 'kenney-rpg/bookFlip3.ogg'],
+  item_acquire:   ['item_misc_01.ogg', 'item_misc_02.ogg'],
+}
+
+function playSfx(key, volume) {
+  if (!audioUnlocked) return
+  const files = SFX_MAP[key]
+  if (!files || files.length === 0) return
+  const file = files[Math.floor(Math.random() * files.length)]
+  const audio = sfxPool[sfxIndex % SFX_POOL_SIZE]
+  sfxIndex++
+  audio.volume = volume !== undefined ? volume : 0.4
+  audio.currentTime = 0
+  audio.src = SFX_BASE + file
+  audio.play().catch(() => {})
+}
+
 // ─── 输入 ───
 function sendInput() {
   const input = document.getElementById('input')
   const text = input.value.trim()
   if (!text || !ws || sending) return
 
+  playSfx('ui_send', 0.2)
   appendMsg('🗡️ ' + text, 'player')
   saveMessage('player', text)
 
@@ -3508,8 +3583,17 @@ function sendInput() {
   input.value = ''
   input.style.height = 'auto'
   sending = true
+  input.disabled = true
+  input.placeholder = 'DM 正在回应...'
   document.getElementById('send').disabled = true
   showThinking()
+}
+
+function unlockInput() {
+  sending = false
+  const inp = document.getElementById('input')
+  if (inp) { inp.disabled = false; inp.placeholder = '说点什么 . . .' }
+  document.getElementById('send').disabled = false
 }
 
 // textarea 自动调整高度

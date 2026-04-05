@@ -323,7 +323,7 @@ function buildFallbackActions(session: GameSession): SceneActions {
             }
           }
         }
-        if (suggestions.length >= 2) break
+        if (suggestions.length >= 3) break
       }
     }
   }
@@ -856,7 +856,7 @@ export class GameEngine {
         'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
       }
       // 只显示已解锁（遇到过/被提到过）的 NPC 位置
-      const unlockedNames = new Set(this.dossier.toListData(trustMap).map(n => n.name))
+      const unlockedNames = new Set(this.dossier.listUnlocked())  // 使用 dossier key（短名），不是 entry.name（全名）
       const npcLocations: Record<string, { location: string; subLocation: string; locationZh: string; subLocationZh: string }> = {}
       for (const npc of session.npcs) {
         if (!unlockedNames.has(npc.name)) continue  // 未解锁的 NPC 不显示
@@ -878,7 +878,7 @@ export class GameEngine {
         data: {
           npcs: this.dossier.toListData(trustMap).map(n => ({
             ...n,
-            condition: session.npcs.find(npc => npc.name === n.name)?.condition ?? 'normal',
+            condition: session.npcs.find(npc => npc.name === n.key)?.condition ?? 'normal',
           })),
           npcLocations,
           playerLocation: session.worldState.currentLocation,
@@ -1247,6 +1247,12 @@ export class GameEngine {
       )
       session.interactionNpc = npcsAtDest.length > 0 ? npcsAtDest[0].name : undefined
       if (session.interactionNpc) console.log(`[interaction] 移动后自动绑定: ${session.interactionNpc}`)
+      // 到达新地点 → 解锁该地点所有 NPC（你看到了他们）
+      const moveChapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
+      for (const npc of npcsAtDest) {
+        const result = this.dossier.unlock(npc.name, session.turnCount, moveChapterNum)
+        console.log(`[move-unlock] ${npc.name}: ${result ? 'newly unlocked' : 'already unlocked'}, isUnlocked=${this.dossier.isUnlocked(npc.name)}`)
+      }
     }
 
     // Set violence alert for consequence system (NPC attacks only)
@@ -1648,6 +1654,21 @@ export class GameEngine {
       yield { type: 'quest_progress', questName: p.questName, text: p.text, current: p.current, required: p.required }
     }
 
+    // Beat 补偿：DM 叙事中出现 NPC 对话但没调 Talk 工具时，也触发 talk beat
+    if (session.chapter) {
+      const cm = new ChapterManager(session)
+      for (const npc of session.npcs) {
+        if (npc.location !== session.worldState.currentLocation) continue
+        if (speakers.includes(npc.name)) continue  // Talk 工具已触发过，不重复
+        // 检测叙事中 NPC 说话：名字后跟引号/冒号 或 「」引号
+        const hasDialogue = fullText.includes(`${npc.name}：`) || fullText.includes(`${npc.name}:`)
+          || (fullText.includes(npc.name) && (fullText.includes(`"`) || fullText.includes(`"`)))
+        if (hasDialogue) {
+          cm.onEvent('talk', npc.name)
+        }
+      }
+    }
+
     // NPC 档案更新 — 先同步执行所有解锁（避免用户在 yield 间隙查询到旧状态），再 yield 通知
     const chapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
     const spokeTo = new Set(speakers) // Talk 工具调用的 NPC 一定解锁
@@ -1667,6 +1688,9 @@ export class GameEngine {
     // 解锁已完成，现在 yield 通知前端
     for (const u of npcUnlocks) yield { type: 'npc_unlock', npcName: u.npcName, portrait: u.portrait, firstFacts: u.firstFacts }
     for (const t of npcUpdates) yield { type: 'npc_update', text: t }
+
+    // 同步 dossierData 到 session（供下一轮 ChapterManager.findPendingBeat 的 requiredFacts 检查使用）
+    session.dossierData = this.dossier.toJSON()
 
     // 章节推进
     if (session.chapter) {

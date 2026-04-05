@@ -236,6 +236,18 @@ export class ChapterManager {
       if (this.state.completedBeats.includes(beat.id)) continue
       if (beat.trigger !== trigger) continue
       if (beat.requires && !beat.requires.every(r => this.state.completedBeats.includes(r))) continue
+
+      // requiredFacts 门控：trigger NPC 在 dossier 中解锁的 facts 数必须 >= requiredFacts
+      if (beat.requiredFacts != null) {
+        const npcName = trigger.split(':')[1]
+        if (npcName) {
+          const dossierData = this.session.dossierData as Record<string, { discovered?: unknown[] }> | undefined
+          const entry = dossierData?.[npcName]
+          const unlockedCount = entry?.discovered?.length ?? 0
+          if (unlockedCount < beat.requiredFacts) continue
+        }
+      }
+
       return beat
     }
     return null
