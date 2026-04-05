@@ -2480,7 +2480,7 @@ export class GameEngine {
 
     // Execute player action
     if (action.action === 'flee') {
-      const result = attemptFlee(session)
+      const result = await attemptFlee(session)
       yield {
         type: 'combat_status',
         text: result.log.join('\n'),

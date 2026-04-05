@@ -327,12 +327,12 @@ export function executeMonsterTurns(session: GameSession): {
 
 // ─── 逃跑 ─────────────────────────────────────────
 
-export function attemptFlee(session: GameSession): {
+export async function attemptFlee(session: GameSession): Promise<{
   success: boolean
   log: string[]
   ended: boolean
   result: CombatResult
-} {
+}> {
   const combat = session.combat
   if (!combat?.active) throw new Error('当前没有进行中的战斗')
 
@@ -340,10 +340,13 @@ export function attemptFlee(session: GameSession): {
   const log: string[] = []
 
   // DEX check: 逃跑DC取决于对手强度
-  // 使用存活怪物中最高的DC值，确保强敌更难逃脱
+  // 从 npc-combatants.json 读取 fleeDC，普通怪物回退到 AC
   const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
-  const maxMonsterDC = Math.max(...aliveMonsters.map(m => m.ac ?? 10))
-  const dc = maxMonsterDC
+  const npcCombatData = (await import('../data/npc-combatants.json', { with: { type: 'json' } })).default as any[]
+  const dc = Math.max(...aliveMonsters.map(m => {
+    const npcEntry = npcCombatData.find((n: any) => n.name === m.name)
+    return npcEntry?.fleeDC ?? m.ac ?? 10
+  }))
   const roll = rollDice('1d20').total
   const total = roll + player.abilityModifiers.DEX
   const success = total >= dc

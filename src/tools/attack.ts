@@ -48,7 +48,7 @@ export const AttackTool: Tool = {
         return { output: '当前没有进行中的战斗，无需逃跑。', isError: true }
       }
       try {
-        const fleeResult = attemptFlee(session)
+        const fleeResult = await attemptFlee(session)
         const combatStatus = !fleeResult.ended ? getCombatSummary(session) : null
         return {
           output: [
