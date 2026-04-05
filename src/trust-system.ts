@@ -155,14 +155,35 @@ export function evaluateResponse(npc: NPC): NPCResponse {
 /** 获取 NPC 对话时应注入的态度指令（供 Talk 工具使用） */
 export function getAttitudeDirective(npc: NPC): string {
   const response = evaluateResponse(npc)
-  switch (response.type) {
-    case 'curt':
-      return `[NPC态度：冷淡。${npc.name}只给最简短的回答，不主动提供信息。]`
-    case 'hostile_dialogue':
-      return `[NPC态度：敌对。${npc.name}充满恶意地回应，可能威胁、嘲讽或驱赶玩家。不会透露有用信息。但仍会对话——玩家可以尝试社交检定改善关系。]`
-    default:
-      return ''
+  const t = npc.trust
+
+  // 负面态度（从重到轻）
+  if (response.type === 'avoidance') {
+    return `[NPC态度：回避（trust ${t}）。${npc.name}看到你立刻转身离开，不愿有任何接触。如果被拦住，会惊恐或愤怒地要求你离开。]`
   }
+  if (response.type === 'hostile_dialogue') {
+    return `[NPC态度：敌对（trust ${t}）。${npc.name}充满恶意，可能威胁、嘲讽或驱赶你。不会透露有用信息，但仍会对话——玩家可尝试社交检定改善关系。]`
+  }
+  if (response.type === 'curt') {
+    return `[NPC态度：冷淡（trust ${t}）。${npc.name}只给最简短回答，不主动提供信息。语气生硬，明显不想多说。]`
+  }
+
+  // 正面态度（根据信任度细分）
+  if (t >= 7) {
+    return `[NPC态度：深厚信任（trust ${t}）。${npc.name}视你为密友或家人，愿意分享核心秘密、提供无条件帮助。会主动关心你的安危，在危机时刻挺身而出。]`
+  }
+  if (t >= 5) {
+    return `[NPC态度：信任（trust ${t}）。${npc.name}认可你的人品，愿意透露重要信息、提供实质帮助。会为你说好话，但不会冒生命危险。]`
+  }
+  if (t >= 3) {
+    return `[NPC态度：友好（trust ${t}）。${npc.name}对你有好感，愿意深入交流、提供一般帮助。会给你优惠或方便，但不会违反原则。]`
+  }
+  if (t >= 1) {
+    return `[NPC态度：礼貌（trust ${t}）。${npc.name}对你有基本好感，愿意正常交流。会按职业规范提供服务，但不会特别照顾。]`
+  }
+
+  // 中立（trust = 0）
+  return `[NPC态度：中立（trust ${t}）。${npc.name}保持礼貌但有距离，按职业规范行事。不会主动提供额外信息或帮助。]`
 }
 
 // ─── 信息门控 ──────────────────────────────
@@ -258,4 +279,125 @@ function getCombatDesc(name: string, response: string): string {
     case 'ban_from_location': return `${name}指着门："出去！永远别再进来！"`
     default: return `${name}变得极度敌对。`
   }
+}
+
+// ─── 暴力后果信任度传播 ──────────────────────────────
+
+export interface ViolenceTrustCascadeResult {
+  changes: Array<{ npcName: string; delta: number; reason: string }>
+  summary: string
+}
+
+/**
+ * 暴力后果的全镇信任度传播
+ *
+ * 触发时机：violence_alert 延迟轮次到达，响应者到达现场时
+ *
+ * 传播规则：
+ * - 受害者的亲近 NPC（bond weight >= 0.5）：-8 到 -10
+ * - 响应者的亲近 NPC（bond weight >= 0.5）：-5 到 -7
+ * - 目击者（在场但未参与的 NPC）：-5 到 -7
+ * - 其他镇民（不在场，通过流言传播）：-3 到 -5
+ *
+ * @param session 游戏会话
+ * @param victim 受害者名称
+ * @param responder 响应者名称（可选，如果有的话）
+ * @param witnesses 目击者名称列表
+ * @param reason 暴力原因描述（用于日志）
+ */
+export function propagateViolenceTrust(
+  session: GameSession,
+  victim: string,
+  responder: string | null,
+  witnesses: string[],
+  reason: string
+): ViolenceTrustCascadeResult {
+  const changes: Array<{ npcName: string; delta: number; reason: string }> = []
+  const processed = new Set<string>([victim])  // 避免重复处理
+  if (responder) processed.add(responder)
+
+  // 1. 受害者的亲近 NPC
+  const victimPersonality = getPersonality(victim)
+  for (const bond of victimPersonality.bonds) {
+    if (bond.weight >= 0.5 && !processed.has(bond.npcName)) {
+      const delta = bond.weight >= 0.8 ? -10 : -8
+      const result = changeTrust(session, {
+        npcName: bond.npcName,
+        channel: 'reputation',
+        delta,
+        reason: `${victim}被你伤害`,
+        turn: session.turnCount,
+      })
+      if (result.applied) {
+        changes.push({ npcName: bond.npcName, delta, reason: `${victim}的亲近关系` })
+      }
+      processed.add(bond.npcName)
+    }
+  }
+
+  // 2. 响应者的亲近 NPC（如果有响应者）
+  if (responder) {
+    const responderPersonality = getPersonality(responder)
+    for (const bond of responderPersonality.bonds) {
+      if (bond.weight >= 0.5 && !processed.has(bond.npcName)) {
+        // 响应者的亲近NPC也可能触发战斗（-8到-9）
+        const delta = bond.weight >= 0.8 ? -9 : -8
+        const result = changeTrust(session, {
+          npcName: bond.npcName,
+          channel: 'reputation',
+          delta,
+          reason: `${responder}因你而卷入暴力`,
+          turn: session.turnCount,
+        })
+        if (result.applied) {
+          changes.push({ npcName: bond.npcName, delta, reason: `${responder}的亲近关系` })
+        }
+        processed.add(bond.npcName)
+      }
+    }
+  }
+
+  // 3. 目击者
+  for (const witness of witnesses) {
+    if (!processed.has(witness)) {
+      const delta = -6
+      const result = changeTrust(session, {
+        npcName: witness,
+        channel: 'witness',
+        delta,
+        reason: `目击你伤害${victim}`,
+        turn: session.turnCount,
+      })
+      if (result.applied) {
+        changes.push({ npcName: witness, delta, reason: '目击暴力' })
+      }
+      processed.add(witness)
+    }
+  }
+
+  // 4. 其他镇民（流言传播）
+  for (const npc of session.npcs) {
+    if (!processed.has(npc.name)) {
+      const delta = -4
+      const result = changeTrust(session, {
+        npcName: npc.name,
+        channel: 'reputation',
+        delta,
+        reason: `听说你伤害了${victim}`,
+        turn: session.turnCount,
+      })
+      if (result.applied) {
+        changes.push({ npcName: npc.name, delta, reason: '流言传播' })
+      }
+    }
+  }
+
+  // 生成摘要
+  const summary = `暴力后果传播：${changes.length} 名 NPC 的信任度下降。` +
+    `受害者亲近关系 ${changes.filter(c => c.reason.includes('亲近关系') && c.reason.includes(victim)).length} 人，` +
+    (responder ? `响应者亲近关系 ${changes.filter(c => c.reason.includes('亲近关系') && c.reason.includes(responder)).length} 人，` : '') +
+    `目击者 ${changes.filter(c => c.reason === '目击暴力').length} 人，` +
+    `流言传播 ${changes.filter(c => c.reason === '流言传播').length} 人。`
+
+  return { changes, summary }
 }
