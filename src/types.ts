@@ -238,4 +238,5 @@ export interface GameSession {
   dmMessages?: any[]            // DM Agent 对话历史（持久化到 localStorage）
   interactionNpc?: string       // 当前正在交互的 NPC（对话/交易状态绑定）
   timeAccum?: number            // 加权时间累积值（达到阈值自动推进时段）
+  npcHostileCooldowns?: Map<string, number>  // NPC 敌对响应冷却记录（npcName -> 触发回合数）
 }

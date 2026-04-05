@@ -14,7 +14,7 @@ import {
   AttackTool, UseItemTool, SearchTool, RestTool,
   RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
-  ChangeTrustTool, ProposeTradeActionTool,
+  ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -71,7 +71,7 @@ export function initDMAgent(): void {
       UseItemTool, SearchTool, RestTool,
       RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
-      ChangeTrustTool, ProposeTradeActionTool,
+      ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,
@@ -84,6 +84,53 @@ export function initDMAgent(): void {
 export function getDMAgent(): Agent {
   if (!agent) throw new Error('DM Agent 未初始化 — 先调用 initDMAgent()')
   return agent
+}
+
+// ─── 工具开关（战斗叙事等场景用） ──────
+
+/** 暂存被静音的工具，unmute 时恢复 */
+let mutedTools: Map<string, any> | null = null
+
+/**
+ * 静音 DM 的工具——只保留白名单中的工具，其余全部移除。
+ * 下一次 dm.run() 只会向 LLM 发送白名单工具的 schema。
+ * 调用后必须配对 unmuteDMTools()。
+ *
+ * @param keep 要保留的工具名数组，默认 ['SetActions']（允许生成选项）
+ *
+ * 注意：SetActions 会被强制保留（即使传入空数组），确保 DM 始终能生成后续选项。
+ */
+export function muteDMTools(keep: string[] = ['SetActions']): void {
+  if (!agent) return
+  if (mutedTools) return // 已经静音，防止重复
+  const registry = (agent as any).tools
+  // 强制保留 SetActions（即使调用方传入空数组），确保战斗叙事后能生成选项
+  const keepSet = new Set([...keep, 'SetActions'])
+  mutedTools = new Map()
+  // 遍历所有工具，不在白名单里的移除并暂存
+  for (const [name, tool] of registry.tools) {
+    if (!keepSet.has(name)) {
+      mutedTools.set(name, tool)
+    }
+  }
+  for (const name of mutedTools.keys()) {
+    registry.tools.delete(name)
+  }
+  const kept = Array.from(keepSet).filter(k => registry.tools.has(k))
+  console.log(`[dm-agent] 工具已静音 (${mutedTools.size} muted, 保留: ${kept.join(', ') || '无'})`)
+}
+
+/**
+ * 恢复 DM 的所有工具。与 muteDMTools() 配对使用。
+ */
+export function unmuteDMTools(): void {
+  if (!agent || !mutedTools) return
+  const registry = (agent as any).tools
+  for (const [name, tool] of mutedTools) {
+    registry.tools.set(name, tool)
+  }
+  console.log(`[dm-agent] 工具已恢复 (${mutedTools.size} tools restored)`)
+  mutedTools = null
 }
 
 /** 导出 DM 对话历史（用于持久化） */
