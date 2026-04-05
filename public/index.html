@@ -2856,6 +2856,10 @@ function handleWsMessage(e) {
     case 'trade_proposal':
       playSfx('ui_coins', 0.3)
       showTradeProposal(msg)
+      // 交易卡片显示期间锁定输入，玩家必须先处理交易（确认/取消/砍价）
+      document.getElementById('input').disabled = true
+      document.getElementById('input').placeholder = '请先处理交易...'
+      document.getElementById('send').disabled = true
       break
 
     // ─── 音频 ───
@@ -3394,8 +3398,10 @@ function tradeBargain(btn) {
   window._bargainMode = true
   window._currentTradeCard = btn.closest('.trade-proposal-card')  // 保存引用，砍价后可能需要更新
   const input = document.getElementById('input')
+  input.disabled = false
   input.value = ''
   input.placeholder = '砍价：你想怎么说？（发送后自动结束砍价模式）'
+  document.getElementById('send').disabled = false
   input.focus()
 }
 
