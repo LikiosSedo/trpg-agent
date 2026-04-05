@@ -1330,7 +1330,6 @@ export class GameEngine {
                 alert.trustCascadeTriggered = true
                 session.worldState.flags['violence_alert'] = JSON.stringify(alert)
                 console.log(`[trust-cascade] ${cascadeResult.summary}`)
-                yield { type: 'narrative_warning', text: `💔 ${cascadeResult.summary}` }
               }
             } else {
               alert.responded = true
@@ -1360,7 +1359,6 @@ export class GameEngine {
                 )
                 alert.trustCascadeTriggered = true
                 console.log(`[trust-cascade] ${cascadeResult.summary}`)
-                yield { type: 'narrative_warning', text: `💔 ${cascadeResult.summary}` }
               }
 
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
@@ -1798,25 +1796,18 @@ export class GameEngine {
         const hasEvidence =
           victimNPC?.condition === 'unconscious' ||
           victimNPC?.condition === 'recovering' ||
-          (session.worldState.flags['violence_alert'] &&
-           session.worldState.flags['violence_alert'].includes(victim))
+          (typeof session.worldState.flags['violence_alert'] === 'string' &&
+           (session.worldState.flags['violence_alert'] as string).includes(victim))
 
         if (hasEvidence) {
           console.log(`[confession] 检测到坦白暴力行为: 受害者=${victim}, 当前NPC=${currentNPC}`)
 
           // 触发信任度传播
           const { propagateViolenceTrust } = await import('./trust-system.js')
-          const cascadeResult = propagateViolenceTrust(session, victim, currentNPC, [])
+          const cascadeResult = propagateViolenceTrust(session, victim, currentNPC, [], '坦白暴力行为')
 
           // 发送信任度传播事件
           if (cascadeResult.changes.length > 0) {
-            const summary = cascadeResult.changes
-              .map(c => `${c.npcName}: ${c.oldTrust} → ${c.newTrust} (${c.delta >= 0 ? '+' : ''}${c.delta})`)
-              .join('\n')
-            yield {
-              type: 'npc_update',
-              text: `⚠️ 暴力事件震惊全镇！\n${summary}`
-            }
             console.log(`[confession] 信任度传播完成: ${cascadeResult.changes.length}个NPC受影响`)
           }
         }
