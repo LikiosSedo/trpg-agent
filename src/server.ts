@@ -419,14 +419,8 @@ wss.on('connection', (ws: WebSocket, req) => {
         send('item_acquired', { text: `交易完成：${results.join('、')}` })
         send('sync', { session: engine.session, dossier: engine.dossier.toJSON() })
         engine.clearBargain()
-
-        // 交易成功后自动触发 DM 叙事（NPC 交付物品的场景描写）
-        if (allSuccess) {
-          await streamEvents(engine.processTurn(
-            `[交易完成] 玩家向${npc}购买了${items.map((i: any) => i.name).join('、')}，支付${totalPrice}金币。` +
-            `请描写${npc}交付物品的场景（1-2句），然后调用 SetActions 提供后续行动建议。`
-          ))
-        }
+        // 交易确认不触发 DM 叙事——避免等待，直接解锁输入
+        send('dm_end', { combat: false, pendingMonster: false, actions: null })
       } finally {
         processing = false
       }
@@ -436,19 +430,9 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 取消交易 ──
     if (msg.type === 'trade_cancel') {
       if (!gameStarted || !engine) return
-      if (processing) { send('error', { text: '处理中...' }); return }
-      processing = true
-      try {
-        const npc = msg.npc
-        engine.clearBargain()
-        // 触发 DM 叙事：玩家取消交易，NPC 的反应
-        await streamEvents(engine.processTurn(
-          `[交易取消] 玩家决定不购买${npc}的商品。` +
-          `请描写${npc}的反应（1-2句），然后调用 SetActions 提供后续行动建议。`
-        ))
-      } finally {
-        processing = false
-      }
+      engine.clearBargain()
+      // 取消交易不触发 DM 叙事——直接解锁输入，玩家继续操作
+      send('dm_end', { combat: false, pendingMonster: false, actions: null })
       return
     }
 
