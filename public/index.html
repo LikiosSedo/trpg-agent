@@ -2690,6 +2690,7 @@ function handleWsMessage(e) {
     case 'combat_narrative_actions':
       // 战斗叙事后 DM 生成的后续行动建议
       if (msg.actions && !combatMode) showSceneActions(msg.actions)
+      unlockInput()
       break
 
     case 'combat_monster':
@@ -2719,7 +2720,9 @@ function handleWsMessage(e) {
         combatTargets = []
         combatSpells = []
         combatItems = []
-        unlockInput()
+        // 不在这里 unlockInput()——等 combat_narrative_actions 或 sync 事件到达后再解锁
+        // 战斗结束后 DM 还需要生成叙事和 SetActions
+        document.getElementById('input').placeholder = 'DM 正在描述战斗结局...'
         document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
         updateCombatPanel()
         // 战斗结束 → 切回场景 BGM（从当前会话状态推导）
@@ -2893,6 +2896,10 @@ function handleWsMessage(e) {
       // Update combat round from session if in combat
       if (msg.session?.combat?.active) {
         combatRound = msg.session.combat.round || 1
+      }
+      // 战斗结束后的 sync 是最后一个事件，兜底解锁输入
+      if (!combatMode && !msg.session?.combat?.active) {
+        unlockInput()
       }
       break
 

@@ -478,11 +478,12 @@ export function executePlayerTurn(
       }
     }
 
-    // 检查是否首次击败无辜NPC
+    // 检查是否首次击败无辜NPC（NPC = 镇上居民，不是怪物）
     let firstInnocentKill = false
     if (!session.worldState.flags['first_innocent_kill']) {
       const target = session.combat?.monsters.find(m => m.id === targetId)
-      if (target?.nonlethal) {
+      const isNPC = target && session.npcs.some(n => n.name === target.name)
+      if (isNPC) {
         session.worldState.flags['first_innocent_kill'] = true
         firstInnocentKill = true
       }
