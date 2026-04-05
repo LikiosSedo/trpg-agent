@@ -244,6 +244,8 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('system', { text: ev.text }); break
         case 'system_message':
           send('system_message', { text: ev.text }); break
+        case 'important_warning':
+          send('important_warning', { title: ev.title, text: ev.text }); break
         case 'item_acquired':
           send('item_acquired', { text: ev.text }); break
         case 'trade_proposal':

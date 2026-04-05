@@ -2838,6 +2838,11 @@ function handleWsMessage(e) {
       break
     }
 
+    // ─── 重要警告弹窗 ───
+    case 'important_warning':
+      showImportantWarning(msg)
+      break
+
     case 'open_guide':
       openGuidePanel()
       break
@@ -3415,6 +3420,23 @@ function showGameOver(data) {
           <button onclick="location.reload()" style="background:#533483;color:white;border:none;padding:12px;border-radius:8px;font-size:15px;cursor:pointer">重新开始新冒险</button>
           ${canContinue ? '<button onclick="this.closest(\'.npc-card-overlay\').remove()" style="background:#0f3460;color:#888;border:1px solid #333;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">继续坚持...</button>' : ''}
         </div>
+      </div>
+    </div>`
+  document.body.appendChild(overlay)
+}
+
+// ─── 重要警告弹窗 ───
+function showImportantWarning(data) {
+  const overlay = document.createElement('div')
+  overlay.className = 'npc-card-overlay open'
+  overlay.style.zIndex = '300'
+  overlay.innerHTML = `
+    <div class="npc-card-popup" style="max-width:420px;text-align:center" onclick="event.stopPropagation()">
+      <div style="padding:40px 24px 24px">
+        <div style="font-size:42px;margin-bottom:16px">🎭</div>
+        <div style="font-size:18px;font-weight:bold;color:#ff9800;margin-bottom:16px">${esc(data.title)}</div>
+        <div style="font-size:14px;color:#ccc;line-height:1.8;margin-bottom:24px;white-space:pre-line">${esc(data.text)}</div>
+        <button onclick="this.closest('.npc-card-overlay').remove()" style="background:#533483;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:15px;cursor:pointer;width:100%">我明白了</button>
       </div>
     </div>`
   document.body.appendChild(overlay)

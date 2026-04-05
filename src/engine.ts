@@ -1203,9 +1203,10 @@ export class GameEngine {
     let actionResult: ActionResult | null = null
 
     // ── 加权时间累积：小动作累积到阈值自动推进时段 ──
+    // 注意：MOVE 和 REST 在工具内部直接推进时间，所以这里 cost 为 0
     const TIME_COST: Record<string, number> = {
-      TALK: 2, SEARCH: 2, BUY: 1, SELL: 1, GIVE: 1, USE: 1, MOVE: 1,
-      ATTACK: 0, LOOK: 0, FLEE: 0, NARRATIVE: 0, REST: 0,
+      TALK: 2, SEARCH: 2, BUY: 1, SELL: 1, GIVE: 1, USE: 1,
+      ATTACK: 0, LOOK: 0, FLEE: 0, NARRATIVE: 0, MOVE: 0, REST: 0,
     }
     const TIME_THRESHOLD = 20
     const cost = TIME_COST[action.type] ?? 0
@@ -1232,11 +1233,12 @@ export class GameEngine {
       console.log(`[rules-agent] 结果: ${actionResult.output.slice(0, 200)}`)
       parts.push(formatActionResult(actionResult))
 
-      // 首次击败无辜NPC提示
+      // 首次击败无辜NPC提示（弹窗形式）
       if (actionResult.firstInnocentKill) {
         yield {
-          type: 'system_message',
-          text: '⚠️ 刀刃所向，非善非恶...只是选择。但选择，终将塑造你。',
+          type: 'important_warning',
+          title: '⚠️ 谜语人的低语',
+          text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
         }
       }
     } else {
