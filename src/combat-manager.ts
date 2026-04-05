@@ -339,9 +339,11 @@ export function attemptFlee(session: GameSession): {
   const player = session.player
   const log: string[] = []
 
-  // DEX check: DC 10 + alive monster count
+  // DEX check: 逃跑DC取决于对手强度
+  // 使用存活怪物中最高的DC值，确保强敌更难逃脱
   const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
-  const dc = 10 + aliveMonsters.length
+  const maxMonsterDC = Math.max(...aliveMonsters.map(m => m.ac ?? 10))
+  const dc = maxMonsterDC
   const roll = rollDice('1d20').total
   const total = roll + player.abilityModifiers.DEX
   const success = total >= dc
