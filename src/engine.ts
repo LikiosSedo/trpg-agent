@@ -253,7 +253,7 @@ export type TurnEvent =
   | { type: 'broken_promise'; npcName: string; reason: string }
   | { type: 'safety_block'; reason: string }
   | { type: 'dm_text_delta'; text: string }
-  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | null }
+  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | null; hasPendingTrade?: boolean }
   | { type: 'dm_error'; message: string }
   | { type: 'combat_monster'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
@@ -1768,7 +1768,9 @@ export class GameEngine {
     }
 
     // 交易提案检查（DM 调用了 ProposeTradeAction？）
+    // 注意：trade 检查必须在 dm_end yield 之前，因为 dm_end 需要知道是否有交易卡片
     const trade = consumeTradeProposal()
+    const hasPendingTrade = !!trade
     if (trade) {
       if (trade.canBargain !== false) {
         this.bargainState = {
@@ -1955,6 +1957,7 @@ export class GameEngine {
       combat: !!session.combat?.active,
       pendingMonster: !!session.combat?.pendingMonsterTurn,
       actions,
+      hasPendingTrade,
     }
 
     // 剧情保底遭遇：关键探索节点完成后，下次移动 100% 触发战斗

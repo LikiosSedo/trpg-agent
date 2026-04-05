@@ -203,7 +203,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'dm_text_delta':
           send('dm', { text: ev.text }); break
         case 'dm_end':
-          send('dm_end', { combat: ev.combat, pendingMonster: ev.pendingMonster, actions: ev.actions }); break
+          send('dm_end', { combat: ev.combat, pendingMonster: ev.pendingMonster, actions: ev.actions, hasPendingTrade: ev.hasPendingTrade }); break
         case 'dm_error':
           send('error', { text: ev.message }); break
         case 'broken_promise':

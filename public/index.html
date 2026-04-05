@@ -2655,7 +2655,8 @@ function handleWsMessage(e) {
       if (msg.pendingMonster) {
         combatMode = true
       } else {
-        unlockInput()
+        // 有交易卡片时不解锁输入——玩家必须先处理交易
+        if (!msg.hasPendingTrade) unlockInput()
         combatMode = !!msg.combat
         updateCombatPanel()
         if (!combatMode) showSceneActions(msg.actions)
