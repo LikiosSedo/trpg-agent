@@ -700,6 +700,53 @@ export class GameEngine {
   }
 
   /**
+   * 检测玩家输入是否包含"坦白暴力"行为
+   *
+   * 检测逻辑：
+   * 1. 输入包含暴力相关关键词（攻击、打、杀、伤害等）
+   * 2. 输入提到了某个 NPC 的名字
+   * 3. 语气是坦白/承认（不是否认或询问）
+   */
+  private detectViolenceConfession(
+    input: string,
+    session: GameSession
+  ): { isConfession: boolean; victimName?: string } {
+    // 暴力关键词
+    const violenceKeywords = [
+      '攻击', '打', '杀', '伤害', '袭击', '揍', '砍', '刺',
+      '昏迷', '打倒', '打伤', '弄伤', '弄晕', '打昏'
+    ]
+
+    // 否定词（如果包含否定词，不算坦白）
+    const negationWords = ['没', '不', '没有', '不是', '未曾', '从未', '并非']
+
+    // 疑问词（如果是疑问句，不算坦白）
+    const questionWords = ['吗', '呢', '？', '?', '是否']
+
+    // 间接叙述词（如果是转述，不算坦白）
+    const indirectWords = ['听说', '据说', '有人', '别人', '他们']
+
+    // 检查是否包含暴力关键词
+    const hasViolenceKeyword = violenceKeywords.some(kw => input.includes(kw))
+    if (!hasViolenceKeyword) return { isConfession: false }
+
+    // 检查是否包含否定词、疑问词或间接叙述词
+    const hasNegation = negationWords.some(nw => input.includes(nw))
+    const hasQuestion = questionWords.some(qw => input.includes(qw))
+    const hasIndirect = indirectWords.some(iw => input.includes(iw))
+    if (hasNegation || hasQuestion || hasIndirect) return { isConfession: false }
+
+    // 检查是否提到了某个 NPC 的名字
+    for (const npc of session.npcs) {
+      if (input.includes(npc.name)) {
+        return { isConfession: true, victimName: npc.name }
+      }
+    }
+
+    return { isConfession: false }
+  }
+
+  /**
    * 判断是否可以跨区域追踪
    * @param fromLocation 追踪起点区域
    * @param toLocation 追踪目标区域
@@ -1739,6 +1786,43 @@ export class GameEngine {
       toolsCalled.push({ toolName: 'ChangeTrust' })
     }
 
+    // 检测坦白暴力行为
+    const confessionDetected = this.detectViolenceConfession(input, session)
+    if (confessionDetected.isConfession && confessionDetected.victimName) {
+      const victim = confessionDetected.victimName
+      const currentNPC = session.interactionNpc
+
+      if (currentNPC) {
+        // 检查受害者是否有暴力证据
+        const victimNPC = session.npcs.find(n => n.name === victim)
+        const hasEvidence =
+          victimNPC?.condition === 'unconscious' ||
+          victimNPC?.condition === 'recovering' ||
+          (session.worldState.flags['violence_alert'] &&
+           session.worldState.flags['violence_alert'].includes(victim))
+
+        if (hasEvidence) {
+          console.log(`[confession] 检测到坦白暴力行为: 受害者=${victim}, 当前NPC=${currentNPC}`)
+
+          // 触发信任度传播
+          const { propagateViolenceTrust } = await import('./trust-system.js')
+          const cascadeResult = propagateViolenceTrust(session, victim, currentNPC, [])
+
+          // 发送信任度传播事件
+          if (cascadeResult.changes.length > 0) {
+            const summary = cascadeResult.changes
+              .map(c => `${c.npcName}: ${c.oldTrust} → ${c.newTrust} (${c.delta >= 0 ? '+' : ''}${c.delta})`)
+              .join('\n')
+            yield {
+              type: 'npc_update',
+              text: `⚠️ 暴力事件震惊全镇！\n${summary}`
+            }
+            console.log(`[confession] 信任度传播完成: ${cascadeResult.changes.length}个NPC受影响`)
+          }
+        }
+      }
+    }
+
     // Unified narrative validation
     console.log(`[validator] 本轮工具调用: ${toolsCalled.map(t => t.toolName).join(',') || '无'}`)
     console.log(`[validator] DM文本长度: ${fullText.length}字`)
@@ -2254,9 +2338,9 @@ export class GameEngine {
     muteDMTools()  // 🔇 静音：只保留 SetActions
     try {
       for await (const event of dmRespond(
-        `[战斗叙事请求]\n${context}\n${scene}\n` +
-        `要求：用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。` +
-        `不要提及HP/AC/骰子等数值。先输出叙事文字，然后调用 SetActions 提供2-3个后续行动建议。`
+        `[战斗叙事请求]\n${context}\n${scene}\n\n` +
+        `用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。不要提及HP/AC/骰子等数值。\n\n` +
+        `叙事结束后，思考玩家此刻最自然的后续行动，调用 SetActions 提供选项。`
       )) {
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
@@ -2476,6 +2560,16 @@ export class GameEngine {
           if (items.length || gold) lines.push(`获得: ${items.join(', ')}${gold ? ` + ${gold}金币` : ''}`)
         }
         yield { type: 'combat_status', text: lines.join('\n'), ended: true, result: turnResult.result }
+
+        // 首次击败无辜NPC警告
+        if (turnResult.firstInnocentKill) {
+          yield {
+            type: 'important_warning',
+            title: '⚠️ 谜语人的低语',
+            text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
+          }
+        }
+
         const isNpcFight = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
         yield* this.combatDMNarrative(
           turnResult.result === 'victory'

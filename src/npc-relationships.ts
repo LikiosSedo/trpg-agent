@@ -116,7 +116,9 @@ export const NPC_PERSONALITIES: Record<string, NPCPersonality> = {
     thresholds: { curt: -1, hostile: -3, avoidance: -5, combat: -5 },
     canFight: true,
     combatResponse: 'fight',
-    bonds: [],
+    bonds: [
+      { npcName: '叶绿', weight: 0.5 },  // 同为镇上商人，有基本的同事情谊
+    ],
     permanentGrudges: [],
     trustCeiling: { 1: 4, 2: 6, 3: 8, 4: 10 },
     canTrack: false,  // 矮人铁匠，不会离开铺子追踪
