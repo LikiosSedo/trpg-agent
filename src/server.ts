@@ -95,6 +95,82 @@ app.get('/', (_req, res) => {
   res.sendFile(join(__dirname, '..', 'public', 'index.html'))
 })
 
+// ─── 调试 API ───
+
+import { runFullDiagnostics, getNPCPanelData } from './debug-api.js'
+
+// 全局 engine 引用（用于调试 API）
+let globalEngine: GameEngine | null = null
+
+app.get('/api/debug/diagnostics', (_req, res) => {
+  if (!globalEngine) {
+    res.status(503).json({ error: '游戏未启动' })
+    return
+  }
+  try {
+    const report = runFullDiagnostics(globalEngine, globalEngine.session)
+    res.json(report)
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message })
+  }
+})
+
+app.get('/api/debug/npc-panel', (_req, res) => {
+  if (!globalEngine) {
+    res.status(503).json({ error: '游戏未启动' })
+    return
+  }
+  try {
+    const data = getNPCPanelData(globalEngine, globalEngine.session)
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message })
+  }
+})
+
+app.get('/api/debug/session', (_req, res) => {
+  if (!globalEngine) {
+    res.status(503).json({ error: '游戏未启动' })
+    return
+  }
+  try {
+    const session = globalEngine.session
+    res.json({
+      player: {
+        name: session.player.name,
+        class: session.player.class,
+        hp: session.player.hp,
+        maxHp: session.player.maxHp,
+        gold: session.player.gold,
+      },
+      world: {
+        location: session.worldState.currentLocation,
+        subLocation: session.worldState.currentSubLocation,
+        timeOfDay: session.worldState.timeOfDay,
+      },
+      chapter: session.chapter ? {
+        current: session.chapter.currentChapter,
+        completedBeats: session.chapter.completedBeats,
+      } : null,
+      combat: session.combat?.active ? {
+        active: true,
+        round: session.combat.round,
+        monsters: session.combat.monsters?.length ?? 0,
+      } : { active: false },
+      npcs: session.npcs.map(n => ({
+        name: n.name,
+        trust: n.trust,
+        location: n.location,
+        subLocation: n.subLocation || n.homeBase,
+        condition: n.condition,
+      })),
+      turnCount: session.turnCount,
+    })
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message })
+  }
+})
+
 // ─── WebSocket 连接 ───
 
 wss.on('connection', (ws: WebSocket, req) => {
@@ -236,6 +312,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     if (msg.type === 'resume') {
       try {
         engine = GameEngine.resumeGame(msg.session, msg.dossier, msg.session.dmMessages)
+        globalEngine = engine  // 更新全局引用
         gameStarted = true
         console.log(`[server] resumed session for ${engine.session.player.name}`)
 
@@ -254,6 +331,7 @@ wss.on('connection', (ws: WebSocket, req) => {
       const { name, classId } = msg
       try {
         engine = GameEngine.createGame(name, classId)
+        globalEngine = engine  // 更新全局引用
         gameStarted = true
         console.log(`[server] game started for ${name} (${classId})`)
       } catch (err) {
