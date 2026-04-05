@@ -3368,8 +3368,10 @@ function tradeConfirm(btn) {
 }
 
 function tradeBargain(btn) {
-  btn.closest('.trade-proposal-card').remove()
+  // 不删除交易卡片，保留让玩家可以看到商品和价格
+  // 卡片会在确认/取消/砍价结果返回时才移除
   window._bargainMode = true
+  window._currentTradeCard = btn.closest('.trade-proposal-card')  // 保存引用，砍价后可能需要更新
   const input = document.getElementById('input')
   input.value = ''
   input.placeholder = '砍价：你想怎么说？（发送后自动结束砍价模式）'
@@ -3639,6 +3641,11 @@ function sendInput() {
     window._bargainMode = false
     input.placeholder = ''
     ws.send(JSON.stringify({ type: 'bargain', text }))
+    // 砍价消息发送后，移除交易卡片（砍价结果会通过 DM 叙事返回）
+    if (window._currentTradeCard) {
+      window._currentTradeCard.remove()
+      window._currentTradeCard = null
+    }
   } else {
     ws.send(JSON.stringify({ type: 'input', text }))
   }
