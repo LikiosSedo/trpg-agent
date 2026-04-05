@@ -181,7 +181,11 @@ async function checkHostileNPCs(session: GameSession): Promise<Array<{ npc: stri
     const response = evaluateResponse(npc)
     if (response.type !== 'combat_trigger') continue
 
-    // 4. 检查冷却
+    // 4. 检查冷却（存档恢复后 Map 可能退化为普通对象）
+    if (session.npcHostileCooldowns && !(session.npcHostileCooldowns instanceof Map)) {
+      session.npcHostileCooldowns = new Map(Object.entries(session.npcHostileCooldowns))
+    }
+    if (!session.npcHostileCooldowns) session.npcHostileCooldowns = new Map()
     const lastTrigger = session.npcHostileCooldowns.get(npc.name)
     if (lastTrigger !== undefined) {
       const cooldownRemaining = 3 - (session.turnCount - lastTrigger)
