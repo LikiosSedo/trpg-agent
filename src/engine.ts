@@ -1561,6 +1561,10 @@ export class GameEngine {
       for (const npc of npcsAtDest) {
         const result = this.dossier.unlock(npc.name, session.turnCount, moveChapterNum)
         console.log(`[move-unlock] ${npc.name}: ${result ? 'newly unlocked' : 'already unlocked'}, isUnlocked=${this.dossier.isUnlocked(npc.name)}`)
+        // 如果是首次解锁，发送事件给前端
+        if (result) {
+          yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
+        }
       }
     }
 
