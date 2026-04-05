@@ -26,14 +26,16 @@ export const TriggerTrustCascade: Tool = {
 - victim="小莉", reason="玩家偷窃被发现"
 - victim="格雷格", reason="玩家在酒馆打人", responder="陈妈", witnesses="叶绿,老板"`,
 
-  schema: z.object({
+  inputSchema: z.object({
     victim: z.string().describe('受害者名称'),
     reason: z.string().describe('触发原因的简短描述'),
     responder: z.string().optional().describe('响应者名称（可选）'),
     witnesses: z.string().optional().describe('目击者名称列表，逗号分隔（可选）'),
   }),
+  isConcurrencySafe: false,
+  isReadOnly: false,
 
-  execute: async (args: any) => {
+  async execute(args: any) {
     const { victim, reason, responder, witnesses } = args
     const session = getSession()
 

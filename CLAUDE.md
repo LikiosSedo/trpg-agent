@@ -146,6 +146,19 @@ DM 是**说书人**，不是程序员。DM 的主要工作是：
 - [ ] 是否更新了相关文档？
 - [ ] 类型检查是否通过？
 - [ ] 是否考虑了边界情况？
+- [ ] 新工具是否使用正确的字段名（`inputSchema` 而非 `schema`）？
+
+## 常见陷阱
+
+### 工具定义
+- ❌ 使用 `schema:` 字段 → 导致 `_def` 错误
+- ✅ 必须使用 `inputSchema:` 字段
+- ✅ 必须包含 `isConcurrencySafe` 和 `isReadOnly` 字段
+- ✅ 使用 `async execute(input)` 而非 `execute: async (input) =>`
+
+参考现有工具（如 `src/tools/move.ts`）的格式。
+
+---
 
 ## 修订历史
 
