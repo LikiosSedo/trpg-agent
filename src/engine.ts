@@ -870,6 +870,8 @@ export class GameEngine {
         }
       }
       console.log(`[npc-panel] player at: ${session.worldState.currentLocation}/${session.worldState.currentSubLocation}`)
+      console.log(`[npc-panel] npcLocations keys:`, Object.keys(npcLocations))
+      console.log(`[npc-panel] dossier.toListData keys:`, this.dossier.toListData(trustMap).map(n => `${n.key}(${n.name})`))
       for (const [name, loc] of Object.entries(npcLocations)) {
         console.log(`[npc-panel] ${name}: ${loc.location}/${loc.subLocation}`)
       }

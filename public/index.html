@@ -2294,10 +2294,15 @@ function renderNPCListPanel(data) {
   const playerLoc = data.playerLocation || ''
   const playerSub = data.playerSubLocation || ''
 
+  console.log('[npc-panel-frontend] playerLoc:', playerLoc, 'playerSub:', playerSub)
+  console.log('[npc-panel-frontend] npcLocs keys:', Object.keys(npcLocs))
+  console.log('[npc-panel-frontend] npcs:', npcs.map(n => `key=${n.key} name=${n.name}`))
+
   // 分组：在场（同子地点） vs 不在场。用 key（短名）匹配 npcLocs
   const here = [], away = []
   for (const npc of npcs) {
     const loc = npcLocs[npc.key || npc.name]
+    console.log(`[npc-panel-frontend] ${npc.key}(${npc.name}): loc=${JSON.stringify(loc)}, sameSub=${loc && loc.location === playerLoc && loc.subLocation === playerSub}`)
     const sameArea = loc && loc.location === playerLoc
     const sameSub = sameArea && loc.subLocation === playerSub
     if (sameSub) here.push(npc)
