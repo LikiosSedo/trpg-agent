@@ -92,7 +92,11 @@ export const MoveTool: Tool = {
         if (avoidNpc) {
           const resp = evaluateResponse(avoidNpc)
           if (resp.type === 'avoidance' && resp.moveAway) {
-            moveNPC(avoidNpc, avoidNpc.homeBase ?? '', session)
+            // 如果 homeBase 就是玩家当前位置，逃到广场
+            const dest = (avoidNpc.homeBase === session.worldState.currentSubLocation)
+              ? 'town-square'
+              : (avoidNpc.homeBase ?? 'town-square')
+            moveNPC(avoidNpc, dest, session)
             avoidingNpcs.push(npcName)
           }
         }
@@ -177,7 +181,11 @@ export const MoveTool: Tool = {
         if (avoidNpc) {
           const resp = evaluateResponse(avoidNpc)
           if (resp.type === 'avoidance' && resp.moveAway) {
-            moveNPC(avoidNpc, avoidNpc.homeBase ?? '', session)
+            // 如果 homeBase 就是玩家当前位置，逃到广场
+            const dest = (avoidNpc.homeBase === session.worldState.currentSubLocation)
+              ? 'town-square'
+              : (avoidNpc.homeBase ?? 'town-square')
+            moveNPC(avoidNpc, dest, session)
             avoidingNpcs.push(npcName)
           }
         }
