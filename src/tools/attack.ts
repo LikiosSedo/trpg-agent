@@ -85,9 +85,11 @@ export const AttackTool: Tool = {
       const personality = getPersonality(targetId)
       const grudgeTag = targetId === '小莉' ? 'harm_小莉' : undefined
 
+      // 用 reputation channel 避免 cascadeReputation 立即传播
+      // 全镇传播由 violence_alert 延迟后的 propagateViolenceTrust 统一处理
       changeTrust(session, {
         npcName: targetId,
-        channel: 'combat',
+        channel: 'reputation',
         delta: -5,
         reason: `玩家攻击了${targetId}`,
         turn: session.turnCount,
@@ -130,7 +132,7 @@ export const AttackTool: Tool = {
           // 护卫挡在前面，本体不参战
           for (const name of availableShields) {
             const npc = session.npcs.find(n => n.name === name)
-            if (npc) changeTrust(session, { npcName: name, channel: 'combat', delta: -5, reason: `玩家攻击了${targetId}`, turn: session.turnCount })
+            if (npc) changeTrust(session, { npcName: name, channel: 'reputation', delta: -5, reason: `玩家攻击了${targetId}`, turn: session.turnCount })
           }
           combatNames = guardConfig.canFightSelf ? [targetId, ...availableShields] : availableShields
           if (!guardConfig.canFightSelf) {
