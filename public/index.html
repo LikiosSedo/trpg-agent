@@ -19,23 +19,58 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { color-scheme: dark; }
   body {
-    background-color: #1a1a2e !important; color: #e0e0e0 !important;
+    background-color: #0c0b14 !important; color: #e0e0e0 !important;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse at 50% 20%, rgba(25,15,45,0.4) 0%, transparent 70%);
     font-family: -apple-system, 'Courier New', monospace; font-size: 15px;
     height: 100vh; height: 100dvh; display: flex; flex-direction: column;
     -webkit-text-size-adjust: 100%;
   }
   #header {
-    background: #16213e; padding: 12px 16px; border-bottom: 1px solid #0f3460;
+    background: linear-gradient(180deg, #141e38 0%, #0e1628 100%);
+    padding: 8px 16px 6px;
+    border-bottom: 1px solid rgba(184,134,11,0.2);
+    box-shadow: 0 3px 16px rgba(0,0,0,0.5);
     text-align: center; flex-shrink: 0; position: sticky; top: 0; z-index: 50;
   }
-  #header h1 { color: #e6b800; font-size: 18px; margin-bottom: 4px; }
+  #header h1 { color: #d4a017; font-size: 16px; margin-bottom: 2px; letter-spacing: 1.5px; font-family: 'Georgia', serif; }
   #header .sub { color: #888; font-size: 12px; }
-  #messages {
-    flex: 1; overflow-y: auto; padding: 12px 16px;
-    display: flex; flex-direction: column; gap: 8px;
+  #player-hud {
+    background: rgba(0,0,0,0.2); border-radius: 12px;
+    padding: 3px 12px; letter-spacing: 0.2px;
   }
-  .msg { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #e0e0e0; }
-  .msg.dm { color: #e0e0e0 !important; }
+  #messages {
+    flex: 1; overflow-y: auto; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    background-color: #0c0c20;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse at 50% 0%, rgba(20,40,70,0.3) 0%, transparent 60%);
+  }
+  /* 左侧装饰暗纹边栏 */
+  #messages::before {
+    content: ''; position: sticky; top: 0; left: 0;
+    width: 100%; height: 0;
+    box-shadow: 0 0 60px 30px rgba(15,30,60,0.3);
+    pointer-events: none; z-index: 1;
+  }
+  .msg {
+    line-height: 1.8; white-space: pre-wrap; word-wrap: break-word;
+    color: #ccc; font-size: 14.5px;
+    padding: 8px 12px 8px 14px;
+    border-left: 3px solid transparent;
+    border-radius: 4px;
+    font-family: 'Georgia', 'Noto Serif SC', serif;
+  }
+  .msg.dm {
+    color: #d4cfc4 !important;
+    border-left-color: rgba(184, 134, 11, 0.4);
+    background: linear-gradient(135deg, rgba(20,18,35,0.6) 0%, rgba(15,25,45,0.4) 100%);
+    padding: 10px 14px 10px 16px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
+  }
   .msg.system {
     color: #e6b800 !important; font-size: 13px;
     background: #1a1a3e; border-left: 3px solid #e6b800; padding: 8px 12px;
@@ -46,15 +81,37 @@
   .msg.system::after { content: ' ▼ 点击展开'; color: #666; font-size: 11px; }
   .msg.system.expanded::after { content: ' ▲ 点击收起'; }
   .msg.error { color: #ff6b6b !important; font-size: 12px; }
-  .msg.player { color: #4ecdc4 !important; }
-  .msg.prologue { color: #ccc !important; font-style: italic; }
-  /* 快速动作建议 */
-  .actions { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
-  .action-btn {
-    background: #0f3460; color: #aaa; border: 1px solid #333; padding: 6px 12px;
-    border-radius: 16px; font-size: 13px; cursor: pointer;
+  .msg.player {
+    color: #4ecdc4 !important; font-size: 13px;
+    font-family: inherit;
+    border-left-color: rgba(78, 205, 196, 0.3);
+    background: rgba(78, 205, 196, 0.04);
+    padding: 6px 12px 6px 14px;
   }
-  .action-btn:hover { color: #e6b800; border-color: #e6b800; }
+  .msg.prologue {
+    color: #c8b888 !important; font-style: italic;
+    border-left-color: rgba(184, 134, 11, 0.3);
+    background: linear-gradient(135deg, rgba(30,22,10,0.4) 0%, rgba(20,18,35,0.3) 100%);
+    font-size: 14.5px; line-height: 1.85;
+    padding: 12px 16px 12px 18px;
+  }
+  /* 快速动作建议 */
+  .actions {
+    display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 12px;
+    background: linear-gradient(180deg, rgba(12,15,30,0.7) 0%, rgba(18,22,42,0.5) 100%);
+    border: 1px solid rgba(184,134,11,0.1);
+    border-radius: 6px;
+    margin-top: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .action-btn {
+    background: linear-gradient(180deg, #162040 0%, #0e1830 100%);
+    color: #9aa; border: 1px solid #2a3555; padding: 7px 14px;
+    border-radius: 4px; font-size: 13px; cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .action-btn:hover { color: #e6b800; border-color: rgba(184,134,11,0.5); background: #1a2850; box-shadow: 0 0 8px rgba(184,134,11,0.15); }
   .action-btn-quest {
     background: linear-gradient(135deg, #1a0f3d, #2d1b69);
     border: 1px solid #b8860b;
@@ -347,51 +404,95 @@
   }
 
   #input-area {
-    background: #16213e; padding: 12px 16px; border-top: 1px solid #0f3460;
+    background: linear-gradient(180deg, #10162a 0%, #141e38 100%);
+    padding: 10px 16px 12px;
+    border-top: 1px solid rgba(184,134,11,0.15);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
     display: flex; gap: 8px;
   }
   #input {
-    flex: 1; background: #0f3460; border: 1px solid #533483;
-    color: #e0e0e0; padding: 10px 12px; border-radius: 6px;
+    flex: 1; background: #0a0f20; border: 1px solid #2a3050;
+    color: #d0d0d0; padding: 10px 12px; border-radius: 4px;
     font-family: inherit; font-size: 16px; outline: none;
     resize: none; min-height: 40px; max-height: 120px;
     line-height: 1.4; overflow-y: auto;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
   }
-  #input:focus { border-color: #e6b800; }
-  #input::placeholder { color: #666; }
+  #input:focus { border-color: rgba(184,134,11,0.5); box-shadow: inset 0 2px 6px rgba(0,0,0,0.3), 0 0 8px rgba(184,134,11,0.1); }
+  #input::placeholder { color: #556; }
   #send {
-    background: #533483; color: white; border: none; padding: 10px 20px;
-    border-radius: 6px; font-size: 15px; cursor: pointer;
+    background: linear-gradient(180deg, #2a1a45, #1a1030); color: #c8a45c;
+    border: 1px solid rgba(184,134,11,0.3); padding: 10px 20px;
+    border-radius: 4px; font-size: 15px; cursor: pointer;
+    transition: all 0.2s; font-weight: 600; letter-spacing: 0.5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   }
-  #send:hover { background: #6b44a0; }
-  #send:disabled { background: #333; cursor: wait; }
+  #send:hover { background: linear-gradient(180deg, #3a2560, #2a1a45); border-color: rgba(184,134,11,0.5); box-shadow: 0 0 12px rgba(184,134,11,0.15); }
+  #send:disabled { background: #333; cursor: wait; box-shadow: none; }
 
+  /* 入口屏幕通用背景（auth / resume / create） */
+  #auth-screen, #resume-screen, #create-screen {
+    image-rendering: pixelated;
+    position: relative; z-index: 1;
+  }
+  #auth-screen, #resume-screen {
+    background:
+      linear-gradient(180deg, rgba(8,6,14,0) 0%, rgba(8,6,14,0.25) 40%, rgba(8,6,14,0.75) 70%, #08060e 92%),
+      url('portraits/scenes/title-bg.png');
+    background-size: cover, cover;
+    background-position: center, center 30%;
+    background-repeat: no-repeat, no-repeat;
+  }
+  #create-screen {
+    background:
+      url('portraits/scenes/title-bg.png');
+    background-size: cover;
+    background-position: center 30%;
+    background-repeat: no-repeat;
+    backdrop-filter: blur(0px);
+  }
+  #create-screen::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(8,6,14,0.7);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 0;
+  }
+  #create-screen > * { position: relative; z-index: 1; }
   /* 角色创建界面 */
   #create-screen {
     flex: 1; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 20px;
   }
-  #create-screen h2 { color: #e6b800; margin-bottom: 20px; }
+  #create-screen h2 { color: #d4a017; margin-bottom: 20px; font-family: 'Georgia', serif; letter-spacing: 2px; }
   #create-screen input {
-    background: #0f3460; border: 1px solid #533483; color: #e0e0e0;
-    padding: 10px; border-radius: 6px; font-size: 16px; width: 250px;
+    background: #0a0f20; border: 1px solid rgba(184,134,11,0.3); color: #e0e0e0;
+    padding: 10px; border-radius: 4px; font-size: 16px; width: 250px;
     text-align: center; margin-bottom: 16px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
   }
   .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
   .class-btn {
-    background: #16213e; border: 2px solid #533483; color: #e0e0e0;
-    padding: 12px 16px; border-radius: 8px; cursor: pointer; text-align: center;
+    background: linear-gradient(180deg, #141828 0%, #0e1220 100%);
+    border: 1px solid rgba(184,134,11,0.2); color: #d0d0d0;
+    padding: 14px 16px; border-radius: 4px; cursor: pointer; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s;
   }
-  .class-btn:hover { border-color: #e6b800; }
-  .class-btn.selected { border-color: #e6b800; background: #1a1a4e; }
-  .class-btn .name { font-size: 16px; font-weight: bold; }
+  .class-btn:hover { border-color: rgba(184,134,11,0.5); box-shadow: 0 0 12px rgba(184,134,11,0.1); }
+  .class-btn.selected { border-color: #b8860b; background: linear-gradient(180deg, #1a1830 0%, #141020 100%); box-shadow: 0 0 16px rgba(184,134,11,0.15); }
+  .class-btn .name { font-size: 16px; font-weight: bold; color: #d4a017; }
   .class-btn .desc { font-size: 12px; color: #888; margin-top: 4px; }
   #start-btn {
-    background: #e6b800; color: #1a1a2e; border: none; padding: 12px 40px;
-    border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+    background: linear-gradient(180deg, #b8860b, #8a6508); color: #0e0e1a;
+    border: 1px solid #d4a017; padding: 12px 40px;
+    border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;
+    letter-spacing: 1px; box-shadow: 0 2px 12px rgba(184,134,11,0.25);
+    transition: all 0.2s;
   }
-  #start-btn:hover { background: #ffd000; }
-  #start-btn:disabled { background: #666; cursor: not-allowed; }
+  #start-btn:hover { background: linear-gradient(180deg, #d4a017, #b8860b); box-shadow: 0 0 20px rgba(184,134,11,0.3); }
+  #start-btn:disabled { background: #333; border-color: #555; cursor: not-allowed; box-shadow: none; }
 
   /* ─── Bottom Sheet ─── */
   .panel-overlay {
@@ -443,21 +544,27 @@
   #tab-bar {
     display: none; /* shown after game starts */
     position: fixed; bottom: 0; left: 0; right: 0;
-    height: 52px; background: #16213e;
-    border-top: 1px solid #0f3460;
+    height: 52px; background: #131a30;
+    border-top: 1px solid rgba(230,184,0,0.1);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.4);
     z-index: 102;
     justify-content: space-around; align-items: center;
   }
   #tab-bar .tab {
     flex: 1; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 2px;
-    color: #888; font-size: 11px; cursor: pointer;
+    color: #667; font-size: 11px; cursor: pointer;
     padding: 6px 0; transition: color 0.2s;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
   }
   #tab-bar .tab .tab-icon { font-size: 18px; }
   #tab-bar .tab.active { color: #e6b800; }
-  #tab-bar .tab:hover { color: #e6b800; }
+  #tab-bar .tab.active::before {
+    content: ''; position: absolute; top: 0; left: 25%; right: 25%;
+    height: 2px; background: #e6b800; border-radius: 0 0 2px 2px;
+  }
+  #tab-bar .tab:hover { color: #c8a000; }
 
   /* ─── 战斗面板 ─── */
   #combat-panel {
@@ -646,16 +753,25 @@
     font-size: 11px; color: #aaa; font-weight: normal; margin-top: 2px;
   }
 
-  /* ─── POI chip strip ─── */
-  .poi-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; scrollbar-width: none; }
-  .poi-strip::-webkit-scrollbar { display: none; }
+  /* ─── POI chip grid ─── */
+  .poi-strip {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0;
+    justify-content: center;
+  }
   .poi-chip {
-    flex-shrink: 0; padding: 4px 10px; border-radius: 14px;
+    padding: 4px 10px; border-radius: 14px;
     background: #1a1a3e; border: 1px solid #333;
     color: #ccc; font-size: 11px; white-space: nowrap;
     display: flex; align-items: center; gap: 6px;
   }
   .poi-chip.current { background: #2a1a00; border-color: #e6b800; color: #e6c866; }
+  .poi-chip.has-img { cursor: pointer; }
+  .poi-chip.has-img:hover { border-color: #888; }
+  .poi-chip-thumb {
+    width: 22px; height: 22px; border-radius: 4px; object-fit: cover;
+    vertical-align: middle; margin-right: 4px; margin-left: -4px;
+    image-rendering: pixelated; border: 1px solid #444;
+  }
   .poi-chip.undiscovered { opacity: 0.4; }
   .poi-go {
     display: inline-block; padding: 1px 7px; border-radius: 10px;
@@ -1091,20 +1207,21 @@
 
 <!-- 密码验证 -->
 <div id="auth-screen" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-  <h2 style="color:#e6b800; margin-bottom:10px"><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h2>
-  <p style="color:#888; margin-bottom:20px">请输入访问密码</p>
-  <input id="auth-password" type="password" placeholder="密码" style="background:#0f3460; border:1px solid #533483; color:#e0e0e0; padding:10px; border-radius:6px; font-size:16px; width:250px; text-align:center; margin-bottom:12px;">
-  <button id="auth-btn" onclick="authenticate()" style="background:#533483; color:white; border:none; padding:10px 30px; border-radius:6px; font-size:15px; cursor:pointer;">进入</button>
+  <h2 style="color:#e8d5a3; margin-bottom:10px; font-family:Georgia,serif; letter-spacing:2px; text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5);"><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h2>
+  <p style="color:#999; margin-bottom:20px; font-size:13px; text-shadow: 0 1px 6px rgba(0,0,0,0.9);">请输入访问密码</p>
+  <input id="auth-password" type="password" placeholder="密码" style="background:rgba(10,15,32,0.5); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid rgba(184,134,11,0.25); color:#e0e0e0; padding:10px; border-radius:6px; font-size:16px; width:250px; text-align:center; margin-bottom:12px;">
+  <button id="auth-btn" onclick="authenticate()" style="background:rgba(184,134,11,0.15); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#c8a45c; border:1px solid rgba(184,134,11,0.3); padding:10px 30px; border-radius:6px; font-size:15px; cursor:pointer; letter-spacing:0.5px;">进入</button>
   <p id="auth-error" style="color:#ff6b6b; margin-top:10px; display:none;"></p>
 </div>
 
-<!-- 恢复存档 -->
+<!-- 主菜单 -->
 <div id="resume-screen" style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-  <h2 style="color:#e6b800; margin-bottom:10px"><i class="ra ra-sword"></i> 欢迎回来</h2>
-  <div id="resume-info" style="color:#aaa; margin-bottom:20px; text-align:center; line-height:1.8;"></div>
-  <div style="display:flex; gap:12px;">
-    <button onclick="resumeGame()" style="background:#533483; color:white; border:none; padding:12px 30px; border-radius:8px; font-size:15px; cursor:pointer;">继续冒险</button>
-    <button onclick="newGame()" style="background:#333; color:#aaa; border:1px solid #555; padding:12px 20px; border-radius:8px; font-size:14px; cursor:pointer;">新游戏</button>
+  <h2 id="menu-title" style="color:#e8d5a3; margin-bottom:10px; font-family:Georgia,serif; letter-spacing:2px; text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5);"><i class="ra ra-sword"></i> 破晓镇 · 蚀目之影</h2>
+  <p id="menu-subtitle" style="color:#999; margin-bottom:20px; font-size:13px; text-shadow: 0 1px 6px rgba(0,0,0,0.9);">一个 AI 驱动的跑团冒险游戏</p>
+  <div id="resume-info" style="color:#ccc; margin-bottom:20px; text-align:center; line-height:1.8; display:none; text-shadow: 0 1px 6px rgba(0,0,0,0.9);"></div>
+  <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
+    <button id="menu-resume-btn" onclick="resumeGame()" style="display:none; background:rgba(184,134,11,0.15); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#e6c866; border:1px solid rgba(184,134,11,0.4); padding:14px 36px; border-radius:6px; font-size:16px; cursor:pointer; font-weight:bold; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,0.6); min-width:200px;">继续冒险</button>
+    <button onclick="newGame()" style="background:rgba(20,18,30,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#aaa; border:1px solid rgba(100,100,120,0.3); padding:14px 36px; border-radius:6px; font-size:15px; cursor:pointer; text-shadow:0 1px 4px rgba(0,0,0,0.6); min-width:200px;">新游戏</button>
   </div>
 </div>
 
@@ -1143,6 +1260,8 @@
       <span id="hud-hp" style="color:#4caf50"><i class="ra ra-health"></i> --/--</span>
       <span style="margin:0 8px;color:#333">|</span>
       <span id="hud-gold" style="color:#e6b800"><i class="ra ra-gold-bar"></i> --</span>
+      <span style="margin:0 8px;color:#333">|</span>
+      <span id="hud-time" style="color:#e0a040"><i class="ra ra-sun"></i> --</span>
       <span style="margin:0 8px;color:#333">|</span>
       <span id="hud-location" style="color:#888"><i class="ra ra-compass"></i> --</span>
     </div>
@@ -1408,18 +1527,31 @@ function toggleThinking() {
 
 function showEntryScreen() {
   const session = getSavedSession()
+  const menuTitle = document.getElementById('menu-title')
+  const menuSub = document.getElementById('menu-subtitle')
+  const resumeInfo = document.getElementById('resume-info')
+  const resumeBtn = document.getElementById('menu-resume-btn')
+
   if (session && session.player) {
-    // 有存档 → 显示恢复界面
+    // 有存档 → 显示欢迎回来 + 继续冒险按钮
     const p = session.player
     const classNames = { fighter: '剑士', mage: '法师', ranger: '游侠', cleric: '牧师' }
     const className = classNames[session.classId] || session.classId || ''
-    document.getElementById('resume-info').innerHTML =
+    menuTitle.innerHTML = '<i class="ra ra-sword"></i> 欢迎回来'
+    menuSub.style.display = 'none'
+    resumeInfo.style.display = ''
+    resumeInfo.innerHTML =
       `<strong style="color:#e0e0e0;font-size:18px">${esc(p.name)}</strong><br>` +
       `${p.level}级${esc(className)} · HP ${p.hp}/${p.maxHp} · 金币 ${p.gold}`
-    document.getElementById('resume-screen').style.display = 'flex'
+    resumeBtn.style.display = ''
   } else {
-    document.getElementById('create-screen').style.display = 'flex'
+    // 无存档 → 显示游戏标题 + 仅新游戏按钮
+    menuTitle.innerHTML = '<i class="ra ra-sword"></i> 破晓镇 · 蚀目之影'
+    menuSub.style.display = ''
+    resumeInfo.style.display = 'none'
+    resumeBtn.style.display = 'none'
   }
+  document.getElementById('resume-screen').style.display = 'flex'
 }
 
 async function authenticate() {
@@ -1645,6 +1777,17 @@ const MAP_SCENE_IMAGES = {
   'greyspine-mines': 'portraits/scenes/scene-greyspine-mines.png',
   'shatterstone-wastes': 'portraits/scenes/scene-shatterstone-wastes.png',
 }
+const POI_SCENE_IMAGES = {
+  'town-square':              'portraits/scenes/poi-town-square.png',
+  'dawn-stele':               'portraits/scenes/poi-dawn-stele.png',
+  'dawns-rest-inn':           'portraits/scenes/poi-shattered-shield-tavern.png', // 暂用酒馆图
+  'sturdy-anvil':             'portraits/scenes/poi-sturdy-anvil.png',
+  'greenleaf-apothecary':     'portraits/scenes/poi-greenleaf-apothecary.png',
+  'adventurer-guild':         'portraits/scenes/poi-adventurer-guild.png',
+  'mayor-office':             'portraits/scenes/poi-mayor-office.png',
+  'silver-scale-guild':       'portraits/scenes/poi-silver-scale-guild.png',
+  'shattered-shield-tavern':  'portraits/scenes/poi-shattered-shield-tavern.png',
+}
 const MAP_AREA_ZH = {
   'dawnbreak-town': '破晓镇', 'twilight-woods': '暮色森林',
   'greyspine-mines': '灰脊矿道', 'shatterstone-wastes': '碎石荒原',
@@ -1670,13 +1813,19 @@ function renderMapPanel(data) {
 
   let html = ''
 
-  // ── 第1层：当前区域场景横幅（120px裁切，点击展开全图） ──
-  const sceneImg = MAP_SCENE_IMAGES[current]
-  if (sceneImg) {
+  // ── 第1层：当前场景横幅（优先显示 POI 图，fallback 区域图） ──
+  const curSubLoc = data.currentSubLocation || ''
+  const poiImg = POI_SCENE_IMAGES[curSubLoc]
+  const areaImg = MAP_SCENE_IMAGES[current]
+  const bannerImg = poiImg || areaImg
+  if (bannerImg) {
     const nameZh = MAP_AREA_ZH[current] || ''
     const subLocName = data.currentSubLocationName || ''
-    html += `<div class="scene-banner" onclick="openSceneDetail('${current}', true)">`
-    html += `<img src="${sceneImg}" alt="${esc(nameZh)}">`
+    const bannerClick = poiImg
+      ? `openPoiDetail('${esc(curSubLoc)}', '${esc(current)}')`
+      : `openSceneDetail('${current}', true)`
+    html += `<div class="scene-banner" onclick="${bannerClick}">`
+    html += `<img src="${bannerImg}" alt="${esc(subLocName || nameZh)}">`
     html += `<div class="scene-label"><div>${esc(nameZh)}`
     if (subLocName) html += `<div class="scene-sublabel">📍 ${esc(subLocName)}</div>`
     html += `</div></div></div>`
@@ -1689,11 +1838,16 @@ function renderMapPanel(data) {
     for (const sl of subLocs) {
       const isCur = sl.isCurrent
       const disc = sl.discovered !== false
-      const npcs = (sl.npcs || []).filter(n => n !== '???').join('、')
+      const npcs = (sl.npcs || []).join('、')
       if (!disc) {
         html += `<div class="poi-chip undiscovered">???</div>`
       } else {
-        html += `<div class="poi-chip${isCur ? ' current' : ''}">`
+        const hasPoiImg = !!POI_SCENE_IMAGES[sl.id]
+        const chipClick = hasPoiImg ? `onclick="openPoiDetail('${esc(sl.id)}', '${esc(current)}')"` : ''
+        html += `<div class="poi-chip${isCur ? ' current' : ''}${hasPoiImg ? ' has-img' : ''}" ${chipClick}>`
+        if (hasPoiImg) {
+          html += `<img class="poi-chip-thumb" src="${POI_SCENE_IMAGES[sl.id]}" alt="">`
+        }
         html += isCur ? `📍 ${esc(sl.nameZh)}` : esc(sl.nameZh)
         if (npcs) html += ` <span style="color:#888;font-size:10px">${esc(npcs)}</span>`
         if (!isCur) html += ` <button class="poi-go" onclick="event.stopPropagation();mapGoConfirm('${esc(sl.nameZh)}')">前往</button>`
@@ -1785,6 +1939,37 @@ function openSceneDetail(areaId, isCurrent) {
 }
 function closeSceneDetail() {
   document.getElementById('scene-detail-overlay').classList.remove('open')
+}
+
+// ─── POI 场景详情（复用 scene-detail-overlay） ───
+function openPoiDetail(poiId, areaId) {
+  const overlay = document.getElementById('scene-detail-overlay')
+  const img = document.getElementById('sd-img')
+  const title = document.getElementById('sd-title')
+  const desc = document.getElementById('sd-desc')
+  const goBtn = document.getElementById('sd-go-btn')
+
+  const poiImg = POI_SCENE_IMAGES[poiId]
+  if (poiImg) img.src = poiImg
+  img.alt = poiId
+
+  const subLocs = window._mapData?.subLocations || []
+  const poi = subLocs.find(s => s.id === poiId)
+  const poiName = poi?.nameZh || poiId
+  const areaName = MAP_AREA_ZH[areaId] || ''
+  title.textContent = poiName + (areaName ? ` · ${areaName}` : '')
+  desc.textContent = poi?.description || ''
+
+  if (poi?.isCurrent) {
+    goBtn.className = 'sd-go here'
+    goBtn.textContent = '📍 当前位置'
+    goBtn.onclick = null
+  } else {
+    goBtn.className = 'sd-go'
+    goBtn.textContent = '前往' + poiName
+    goBtn.onclick = (e) => { e.stopPropagation(); closeSceneDetail(); mapGoConfirm(poiName) }
+  }
+  overlay.classList.add('open')
 }
 
 // ─── 世界地图全屏浮层 ───
@@ -1954,6 +2139,43 @@ function renderRecapPanel(data) {
   return html
 }
 
+function openGuidePanel() {
+  closePanel()
+  setTimeout(() => openPanel('guide', '游戏指南', renderGuidePanel()), 80)
+}
+
+function renderGuidePanel() {
+  const s = (title) => `<div style="font-size:13px;color:#e6c866;font-weight:bold;padding:10px 0 6px;border-bottom:1px solid #1a1a3e;margin-bottom:6px">${title}</div>`
+  const p = (text) => `<div style="font-size:12px;color:#b0b0b0;line-height:1.7;padding:0 2px 8px">${text}</div>`
+  return s('🌍 世界背景') +
+    p('你身处<b style="color:#e0e0e0">破晓镇</b>——灰脊山脉东麓的矿业小镇。近来一股被称为「<b style="color:#c44">蚀影</b>」的力量从地底蔓延，矿工失踪、动物异变、亡者不安。作为一名<b style="color:#e0e0e0">失忆旅人</b>，你需要在这里调查真相、揭开蚀影的源头。') +
+    p('镇子周围有四个区域：<b style="color:#e0e0e0">破晓镇</b>（安全）、<b style="color:#6a6">暮色森林</b>（中危）、<b style="color:#c66">灰脊矿道</b>（高危）、<b style="color:#ca6">碎石荒原</b>（中危）。地图面板可查看详情。') +
+    s('🎮 基本操作') +
+    p('直接在输入框<b style="color:#e0e0e0">用自然语言</b>描述你要做的事——走到酒馆、和某人聊天、搜索房间、攻击敌人，DM 会理解并推进故事。无需记忆固定命令。') +
+    p('底部栏可查看：<b style="color:#e0e0e0">状态</b>（HP/属性）、<b style="color:#e0e0e0">人物</b>（NPC档案）、<b style="color:#e0e0e0">地图</b>（区域/子场景）。') +
+    s('⚔️ 战斗') +
+    p('遭遇敌人时自动进入<b style="color:#e0e0e0">回合制战斗</b>。屏幕下方出现战斗面板，可选择：攻击、法术、物品、逃跑、防御。') +
+    p('战斗基于 D20 规则——命中需要掷骰超过目标 AC，伤害根据武器和属性计算。<b style="color:#ca6">量力而行</b>，初期避免闯入高危区域。') +
+    s('💬 NPC 与信任') +
+    p('多和 NPC <b style="color:#e0e0e0">交谈</b>是推进故事的核心。每个 NPC 都有自己的<b style="color:#6a6">信任度</b>——信任越高，透露的信息越多。送礼、帮忙完成请求、选择合适的对话态度都能提升信任。') +
+    p('首次交谈会自动解锁该 NPC 的<b style="color:#e0e0e0">人物档案</b>，可在人物面板查看。') +
+    s('🛒 交易与物品') +
+    p('在商店（铁砧铺、草药堂等）可以<b style="color:#e0e0e0">买卖</b>物品。直接说"买一瓶治疗药水"或"卖掉狼皮"即可。') +
+    p('背包可通过更多面板的"背包"按钮查看，也可以直接说"看看背包"。') +
+    s('🗺️ 探索与移动') +
+    p('在地图面板点击<b style="color:#e0e0e0">前往</b>按钮可快速移动到子场景或其他区域。也可以直接输入"去冒险者公会"、"前往暮色森林"。') +
+    p('跨区域移动会<b style="color:#ca6">推进时间</b>并可能遭遇随机事件。时间分为清晨、下午、黄昏、深夜四个时段，不同时段 NPC 位置和事件会有变化。') +
+    s('📜 任务推进') +
+    p('主线任务会通过<b style="color:#e6c866">屏幕顶部提示条</b>显示当前目标。完成阶段性目标后自动推进。') +
+    p('支线任务来自 NPC 对话和探索发现。多留意 NPC 的暗示和环境描述中的异常细节。') +
+    s('💡 小贴士') +
+    p('· 碎盾亭酒馆是最好的起点——老板格雷格消息灵通<br>· 注意 NPC 的异常行为，可能隐藏线索<br>· 不是所有问题都需要武力解决<br>· 搜索房间和环境经常能发现隐藏物品<br>· 休息可以恢复 HP，但会推进时间') +
+    `<div style="margin-top:12px;padding:10px 12px;background:rgba(180,30,30,0.12);border:1px solid #6b2222;border-radius:8px">
+      <div style="font-size:13px;color:#e04040;font-weight:bold;margin-bottom:4px">⚠ 你可以做任何想做的事——理论上</div>
+      <div style="font-size:12px;color:#cc6666;line-height:1.7">每一个选择都牵着看不见的线，有些门会因此永远关闭。<b style="color:#e04040">这个世界会记住一切。</b></div>
+    </div>`
+}
+
 function renderMorePanel() {
   return `
   <div style="font-size:12px;color:#666;padding:0 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">冒险</div>
@@ -1973,8 +2195,8 @@ function renderMorePanel() {
     <div class="more-item" onclick="moreCmd('/chapter', '章节进度')">
       <div class="more-icon"><i class="ra ra-scroll-unfurled"></i></div><div class="more-label">章节进度</div>
     </div>
-    <div class="more-item" onclick="moreCmd('/world', '世界知识')">
-      <div class="more-icon"><i class="ra ra-mountains"></i></div><div class="more-label">世界知识</div>
+    <div class="more-item" onclick="openGuidePanel()">
+      <div class="more-icon"><i class="ra ra-help"></i></div><div class="more-label">游戏指南</div>
     </div>
   </div>
   <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">系统</div>
@@ -1984,9 +2206,6 @@ function renderMorePanel() {
     </div>
     <div class="more-item" onclick="triggerUploadSave()">
       <div class="more-icon"><i class="ra ra-load"></i></div><div class="more-label">上传存档</div>
-    </div>
-    <div class="more-item" onclick="moreCmd('/help', '帮助')">
-      <div class="more-icon"><i class="ra ra-help"></i></div><div class="more-label">帮助</div>
     </div>
   </div>
   <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">开发者</div>
@@ -2073,7 +2292,7 @@ function renderNPCListPanel(data) {
   const playerLoc = data.playerLocation || ''
   const playerSub = data.playerSubLocation || ''
 
-  // 分组：在场 vs 不在场
+  // 分组：在场（同子地点） vs 不在场
   const here = [], away = []
   for (const npc of npcs) {
     const loc = npcLocs[npc.name]
@@ -2579,6 +2798,10 @@ function handleWsMessage(e) {
       sysDiv.scrollIntoView({ behavior: 'smooth' })
       break
     }
+
+    case 'open_guide':
+      openGuidePanel()
+      break
 
     // ─── 交易提案（DM 驱动的完整交易卡片） ───
     case 'trade_proposal':
@@ -3195,6 +3418,20 @@ function updateHUD(session) {
     hpEl.innerHTML = `<i class="ra ra-health"></i> ${p.hp}/${p.maxHp}`
   }
   if (goldEl) goldEl.innerHTML = `<i class="ra ra-gold-bar"></i> ${p.gold}`
+  // 时间阶段 — 四个阶段四个图标+颜色
+  const timeEl = document.getElementById('hud-time')
+  if (timeEl) {
+    const phase = session.worldState?.timeOfDay || 'morning'
+    const TIME_DISPLAY = {
+      morning:   { icon: 'ra-sunbeams',      label: '晨',  color: '#f0c040' },
+      afternoon: { icon: 'ra-sun',           label: '午',  color: '#e6a010' },
+      evening:   { icon: 'ra-moon-sun',      label: '暮',  color: '#d07040' },
+      night:     { icon: 'ra-lantern-flame', label: '夜',  color: '#8090cc' },
+    }
+    const t = TIME_DISPLAY[phase] || TIME_DISPLAY.morning
+    timeEl.style.color = t.color
+    timeEl.innerHTML = `<i class="ra ${t.icon}"></i> ${t.label}`
+  }
   if (locEl) {
     const locNames = { 'dawnbreak-town':'破晓镇','twilight-woods':'暮色森林','greyspine-mines':'灰脊矿道','shatterstone-wastes':'碎石荒原' }
     locEl.innerHTML = `<i class="ra ra-compass"></i> ${locNames[session.worldState?.currentLocation] ?? '未知'}`
