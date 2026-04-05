@@ -1792,14 +1792,16 @@ export class GameEngine {
       toolsCalled.push({ toolName: 'ChangeTrust' })
     }
 
-    // 检测坦白暴力行为
-    const confessionDetected = this.detectViolenceConfession(input, session)
+    // 检测坦白暴力行为（本轮有 ATTACK 预执行时跳过——玩家在攻击，不是在坦白）
+    const confessionDetected = action.type !== 'ATTACK'
+      ? this.detectViolenceConfession(input, session)
+      : { isConfession: false }
     if (confessionDetected.isConfession && confessionDetected.victimName) {
       const victim = confessionDetected.victimName
       const currentNPC = session.interactionNpc
 
-      if (currentNPC) {
-        // 检查受害者是否有暴力证据
+      if (currentNPC && currentNPC !== victim) {
+        // 不能向受害者本人坦白；检查受害者是否有暴力证据
         const victimNPC = session.npcs.find(n => n.name === victim)
         const hasEvidence =
           victimNPC?.condition === 'unconscious' ||
