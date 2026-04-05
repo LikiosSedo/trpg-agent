@@ -3182,7 +3182,7 @@ function showSceneActions(actions) {
   }
 
   const details = actions?.details || []
-  const suggestions = actions?.suggestions || ['四处看看', '继续前进']
+  const suggestions = actions?.suggestions || []
 
   const div = document.createElement('div')
   div.className = 'actions'
@@ -3354,7 +3354,7 @@ function showTradeProposal(data) {
     <div class="trade-proposal-btns">
       ${data.canBargain ? `<button class="trade-btn trade-btn-bargain" onclick="tradeBargain(this)"><i class="ra ra-speech-bubble"></i> 砍价</button>` : ''}
       <button class="trade-btn trade-btn-confirm" ${canAfford ? '' : 'disabled'} onclick="tradeConfirm(this)">确认交易</button>
-      <button class="trade-btn trade-btn-cancel" onclick="this.closest('.trade-proposal-card').remove()">取消</button>
+      <button class="trade-btn trade-btn-cancel" onclick="tradeCancel(this)">取消</button>
     </div>`
   container.appendChild(card)
   smartScrollToBottom()
@@ -3363,8 +3363,29 @@ function showTradeProposal(data) {
 function tradeConfirm(btn) {
   const card = btn.closest('.trade-proposal-card')
   const { npc, items, totalPrice } = card._tradeData
+
+  // 锁定输入，等待交易完成和 DM 叙事
+  const input = document.getElementById('input')
+  input.disabled = true
+  input.placeholder = 'DM 正在回应...'
+  document.getElementById('send').disabled = true
+
   ws.send(JSON.stringify({ type: 'trade_execute', npc, items, totalPrice }))
-  card.innerHTML = '<div style="color:#4caf50;font-size:13px;padding:8px"><i class="ra ra-trophy"></i> 交易完成</div>'
+  card.remove()  // 移除交易卡片
+}
+
+function tradeCancel(btn) {
+  const card = btn.closest('.trade-proposal-card')
+  const { npc } = card._tradeData
+
+  // 锁定输入，等待 DM 叙事
+  const input = document.getElementById('input')
+  input.disabled = true
+  input.placeholder = 'DM 正在回应...'
+  document.getElementById('send').disabled = true
+
+  ws.send(JSON.stringify({ type: 'trade_cancel', npc }))
+  card.remove()  // 移除交易卡片
 }
 
 function tradeBargain(btn) {

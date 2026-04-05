@@ -264,6 +264,8 @@ export class ChapterManager {
   }
 
   private checkDiscovery(ch: ChapterDef, trigger: string): void {
+    if (!this.state.pendingFacts) this.state.pendingFacts = []
+
     for (const disc of ch.discoveries) {
       if (this.state.discoveries.includes(disc.id)) continue
 
@@ -285,6 +287,10 @@ export class ChapterManager {
       if (disc.location !== this.session.worldState.currentLocation) continue
 
       this.state.discoveries.push(disc.id)
+
+      // 通知 DM：玩家发现了新内容，下一轮自然融入叙事
+      const fact = disc.hint ?? `玩家注意到了一些新的细节——${disc.label}`
+      this.state.pendingFacts.push(fact)
     }
   }
 
@@ -309,6 +315,16 @@ export class ChapterManager {
       this.state.idleTurns = 0
       this.state.nudgeIndex = 0
       // 不清空 completedBeats 和 discoveries — 它们是全局累积的
+
+      // 注入章节过渡通知——告诉 DM 叙事基调需要转变
+      if (!this.state.pendingFacts) this.state.pendingFacts = []
+      const newCh = getChapter(ch.nextChapter)
+      if (newCh) {
+        this.state.pendingFacts.push(
+          `【章节转换】故事进入${newCh.title}。` +
+          (newCh.transitionHint ?? '叙事基调和氛围应随新章节自然转变。')
+        )
+      }
 
       // 处理新章节的 auto beats
       this.processAutoBeats()

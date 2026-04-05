@@ -422,8 +422,30 @@ wss.on('connection', (ws: WebSocket, req) => {
 
         // 交易成功后自动触发 DM 叙事（NPC 交付物品的场景描写）
         if (allSuccess) {
-          await streamEvents(engine.processTurn(`[交易完成] 玩家向${npc}购买了${items.map((i: any) => i.name).join('、')}，支付${totalPrice}金币`))
+          await streamEvents(engine.processTurn(
+            `[交易完成] 玩家向${npc}购买了${items.map((i: any) => i.name).join('、')}，支付${totalPrice}金币。` +
+            `请描写${npc}交付物品的场景（1-2句），然后调用 SetActions 提供后续行动建议。`
+          ))
         }
+      } finally {
+        processing = false
+      }
+      return
+    }
+
+    // ── 取消交易 ──
+    if (msg.type === 'trade_cancel') {
+      if (!gameStarted || !engine) return
+      if (processing) { send('error', { text: '处理中...' }); return }
+      processing = true
+      try {
+        const npc = msg.npc
+        engine.clearBargain()
+        // 触发 DM 叙事：玩家取消交易，NPC 的反应
+        await streamEvents(engine.processTurn(
+          `[交易取消] 玩家决定不购买${npc}的商品。` +
+          `请描写${npc}的反应（1-2句），然后调用 SetActions 提供后续行动建议。`
+        ))
       } finally {
         processing = false
       }

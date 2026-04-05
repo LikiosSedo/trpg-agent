@@ -33,6 +33,8 @@ export interface Discovery {
   requires?: string[]
   /** 简短描述（UI 显示 + 回顾用） */
   label: string
+  /** 触发时注入 DM prompt 的叙事提示（可选，不写则用 label 自动生成） */
+  hint?: string
 }
 
 export interface ChapterDef {
@@ -60,6 +62,8 @@ export interface ChapterDef {
   }
   /** 下一章 id（undefined = 最终章） */
   nextChapter?: string
+  /** 进入本章时注入 DM prompt 的叙事基调引导（告诉 DM 氛围应该如何转变） */
+  transitionHint?: string
 }
 
 // ─── 章节数据 ──────────────────────────────────
@@ -174,6 +178,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: 'ch2',
     title: '第二章：公会试炼',
+    transitionHint: '夜幕褪去，破晓镇迎来新的一天。叙事基调从深夜的神秘和陌生感，转为清晨小镇的烟火气和冒险的期待。玩家已经初步融入，现在要证明自己的实力。',
     worldContext: [
       '当前章节背景：清晨，玩家在碎盾亭过了一夜。',
       '冒险者公会在镇东，会长艾琳娜正在寻找能手。',
@@ -269,7 +274,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch2_d_yelv',      location: 'dawnbreak-town',  trigger: 'talk:叶绿',   label: '药剂师叶绿提到助手最近行为古怪，深夜外出' },
       { id: 'ch2_d_kahn',      location: 'dawnbreak-town',  trigger: 'talk:卡恩',   label: '遇到游吟诗人卡恩，友善健谈但问很多问题' },
       { id: 'ch2_d_forest_hut', location: 'twilight-woods', trigger: 'search',       label: '在森林深处发现猎人石屋，有近期过夜痕迹' },
-      { id: 'ch2_d_moonpool',  location: 'twilight-woods',  trigger: 'search',       label: '发现月池边有仪式残留痕迹和奇怪符号' },
+      { id: 'ch2_d_moonpool',  location: 'twilight-woods',  trigger: 'search',       label: '发现月池边有仪式残留痕迹和奇怪符号', hint: '月池边的泥地上有被刻意抹去的奇怪符号，空气中残留着一丝不属于森林的焦灼气味。在叙事中营造不安感——这片森林并不像表面那样平静。' },
     ],
 
     advanceWhen: ['ch2_report_elena'],
@@ -296,6 +301,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: 'ch3',
     title: '第三章：矿道阴影',
+    transitionHint: '氛围急转直下。森林试炼只是开胃菜，真正的危险潜伏在矿道深处。叙事基调从冒险试炼转为悬疑和压迫感——空气中有什么不对劲，NPC们似乎都在隐藏什么。让黑暗和未知成为这一章的底色。',
     worldContext: [
       '当前章节背景：玩家完成森林试炼，获得公会信任。',
       '艾琳娜决定派玩家调查矿道——失踪矿工和搜救队两周未归。',
@@ -368,7 +374,7 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch3_d_chenma_tip', location: 'dawnbreak-town',   trigger: 'talk:陈妈',  label: '陈妈说陌生人总在月圆前后出现，往矿道方向去' },
       { id: 'ch3_d_kahn_night', location: 'dawnbreak-town',   trigger: 'talk:陈妈',  requires: ['ch3_d_chenma_tip'], label: '陈妈还提到卡恩深夜独自外出' },
       { id: 'ch3_d_crystals',   location: 'greyspine-mines',  trigger: 'search',     label: '发现矿道中的黑色晶体，靠近铁器时会发出嗡鸣' },
-      { id: 'ch3_d_cold_zone',  location: 'greyspine-mines',  trigger: 'search',     label: '矿道中层温度骤降区域，墙壁上有微光符文' },
+      { id: 'ch3_d_cold_zone',  location: 'greyspine-mines',  trigger: 'search',     label: '矿道中层温度骤降区域，墙壁上有微光符文', hint: '矿道中突然一阵刺骨寒意，火把的火焰向内弯折。墙壁上隐约浮现淡蓝色符文，像是某种古老的封印——或者警告。描写这种超自然的压迫感。' },
       { id: 'ch3_d_camp',       location: 'greyspine-mines',  trigger: 'search',     label: '发现失踪搜救队的临时营地遗留物' },
       { id: 'ch3_d_journal',    location: 'dawnbreak-town',   trigger: 'talk:格雷格', requires: ['ch3_mine_quest'], label: '格雷格交出达里安的旧日志——记录了矿道深层的异象和远古封印的线索' },
     ],
@@ -397,6 +403,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: 'ch4',
     title: '第四章：荒原真相',
+    transitionHint: '一切谜团即将揭开。叙事基调从悬疑转为紧迫和决断——真相就在眼前，但危险也是最大的。每个NPC都有自己的秘密和立场，信任和背叛交织。让玩家感受到终局将至的沉重和使命感。',
     worldContext: [
       '当前章节背景：教团的存在已经确认。公会进入高度戒备状态。',
       '艾琳娜怀疑碎石荒原的兽人异常和教团有关——兽人可能被教团利用或驱动。',
@@ -470,8 +477,8 @@ export const CHAPTERS: ChapterDef[] = [
       { id: 'ch4_d_victor_plea', location: 'dawnbreak-town',      trigger: 'talk:维克多',  label: '维克多私下暗示自己被人控制，恳求帮助' },
       { id: 'ch4_d_xiaoli_warn', location: 'dawnbreak-town',      trigger: 'talk:小莉',    label: '小莉说镇长身上缠着"灰色扭动的东西"' },
       { id: 'ch4_d_kahn_slip',   location: 'dawnbreak-town',      trigger: 'talk:卡恩',    label: '卡恩在某个问题上的回答露出了破绽' },
-      { id: 'ch4_d_orc_camp',    location: 'shatterstone-wastes', trigger: 'search',        label: '兽人营地中发现教团标记——兽人被暗中操控' },
-      { id: 'ch4_d_tower_notes', location: 'shatterstone-wastes', trigger: 'search',        label: '瞭望塔笔记中详述了"虚空棱镜"和位面裂隙' },
+      { id: 'ch4_d_orc_camp',    location: 'shatterstone-wastes', trigger: 'search',        label: '兽人营地中发现教团标记——兽人被暗中操控', hint: '兽人营地的帐篷柱上刻着和矿道中相同的蚀目者符号。兽人们并非自愿——它们眼中有一层灰蒙蒙的薄膜。这不是部落战争，是有人在幕后操控。' },
+      { id: 'ch4_d_tower_notes', location: 'shatterstone-wastes', trigger: 'search',        label: '瞭望塔笔记中详述了"虚空棱镜"和位面裂隙', hint: '废弃瞭望塔的桌上散落着泛黄的笔记，用颤抖的笔迹记录着"虚空棱镜"和"位面裂隙"。这是拼图的关键一块——所有线索开始串联起来。在叙事中强调这个发现的重要性。' },
       { id: 'ch4_d_tomb',        location: 'shatterstone-wastes', trigger: 'search',        label: '古战场墓冢中发现石碑碎片，与镇口石碑图案呼应' },
       { id: 'ch4_d_fireplace',   location: 'dawnbreak-town',      trigger: 'talk:维克多',   requires: ['ch4_d_victor_plea'], label: '维克多私下递来半烧毁的文件——教团胁迫他签署的"特别勘探许可"和矿道通行记录' },
     ],
