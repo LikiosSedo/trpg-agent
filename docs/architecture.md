@@ -1,459 +1,544 @@
-# 多 Agent 架构设计
+# TRPG Agent 系统架构文档
 
-> 基于 open-claude-cli SDK 的 `Agent` + `AgentGraph` 构建 TRPG 游戏引擎。
+> 本文档记录项目的底层组件、调用链路、消费者模式、常见陷阱。  
+> **目标**：为后续 AI 开发提供准确的技术参考，避免重复踩坑。
 
-## 1. 架构总览
+---
+
+## 目录
+
+1. [核心架构](#核心架构)
+2. [消费者模式组件](#消费者模式组件)
+3. [工具静音机制](#工具静音机制)
+4. [事件系统](#事件系统)
+5. [关键组件映射](#关键组件映射)
+6. [常见陷阱与检查清单](#常见陷阱与检查清单)
+
+---
+
+## 核心架构
+
+### 架构概览
 
 ```
-                          ┌─────────────┐
-                          │   玩家 CLI   │
-                          │  (readline)  │
-                          └──────┬───────┘
-                                 │ 玩家输入
-                                 ▼
-╔═══════════════════════ AgentGraph "trpg-session" ════════════════════════╗
-║                                                                          ║
-║  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────────┐   ║
-║  │ Parse    │───▶│ DM Agent │───▶│ Resolve  │───▶│ Render + Output  │   ║
-║  │ Input    │    │ (核心)    │    │ (执行)    │    │ (渲染)           │   ║
-║  └──────────┘    └────┬─────┘    └──────────┘    └──────────────────┘   ║
-║                       │                                    │             ║
-║                       │ 需要 NPC/战斗                       │             ║
-║                       ▼                                    │             ║
-║              ┌────────────────┐                            │             ║
-║              │ NPC Agent(s)   │                            │             ║
-║              │ Battle Agent   │────────────────────────────┘             ║
-║              └────────────────┘                                          ║
-╚══════════════════════════════════════════════════════════════════════════╝
-                                 │
-                                 ▼
-                        ┌────────────────┐
-                        │  GameSession   │
-                        │  (共享状态)     │
-                        └────────────────┘
+┌─────────────┐
+│   玩家输入   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│          GameEngine (engine.ts)          │
+│  ┌────────────────────────────────────┐ │
+│  │  processTurn(input)                │ │
+│  │  ├─ 安全检查 (safety.ts)            │ │
+│  │  ├─ 意图分类 (rules-agent.ts)      │ │
+│  │  ├─ 动作执行 (action-executor.ts)  │ │
+│  │  ├─ DM 叙事 (dm-agent.ts)          │ │
+│  │  └─ 消费副作用 (consume*)          │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+       │
+       ├─ 读写 GameSession (game-state.ts)
+       ├─ 调用 DM Agent (dm-agent.ts)
+       └─ 发送事件流 (TurnEvent)
 ```
 
-## 2. Agent 角色定义
+### 三层管道设计
 
-### 2.1 DM Agent (地下城主)
+| 层级 | 组件 | 职责 |
+|------|------|------|
+| **规则层** | rules-agent.ts, action-executor.ts | 意图分类、动作预执行、数值计算 |
+| **叙事层** | dm-agent.ts, DM Agent (LLM) | 生成叙事文本、调用工具、推进剧情 |
+| **副作用层** | consume* 函数 | 收集工具调用的副作用（选项、信任变化、音频等） |
 
-游戏的核心决策者。接收玩家输入，决定叙事走向，协调其他 Agent。
+**关键原则**：
+- 规则层保证数值正确性（HP、金币、战斗判定）
+- 叙事层保证沉浸感（文本质量、NPC 对话）
+- 副作用层保证状态一致性（消费后清空，避免泄漏）
 
+---
+
+## 消费者模式组件
+
+项目中多个组件使用 **"写入-消费-清空"** 的单次消费模式，避免状态在多轮之间泄漏。
+
+### 1. SetActions（场景选项）⭐
+
+**文件**：`src/tools/set-actions.ts`
+
+**机制**：
 ```typescript
-const dmAgent = new Agent({
-  provider: config.provider,
-  tools: [
-    RollDiceTool,    // 掷骰判定
-    MoveTool,        // 移动玩家
-    LookTool,        // 观察环境
-    SearchTool,      // 搜索区域
-    RestTool,        // 休息恢复
-    UseItemTool,     // 物品操作
-    RenderSceneTool, // 渲染输出
-  ],
-  systemPrompt: `你是这个 TRPG 世界的 DM (地下城主)。
-你的职责:
-1. 解读玩家意图，将自然语言映射到游戏动作
-2. 执行规则判定 (技能检定、战斗、物品使用)
-3. 推进叙事，保持世界的一致性和沉浸感
-4. 在合适时机触发战斗、任务事件、NPC 交互
-...完整 system prompt 在实现时填充`,
-  maxTurns: 10,
-})
-```
+let pendingActions: SceneActions | null = null
 
-**DM Agent 职责边界:**
-- ✅ 叙事描写、环境描述、规则裁决、NPC 调度
-- ✅ 判断何时进入/退出战斗
-- ✅ 决定检定难度 (DC)
-- ❌ 不直接扮演 NPC 对话 (委托给 NPC Agent)
-- ❌ 不直接管理战斗回合 (委托给 Battle Agent)
-
-### 2.2 NPC Agent (独立 NPC)
-
-每个重要 NPC 是一个独立的 Agent 实例，拥有自己的记忆和性格。
-
-```typescript
-function createNPCAgent(npc: NPC): Agent {
-  return new Agent({
-    provider: config.provider,
-    tools: [TalkTool, RenderSceneTool],
-    systemPrompt: `你是 ${npc.name}，${npc.role}。
-性格: ${npc.personality}
-背景: ${npc.backstory}
-你知道: ${npc.knownInfo.join('; ')}
-对玩家的态度: ${npc.disposition > 0 ? '友好' : npc.disposition < 0 ? '敌对' : '中立'}
-
-行为规则:
-- 始终保持角色一致性，不要打破角色
-- 根据对话内容和玩家行为动态调整态度
-- 只透露你"知道"的信息
-- 用 RenderScene 输出你的对话`,
-    maxTurns: 4,
-  })
-}
-```
-
-**NPC Agent 独立记忆机制:**
-
-每个 NPC Agent 的对话历史保留在自己的 `messages` 数组中。通过 Agent 的 session 功能实现跨对话记忆：
-
-```typescript
-const npcAgent = createNPCAgent(npc)
-
-// 第一次对话
-for await (const e of npcAgent.run('玩家: "你好，你知道北边的遗迹吗？"')) { ... }
-
-// 第二次对话——NPC 记得之前聊过
-for await (const e of npcAgent.run('玩家: "我回来了，找到了你说的符文石"')) { ... }
-// NPC Agent 的 messages 中保留了之前的对话上下文
-```
-
-### 2.3 Battle Agent (战斗管理)
-
-专门处理战斗流程的 Agent，在战斗触发时由 DM Agent 移交控制权。
-
-```typescript
-const battleAgent = new Agent({
-  provider: config.provider,
-  tools: [
-    RollDiceTool,
-    AttackTool,
-    MoveTool,
-    UseItemTool,
-    RenderSceneTool,
-  ],
-  systemPrompt: `你是战斗管理器。你的职责:
-1. 管理先攻顺序和回合流转
-2. 执行玩家的战斗动作 (攻击、施法、使用物品、移动)
-3. 控制怪物/敌对NPC的战术行动
-4. 判定命中、伤害、状态效果
-5. 每回合用 RenderScene("combat") 展示战场状态
-6. 判断战斗结束条件
-
-怪物AI行为模式:
-- aggressive: 优先攻击最近/最弱的目标
-- defensive: 保护同伴，优先控制/削弱
-- ambush: 开局集火，劣势时逃跑`,
-  maxTurns: 30,  // 战斗可能持续多轮
-})
-```
-
-## 3. 事件系统
-
-Agent 之间通过 **GameSession 共享状态** + **Agent Event System** 通信。
-
-### 3.1 事件流转
-
-```
-玩家输入 "我要和铁匠说话"
-        │
-        ▼
-  DM Agent (解析意图)
-        │ 识别: NPC 交互
-        │ 查找: npcs["blacksmith"]
-        │ 更新: GameSession.eventLog
-        ▼
-  NPC Agent "blacksmith" (生成回应)
-        │ 读取: npc.personality, npc.knownInfo
-        │ 生成: 对话内容
-        │ 更新: npc.disposition (如果态度变化)
-        ▼
-  DM Agent (整合结果)
-        │ 检查: 是否触发任务更新
-        │ 检查: 是否有新的叙事展开
-        ▼
-  RenderScene → 玩家看到输出
-```
-
-### 3.2 事件类型与处理
-
-| 事件 | 触发者 | 处理者 | 状态变更 |
-|------|--------|--------|----------|
-| `combat_start` | DM Agent | → Battle Agent 接管 | combat.active = true |
-| `combat_end` | Battle Agent | → DM Agent 恢复 | combat.active = false, 掉落处理 |
-| `npc_interaction` | DM Agent | → NPC Agent | npc.disposition 可能变化 |
-| `quest_update` | DM/NPC Agent | DM Agent 检查 | quest.status/objectives 更新 |
-| `location_change` | DM Agent | 更新场景 | currentLocationId 变化 |
-| `item_acquired` | 各 Agent | 更新背包 | player.inventory 变化 |
-| `skill_check` | DM Agent | 掷骰判定 | 根据结果推进叙事 |
-| `player_damaged` | Battle Agent | 更新 HP | player.hp 变化 |
-
-### 3.3 用 Agent Event System 实现
-
-```typescript
-// DM Agent 遇到需要 NPC 对话的场景
-dmAgent.on('npc_interaction', async (data, agent) => {
-  const npcAgent = npcAgents[data.npcId]
-  const prompt = `玩家对你说: "${data.message}"
-当前态度: ${session.npcs[data.npcId].disposition}
-场景: ${session.locations[session.currentLocationId].description}`
-
-  let response = ''
-  for await (const e of npcAgent.run(prompt)) {
-    if (e.type === 'text_delta') response += e.text
-  }
-  // NPC 回应后，DM Agent 继续处理
-})
-
-// Battle Agent 结束战斗时
-battleAgent.on('combat_end', async (data, agent) => {
-  session.combat.active = false
-  // 处理战利品、经验等
-})
-```
-
-## 4. AgentGraph 游戏流程
-
-用 `AgentGraph` 定义整个游戏的状态机：
-
-```typescript
-import { AgentGraph, agentNode, END } from 'open-claude-cli/engine'
-
-// ─── Graph State ─────────────────────────────
-interface GameGraphState {
-  session: GameSession
-  playerInput: string
-  dmIntent: string           // DM 解析出的意图
-  pendingAction: string      // 待执行的动作类型
-  actionResult: string       // 动作执行结果
-  narrativeOutput: string    // 最终输出文本
-  shouldEndGame: boolean
-  _nodeHistory: string[]
+export function consumeActions(): SceneActions | null {
+  const a = pendingActions
+  pendingActions = null  // 消费后清空
+  return a
 }
 
-// ─── Node Functions ──────────────────────────
-
-/**
- * 节点 1: 解析输入
- * 将玩家的自然语言转化为结构化意图
- */
-const parseInput = agentNode(dmAgent, (state) => {
-  return `玩家输入: "${state.playerInput}"
-当前位置: ${state.session.currentLocationId}
-战斗中: ${state.session.combat.active}
-请解析玩家意图，返回动作类型: move/look/talk/attack/search/use_item/rest/other`
-}, { resultKey: 'dmIntent' })
-
-/**
- * 节点 2: DM 叙事 + 执行
- * 根据意图调用对应工具，推进游戏状态
- */
-const dmNarrate = agentNode(dmAgent, (state) => {
-  return `执行玩家动作。
-意图: ${state.dmIntent}
-原始输入: "${state.playerInput}"
-游戏状态: ${JSON.stringify(state.session, null, 2)}
-
-使用对应的工具执行动作，然后用 RenderScene 展示结果。
-如果需要 NPC 对话，标记 pendingAction 为 "npc_interaction"。
-如果需要进入战斗，标记 pendingAction 为 "combat"。`
-}, { resultKey: 'actionResult' })
-
-/**
- * 节点 3: NPC 对话 (条件进入)
- */
-async function npcInteraction(state: GameGraphState) {
-  const npcId = state.session.currentLocationId // 从 actionResult 解析
-  const npcAgent = npcAgents[npcId]
-  if (!npcAgent) return state
-
-  let response = ''
-  for await (const e of npcAgent.run(state.playerInput)) {
-    if (e.type === 'text_delta') response += e.text
-  }
-  return { ...state, narrativeOutput: response, pendingAction: 'done' }
-}
-
-/**
- * 节点 4: 战斗 (条件进入)
- */
-const combat = agentNode(battleAgent, (state) => {
-  return `战斗开始！
-场景: ${state.session.locations[state.session.currentLocationId].name}
-玩家: HP ${state.session.player.hp}/${state.session.player.maxHp}
-敌人: ${JSON.stringify(state.session.combat.turnOrder.filter(c => c.type === 'monster'))}
-
-等待玩家战斗指令: "${state.playerInput}"
-按先攻顺序执行一轮战斗。`
-}, { resultKey: 'actionResult' })
-
-/**
- * 节点 5: 渲染输出
- */
-async function renderOutput(state: GameGraphState) {
-  // RenderScene 工具已在各 Agent 内部调用
-  // 此节点做最终的状态同步和清理
-  return {
-    ...state,
-    pendingAction: '',
-    shouldEndGame: state.session.player.hp <= 0,
+export const SetActionsTool: Tool = {
+  async execute(input: any) {
+    pendingActions = { details: [...], suggestions: [...] }
+    return { output: '已设置选项' }
   }
 }
-
-// ─── 构建 Graph ──────────────────────────────
-
-const gameGraph = new AgentGraph('trpg-session', {
-  maxIterations: 50,    // 一局游戏最多 50 步
-  checkpoint: true,     // 启用存档
-})
-
-gameGraph
-  .addNode('parse', parseInput)
-  .addNode('dm', dmNarrate)
-  .addNode('npc', npcInteraction)
-  .addNode('combat', combat)
-  .addNode('render', renderOutput)
-
-  // 固定流转
-  .addEdge('parse', 'dm')
-
-  // DM 之后根据 pendingAction 条件路由
-  .addConditionalEdge('dm', (state) => {
-    if (state.pendingAction === 'npc_interaction') return 'npc'
-    if (state.pendingAction === 'combat') return 'combat'
-    return 'render'
-  })
-
-  // NPC / 战斗结束后都到渲染
-  .addEdge('npc', 'render')
-  .addEdge('combat', 'render')
-
-  // 渲染后判断游戏是否结束
-  .addConditionalEdge('render', (state) => {
-    if (state.shouldEndGame) return END
-    return END  // 单步结束，等待下一次玩家输入
-  })
 ```
 
-### 4.1 游戏主循环
+**消费点**（engine.ts）：
+- `1675` - 普通回合结束
+- `2074` - 战斗回合结束
+- `2157` - 战斗叙事后（combat_narrative_actions）
+- `2165` - finally 兜底清理
+- `2539` - 开场叙事后
+
+**调用链路**：
+```
+DM Agent 调用 SetActions
+  ↓
+pendingActions 写入
+  ↓
+engine.ts:consumeActions() 读取
+  ↓
+yield { type: 'dm_end', actions }
+  ↓
+server.ts:205 发送到前端
+  ↓
+index.html:2635 渲染按钮
+```
+
+**陷阱**：
+- ❌ 忘记在 finally 块中消费 → 下一轮会读到旧选项
+- ❌ 工具静音时禁用 SetActions → DM 无法生成选项
+
+---
+
+### 2. ChangeTrust（信任变化）
+
+**文件**：`src/tools/change-trust.ts`
+
+**机制**：
+```typescript
+let pendingChanges: TrustChange[] = []
+
+export function consumeTrustChanges(): TrustChange[] {
+  const changes = pendingChanges
+  pendingChanges = []
+  return changes
+}
+```
+
+**消费点**：`engine.ts:1669` - 每回合结束后批量处理信任变化
+
+**用途**：DM 可以在一轮中多次调用 ChangeTrust，engine 统一处理并触发级联效应（trust-system.ts）
+
+---
+
+### 3. SpeakingNPCs（对话 NPC）
+
+**文件**：`src/tools/talk.ts`
+
+**机制**：
+```typescript
+let speakingNPCs: Set<string> = new Set()
+
+export function consumeSpeakingNPCs(): string[] {
+  const npcs = Array.from(speakingNPCs)
+  speakingNPCs.clear()
+  return npcs
+}
+```
+
+**消费点**：`engine.ts:1664` - 更新 `session.interactionNpc`（用于交易/对话状态绑定）
+
+---
+
+### 4. TradeProposal（交易提案）
+
+**文件**：`src/tools/propose-trade.ts`
+
+**机制**：DM 调用 ProposeTradeAction 后，engine 消费并发送 `trade_proposal` 事件到前端
+
+**消费点**：`engine.ts:1680` - 每回合结束后检查
+
+---
+
+### 5. AmbianceOverride（音频覆盖）
+
+**文件**：`src/tools/set-ambiance.ts`
+
+**机制**：DM 在关键剧情节点（BOSS战、揭秘、牺牲）调用 SetAmbiance 覆盖默认 BGM
+
+**消费点**：`engine.ts:1686` - 每回合结束后发送 `audio` 事件
+
+---
+
+### 6. GameOver（游戏终局）
+
+**文件**：`src/tools/game-over.ts`
+
+**机制**：DM 在剧情到达死胡同时调用，弹出"重新开始/坚持继续"选择
+
+**消费点**：`engine.ts:1692` - 每回合结束后检查
+
+---
+
+### 消费者模式设计总结
+
+**优点**：
+- 工具调用和消费解耦（工具只负责写入，engine 负责消费）
+- 避免状态在多轮之间泄漏
+- 单一职责：工具 = 副作用声明，engine = 副作用执行
+
+**注意事项**：
+- ✅ 必须在每个可能的退出路径上消费（包括 catch/finally）
+- ✅ 消费函数是幂等的（多次调用返回 null/[]/空）
+- ❌ 不要在工具内部消费（会导致 engine 读不到）
+- ❌ 不要在 DM prompt 中提及消费逻辑（DM 只需要知道工具的功能）
+
+---
+
+## 工具静音机制
+
+### 实现原理
+
+**文件**：`src/dm-agent.ts:101-131`
 
 ```typescript
-// 每次玩家输入触发一次 Graph 运行
-async function gameLoop(session: GameSession) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+let mutedTools: Map<string, any> | null = null
 
-  const ask = () => new Promise<string>(resolve => {
-    rl.question('⚔️  你> ', resolve)
-  })
-
-  while (true) {
-    const input = await ask()
-    if (input.trim() === '/quit') break
-
-    const initialState: GameGraphState = {
-      session,
-      playerInput: input,
-      dmIntent: '',
-      pendingAction: '',
-      actionResult: '',
-      narrativeOutput: '',
-      shouldEndGame: false,
-      _nodeHistory: [],
-    }
-
-    for await (const event of gameGraph.run(initialState)) {
-      if (event.type === 'graph_complete') {
-        // 从最终 state 同步回 session
-        session = event.state.session
-        if (event.state.shouldEndGame) {
-          console.log('\n💀 游戏结束...')
-          rl.close()
-          return
-        }
-      }
+export function muteDMTools(keep: string[] = ['SetActions']): void {
+  if (!agent) return
+  if (mutedTools) return  // 防止重复静音
+  
+  const registry = (agent as any).tools
+  const keepSet = new Set(keep)
+  mutedTools = new Map()
+  
+  // 遍历所有工具，不在白名单里的移除并暂存
+  for (const [name, tool] of registry.tools) {
+    if (!keepSet.has(name)) {
+      mutedTools.set(name, tool)
     }
   }
+  for (const name of mutedTools.keys()) {
+    registry.tools.delete(name)
+  }
+}
 
-  rl.close()
+export function unmuteDMTools(): void {
+  if (!agent || !mutedTools) return
+  const registry = (agent as any).tools
+  for (const [name, tool] of mutedTools) {
+    registry.tools.set(name, tool)
+  }
+  mutedTools = null
 }
 ```
 
-### 4.2 状态流转图
+### 使用场景
 
-```
-                ┌──────────────────────────────────────┐
-                │         玩家输入 (readline)            │
-                └──────────────┬───────────────────────┘
-                               │
-                               ▼
-                    ┌──────────────────┐
-                    │    parse (DM)    │
-                    │  解析玩家意图     │
-                    └────────┬─────────┘
-                             │
-                             ▼
-                    ┌──────────────────┐
-                    │     dm (DM)      │
-                    │  叙事 + 执行动作  │
-                    └────────┬─────────┘
-                             │
-               ┌─────────────┼─────────────┐
-               │             │             │
-    pendingAction=       (default)    pendingAction=
-    "npc_interaction"                  "combat"
-               │             │             │
-               ▼             │             ▼
-      ┌────────────┐        │     ┌────────────┐
-      │  npc (NPC  │        │     │  combat    │
-      │   Agent)   │        │     │  (Battle   │
-      └──────┬─────┘        │     │   Agent)   │
-             │              │     └──────┬─────┘
-             │              │            │
-             └──────────────┼────────────┘
-                            │
-                            ▼
-                   ┌────────────────┐
-                   │    render      │
-                   │  渲染 + 输出    │
-                   └────────┬───────┘
-                            │
-                  shouldEndGame?
-                   /            \
-                  yes            no
-                  ↓              ↓
-                 END      等待下一次输入
-```
+| 场景 | 保留工具 | 原因 | 调用位置 |
+|------|---------|------|---------|
+| 战斗叙事 | SetActions | 只需要生成文本 + 后续选项 | engine.ts:2138 |
+| 战斗开场 | SetActions | 描写怪物出现 + 战斗氛围 | engine.ts:1845 |
+| 逃跑成功 | SetActions | 描写逃跑过程 + 脱离危险 | engine.ts:2322 |
+| 战斗胜利 | SetActions | 描写最后一击 + 战利品场景 | engine.ts:2364 |
 
-## 5. 工具 → 游戏动作映射
+### 陷阱与修复
 
-| 工具 | 游戏动作 | 调用者 | 修改的状态 |
-|------|----------|--------|-----------|
-| `RollDice` | 所有随机判定 | DM / Battle | 无直接状态修改 |
-| `Move` | 移动到新地点 / 战斗移动 | DM / Battle | currentLocationId, position |
-| `Look` | 观察环境 / 检查目标 | DM | isExplored |
-| `Talk` | 与 NPC 对话 | DM → NPC Agent | npc.disposition |
-| `Attack` | 战斗攻击 | Battle | hp, conditions |
-| `UseItem` | 使用/装备/交易物品 | DM / Battle | inventory, equipped |
-| `Search` | 搜索区域/容器 | DM | location.items, inventory |
-| `Rest` | 短休/长休恢复 | DM | hp, spellSlots |
-| `RenderScene` | 渲染输出给玩家 | 所有 Agent | 无 (只读) |
-
-## 6. 存档与恢复
-
-`AgentGraph` 内置 checkpoint 机制，每个节点执行后自动保存状态：
-
+**陷阱 1：忘记 unmute**
 ```typescript
-// 存档保存在 ~/.occ/checkpoints/trpg-session/
-// 格式: {timestamp}-{nodeId}.json
+// ❌ 错误示例
+muteDMTools()
+yield* dmRespond(...)
+// 忘记 unmute，后续 DM 调用会失败
 
-// 恢复存档
-const checkpoints = gameGraph.getCheckpoints()
-// 选择一个存档恢复
-for await (const event of gameGraph.resume(checkpoints[0])) {
+// ✅ 正确示例
+muteDMTools()
+try {
+  yield* dmRespond(...)
+} finally {
+  unmuteDMTools()  // 确保恢复
+}
+```
+
+**陷阱 2：空白名单禁用 SetActions**
+```typescript
+// ❌ 问题代码
+muteDMTools([])  // 禁用所有工具，包括 SetActions
+
+// ✅ 修复方案（建议在 dm-agent.ts 中强制保留）
+export function muteDMTools(keep: string[] = ['SetActions']): void {
+  // 强制保留 SetActions（即使调用方传入空数组）
+  const keepSet = new Set([...keep, 'SetActions'])
   // ...
 }
 ```
 
-配合 `GameSession` 的序列化，可以实现完整的游戏存档/读档。
+---
 
-## 7. 扩展点
+## 事件系统
 
-| 扩展方向 | 实现方式 |
-|---------|---------|
-| 新 NPC | 创建新的 NPC Agent 实例，注入到 npcAgents 表 |
-| 新怪物行为 | 在 Battle Agent 的 systemPrompt 中添加新行为模式 |
-| 新技能/法术 | 扩展 types.ts，在 DM/Battle Agent 的 prompt 中说明规则 |
-| 支线任务 | 添加 Quest 数据 + 在 NPC Agent 的 knownInfo 中引用 |
-| 随机事件 | 在 Graph 的 render → END 之间添加 "random_event" 节点 |
-| 多人模式 | 每个玩家一个输入通道，DM Agent 轮流处理 |
+### TurnEvent 类型定义
+
+**文件**：`src/engine.ts:252-262`
+
+```typescript
+export type TurnEvent =
+  | { type: 'broken_promise'; npcName: string; reason: string }
+  | { type: 'safety_block'; reason: string }
+  | { type: 'dm_text_delta'; text: string }
+  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | null }
+  | { type: 'dm_error'; message: string }
+  | { type: 'combat_monster'; text: string }
+  | { type: 'combat_status'; text: string; ended: boolean; result?: string }
+  | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[] }
+  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[] }
+  | { type: 'quest_completed'; questName: string; text: string }
+  | { type: 'sync'; session: GameSession; dossier: any; questHint: string }
+  | { type: 'audio'; bgm: string; ambient: string }
+  | { type: 'trade_proposal'; proposal: TradeProposal }
+  | { type: 'game_over'; data: GameOverData }
+  | { type: 'combat_narrative'; text: string }
+  | { type: 'combat_narrative_actions'; actions: SceneActions }
+  | { type: 'death' }
+  // ... 更多事件类型
+```
+
+### 事件流转
+
+```
+GameEngine.processTurn(input)
+  ↓
+yield* 生成器函数（流式输出）
+  ↓
+for await (const event of engine.processTurn(...))
+  ↓
+server.ts:200-250 (WebSocket)
+  ↓
+index.html:2600-2950 (前端处理)
+```
+
+### 关键事件说明
+
+| 事件类型 | 触发时机 | 前端处理 |
+|---------|---------|---------|
+| `dm_text_delta` | DM 生成文本（流式） | 逐字显示 |
+| `dm_end` | DM 回合结束 | 解锁输入框 + 渲染选项 |
+| `combat_init` | 战斗开始 | 显示战斗面板 + 怪物立绘 |
+| `combat_action_req` | 等待玩家战斗操作 | 显示攻击/防御/逃跑按钮 |
+| `combat_status` | 战斗回合结果 | 显示伤害/命中文本 |
+| `sync` | 状态同步 | 更新 HUD（HP/金币/XP） |
+| `audio` | 音频切换 | 切换 BGM/环境音 |
+| `trade_proposal` | 交易提案 | 弹出交易卡片 |
+| `game_over` | 游戏终局 | 弹出重新开始/继续选择 |
+
+---
+
+## 关键组件映射
+
+### 核心流程组件
+
+| 组件 | 文件 | 职责 | 依赖 |
+|------|------|------|------|
+| GameEngine | `src/engine.ts` | 游戏主循环、回合处理、事件流 | dm-agent, game-state, combat-manager |
+| DM Agent | `src/dm-agent.ts` | LLM 驱动的地下城主 | open-claude-cli, tools |
+| GameFactStore | `src/game-facts.ts` | 游戏状态管理 + 事实存储 | types, game-state |
+| CombatManager | `src/combat-manager.ts` | 战斗逻辑（先攻、回合、结算） | types, game-state |
+| TrustSystem | `src/trust-system.ts` | NPC 信任系统 + 承诺追踪 | types, game-state |
+| ChapterManager | `src/chapter-manager.ts` | 章节剧本 + beat 触发 | types, game-state |
+| DossierManager | `src/dossier.ts` | NPC 档案 + 画像解锁 | types |
+
+### 工具系统
+
+| 工具 | 文件 | 消费者模式 | 用途 |
+|------|------|-----------|------|
+| SetActions | `src/tools/set-actions.ts` | ✅ consumeActions() | 场景选项（details + suggestions） |
+| ChangeTrust | `src/tools/change-trust.ts` | ✅ consumeTrustChanges() | 信任变化（批量处理） |
+| Talk | `src/tools/talk.ts` | ✅ consumeSpeakingNPCs() | NPC 对话（更新 interactionNpc） |
+| ProposeTradeAction | `src/tools/propose-trade.ts` | ✅ consumeTradeProposal() | 交易提案（弹出卡片） |
+| SetAmbiance | `src/tools/set-ambiance.ts` | ✅ consumeAmbianceOverride() | 音频覆盖（关键剧情） |
+| GameOver | `src/tools/game-over.ts` | ✅ consumeGameOver() | 游戏终局（重新开始/继续） |
+| RenderScene | `src/tools/render-scene.ts` | ❌ | 场景渲染（已废弃，现在用流式输出） |
+| Attack | `src/tools/attack.ts` | ❌ | 战斗攻击（不在 DM 工具列表） |
+| Move | `src/tools/move.ts` | ❌ | 移动 |
+| Search | `src/tools/search.ts` | ❌ | 搜索 |
+| UseItem | `src/tools/use-item.ts` | ❌ | 使用物品 |
+| Rest | `src/tools/rest.ts` | ❌ | 休息 |
+
+### 前端组件
+
+| 组件 | 文件 | 职责 |
+|------|------|------|
+| WebSocket 客户端 | `public/index.html:2600-2950` | 接收服务器事件流 |
+| 场景选项渲染 | `public/index.html:3174-3230` | showSceneActions() |
+| 战斗面板 | `public/index.html:3231-3350` | updateCombatPanel() |
+| HUD 更新 | `public/index.html:3351-3450` | updateHUD() |
+| 音频系统 | `public/index.html:3500-3650` | BGM + 环境音 + SFX |
+
+---
+
+## 常见陷阱与检查清单
+
+### 1. 工具静音后忘记恢复 ⚠️
+
+**症状**：战斗叙事后，DM 无法调用 Move/Talk/Search 等工具
+
+**原因**：`muteDMTools()` 后没有配对调用 `unmuteDMTools()`
+
+**检查清单**：
+- [ ] 所有 `muteDMTools()` 调用都在 try-finally 块中
+- [ ] finally 块中必须调用 `unmuteDMTools()`
+- [ ] 不要在嵌套函数中重复 mute（代码有防护，但最好避免）
+
+**定位**：搜索 `muteDMTools` 调用点，检查是否有配对的 `unmuteDMTools`
+
+---
+
+### 2. 消费者函数未调用导致状态泄漏 ⚠️
+
+**症状**：上一轮的选项/信任变化影响下一轮
+
+**原因**：`consumeActions()` / `consumeTrustChanges()` 未在所有退出路径上调用
+
+**检查清单**：
+- [ ] 正常流程：`engine.ts:1675` 等位置已消费
+- [ ] 异常流程：catch 块中是否消费？
+- [ ] 提前返回：return 前是否消费？
+- [ ] finally 兜底：是否有 finally 块兜底清理？
+
+**定位**：搜索 `consume*` 函数，检查所有调用点
+
+---
+
+### 3. 战斗叙事时传入空白名单 ⚠️
+
+**症状**：DM 无法生成后续选项
+
+**原因**：`muteDMTools([])` 禁用了所有工具，包括 SetActions
+
+**修复**：在 `dm-agent.ts:101` 强制保留 SetActions
+```typescript
+export function muteDMTools(keep: string[] = ['SetActions']): void {
+  const keepSet = new Set([...keep, 'SetActions'])  // 强制保留
+  // ...
+}
+```
+
+---
+
+### 4. 前端 actions 渲染时机错误 ⚠️
+
+**症状**：战斗中显示了场景选项，或场景中显示了战斗面板
+
+**原因**：`dm_end` 事件的 `combat` 标志判断错误
+
+**检查清单**：
+- [ ] `index.html:2661` - `if (!combatMode) showSceneActions(msg.actions)`
+- [ ] 确保 `combatMode` 与 `msg.combat` 同步
+- [ ] 战斗开始时设置 `combatMode = true`
+- [ ] 战斗结束时设置 `combatMode = false`
+
+---
+
+### 5. 工具注册顺序问题 ⚠️
+
+**症状**：某些工具在 DM prompt 中不可见
+
+**原因**：工具未在 `dm-agent.ts:69-75` 的 tools 数组中注册
+
+**检查清单**：
+- [ ] 新工具已在 `src/tools/index.ts` 中导出
+- [ ] 新工具已在 `dm-agent.ts:69` 的 tools 数组中添加
+- [ ] 工具名称与 Tool.name 一致
+
+**定位**：
+```typescript
+// dm-agent.ts:69
+tools: [
+  DiceTool, MoveTool, LookTool, TalkTool,
+  UseItemTool, SearchTool, RestTool,
+  RenderSceneTool, TransferItemTool, MoveNPCTool, 
+  SetActionsTool, SetAmbianceTool,  // ← 确保在这里
+  ChangeTrustTool, ProposeTradeActionTool, 
+  TriggerHostileNPCTool, TriggerTrustCascade,
+],
+```
+
+---
+
+### 6. 战斗后选项生成失败 ⚠️
+
+**完整调用链路**：
+```
+1. 战斗结束触发
+   └─ engine.ts:combatDMNarrative()
+      ├─ muteDMTools(['SetActions'])     // 🔇 只保留 SetActions
+      ├─ dmRespond(战斗叙事请求)          // DM 生成 2-3 句叙事
+      │  └─ DM 调用 SetActions 生成选项
+      ├─ consumeActions()                // 🎯 读取选项
+      ├─ yield combat_narrative_actions  // 发送到前端
+      └─ unmuteDMTools()                 // 🔊 恢复所有工具
+
+2. 事件流转到前端
+   └─ server.ts:205
+      └─ send('dm_end', { actions })
+
+3. 前端渲染
+   └─ index.html:2635 (case 'dm_end')
+      └─ showSceneActions(msg.actions)
+```
+
+**检查清单**：
+- [ ] `muteDMTools()` 默认保留 SetActions
+- [ ] DM prompt 中提示调用 SetActions
+- [ ] `consumeActions()` 在 finally 块中兜底
+- [ ] 前端 `!combatMode` 判断正确
+
+---
+
+### 7. 新工具开发检查清单 ✅
+
+开发新工具时，按以下步骤检查：
+
+1. **工具定义**（`src/tools/your-tool.ts`）
+   - [ ] Tool.name 清晰描述功能
+   - [ ] Tool.description 包含使用时机和示例
+   - [ ] inputSchema 使用 zod 定义参数
+   - [ ] execute() 函数实现逻辑
+
+2. **消费者模式**（如果需要）
+   - [ ] 定义 `let pending*` 变量
+   - [ ] 导出 `consume*()` 函数
+   - [ ] execute() 中写入 pending 变量
+   - [ ] 在 engine.ts 中添加消费点
+
+3. **工具注册**
+   - [ ] 在 `src/tools/index.ts` 中导出
+   - [ ] 在 `dm-agent.ts:69` 的 tools 数组中添加
+
+4. **测试**
+   - [ ] 手动测试工具调用
+   - [ ] 检查消费点是否正确触发
+   - [ ] 检查前端事件处理（如果需要）
+
+---
+
+## 扩展阅读
+
+- [章节系统设计](./CHAPTER_SYSTEM.md)
+- [战斗系统设计](./COMBAT_SYSTEM.md)
+- [信任系统设计](./TRUST_SYSTEM.md)
+- [工具开发指南](./TOOL_DEVELOPMENT.md)
+
+---
+
+## 维护说明
+
+**本文档应在以下情况更新**：
+- 新增消费者模式组件
+- 修改工具静音机制
+- 新增事件类型
+- 发现新的陷阱或最佳实践
+
+**维护者**：请在修改底层机制时同步更新本文档，确保后续 AI 开发有准确的参考。
