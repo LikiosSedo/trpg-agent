@@ -258,5 +258,9 @@ export function formatActionResult(result: ActionResult): string {
  * TALK 也预执行：位置检查 + NPC 上下文获取 + 章节触发
  */
 export function shouldPreExecute(action: PlayerAction): boolean {
+  // BUY/SELL 不预执行：交给 DM 通过 ProposeTradeAction 弹出交易卡片，让玩家确认
+  // TALK/NARRATIVE 不预执行：交给 DM 处理对话
   return action.type !== 'NARRATIVE'
+    && action.type !== 'BUY'
+    && action.type !== 'SELL'
 }
