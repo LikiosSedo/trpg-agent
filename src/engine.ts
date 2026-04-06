@@ -221,9 +221,9 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
 // ─── 选项分类（regex，无 LLM） ──────────────────
 
 const SUGGESTION_CLASSIFY: Array<{ pattern: RegExp; type: string; icon: string }> = [
-  { pattern: /前往|去|走|回|进入/,                type: 'move',      icon: 'ra-compass' },
+  { pattern: /前往|去|走|回|进入|深入|离开|向.{0,4}走|朝.{0,4}去/, type: 'move', icon: 'ra-compass' },
   { pattern: /看|观察|查看|打量/,                  type: 'look',      icon: 'ra-eye-monster' },
-  { pattern: /搜索|搜查|检查|调查|探索/,           type: 'search',    icon: 'ra-telescope' },
+  { pattern: /搜索|搜查|检查|调查/,                type: 'search',    icon: 'ra-telescope' },
   { pattern: /攻击|突袭|偷袭|战斗|冲|杀|先下手|进攻/, type: 'attack',  icon: 'ra-sword' },
   { pattern: /交谈|聊|说话|问|对话|找.{1,4}谈/,    type: 'talk',      icon: 'ra-speech-bubble' },
   { pattern: /休息|睡|歇/,                         type: 'rest',      icon: 'ra-health' },
@@ -310,6 +310,7 @@ export type TurnEvent =
   | { type: 'combat_narrative_actions'; actions: SceneActions }
   | { type: 'dm_thinking'; text: string }
   | { type: 'system_message'; text: string }
+  | { type: 'poi_unlock'; poiId: string; poiName: string; areaId: string; areaName: string; description: string }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -1766,9 +1767,28 @@ export class GameEngine {
       for (const npc of npcsAtDest) {
         const result = this.dossier.unlock(npc.name, session.turnCount, moveChapterNum)
         console.log(`[move-unlock] ${npc.name}: ${result ? 'newly unlocked' : 'already unlocked'}, isUnlocked=${this.dossier.isUnlocked(npc.name)}`)
-        // 如果是首次解锁，发送事件给前端
         if (result) {
           yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
+        }
+      }
+      // POI 首次到达 → 弹出解锁卡片
+      const poiId = session.worldState.currentSubLocation
+      const visitKey = `poi_visited_${poiId}`
+      if (poiId && !session.worldState.flags[visitKey]) {
+        session.worldState.flags[visitKey] = true
+        const areaId = session.worldState.currentLocation
+        const area = locations[areaId]
+        const poi = area?.pointsOfInterest.find((p: any) => p.id === poiId)
+        if (poi) {
+          yield {
+            type: 'poi_unlock',
+            poiId,
+            poiName: poi.nameZh,
+            areaId,
+            areaName: area.nameZh,
+            description: poi.description,
+          }
+          console.log(`[poi-unlock] 首次到达: ${poi.nameZh} (${poiId})`)
         }
       }
     }
