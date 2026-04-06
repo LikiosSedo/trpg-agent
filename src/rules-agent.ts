@@ -92,7 +92,7 @@ const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, inpu
 /**
  * 第一级匹配：能用正则解决的不调 LLM
  */
-function quickMatch(input: string): PlayerAction | null {
+export function quickMatch(input: string): PlayerAction | null {
   const trimmed = input.trim()
   for (const { pattern, build } of QUICK_PATTERNS) {
     const m = trimmed.match(pattern)

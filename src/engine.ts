@@ -21,7 +21,7 @@ import { consumeActions, type SceneActions, type ClassifiedSuggestion, type Clas
 import { consumeTrustChanges } from './tools/change-trust.js'
 import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
 import { consumeSpeakingNPCs } from './tools/talk.js'
-import { classifyIntent, formatActionResult, shouldPreExecute, type ActionResult } from './rules-agent.js'
+import { classifyIntent, formatActionResult, shouldPreExecute, quickMatch, type ActionResult } from './rules-agent.js'
 import { executeAction } from './action-executor.js'
 import { getActiveEffectsSummary } from './effect-manager.js'
 import { isBuffSpell } from './combat-manager.js'
@@ -218,23 +218,28 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
   }
 }
 
-// ─── 选项分类（regex，无 LLM） ──────────────────
+// ─── 选项分类（复用 rules-agent quickMatch，图标与执行一致） ──────────────────
 
-const SUGGESTION_CLASSIFY: Array<{ pattern: RegExp; type: string; icon: string }> = [
-  { pattern: /前往|去|走向|回|进入|离开|向.{0,4}走|朝.{0,4}去/, type: 'move', icon: 'ra-compass' },
-  { pattern: /看|观察|查看|打量/,                  type: 'look',      icon: 'ra-eye-monster' },
-  { pattern: /搜索|搜查|检查|调查/,                type: 'search',    icon: 'ra-telescope' },
-  { pattern: /攻击|突袭|偷袭|战斗|冲|杀|先下手|进攻/, type: 'attack',  icon: 'ra-sword' },
-  { pattern: /交谈|聊|说话|问|对话|找.{1,4}谈/,    type: 'talk',      icon: 'ra-speech-bubble' },
-  { pattern: /休息|睡|歇/,                         type: 'rest',      icon: 'ra-health' },
-  { pattern: /买|购买/,                            type: 'buy',       icon: 'ra-gold-bar' },
-  { pattern: /逃|跑|撤/,                           type: 'flee',      icon: 'ra-footprint' },
-]
+const ACTION_TYPE_ICONS: Record<string, string> = {
+  MOVE: 'ra-compass',
+  LOOK: 'ra-eye-monster',
+  SEARCH: 'ra-telescope',
+  ATTACK: 'ra-sword',
+  TALK: 'ra-speech-bubble',
+  REST: 'ra-health',
+  BUY: 'ra-gold-bar',
+  SELL: 'ra-gold-bar',
+  FLEE: 'ra-footprint',
+  USE: 'ra-potion',
+  GIVE: 'ra-hand',
+}
 
 function classifySuggestion(text: string): ClassifiedSuggestion {
   const clean = text.startsWith('★') ? text.slice(1) : text
-  for (const { pattern, type, icon } of SUGGESTION_CLASSIFY) {
-    if (pattern.test(clean)) return { text, actionType: type, icon }
+  const action = quickMatch(clean)
+  if (action) {
+    const icon = ACTION_TYPE_ICONS[action.type] || 'ra-scroll-unfurled'
+    return { text, actionType: action.type.toLowerCase(), icon }
   }
   return { text, actionType: 'narrative', icon: 'ra-scroll-unfurled' }
 }
