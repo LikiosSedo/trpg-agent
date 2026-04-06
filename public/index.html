@@ -962,6 +962,10 @@
     .quick-btn:active {
       transform: scale(0.96);
     }
+    .quick-btn.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
     .quick-btn i { margin-right: 3px; font-size: 11px; }
     /* #input-hint removed — hint now uses input placeholder */
 
@@ -985,8 +989,9 @@
       pointer-events: none;
       padding: 10px 12px;
       font-family: inherit;
-      font-size: 14px;
-      color: #556;
+      font-size: 16px;
+      line-height: 1.4;
+      color: #445;
       white-space: nowrap;
       overflow: hidden;
       opacity: 0;
@@ -4216,6 +4221,13 @@
 
       setupSmartScroll()
 
+      // 开场期间锁定输入（DM 正在生成序幕叙事）
+      sending = true
+      document.getElementById('input').disabled = true
+      document.getElementById('input').placeholder = 'DM 正在讲述序幕...'
+      document.getElementById('send').disabled = true
+      document.querySelectorAll('.quick-btn').forEach(b => b.classList.add('disabled'))
+
       connectWs((ws) => {
         ws.send(JSON.stringify({ type: 'create', name, classId: selectedClass }))
       })
@@ -5488,7 +5500,10 @@
 
     document.querySelectorAll('.quick-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        // 输入锁定时（DM 生成中、战斗中）快捷按钮也不可用
+        if (sending || combatMode) return
         const inp = document.getElementById('input')
+        if (inp.disabled) return
         inp.value = btn.dataset.tpl
         inp.focus()
         inp.setSelectionRange(inp.value.length, inp.value.length)
@@ -5533,6 +5548,7 @@
       input.disabled = true
       input.placeholder = 'DM 正在回应...'
       document.getElementById('send').disabled = true
+      document.querySelectorAll('.quick-btn').forEach(b => b.classList.add('disabled'))
       showThinking()
     }
 
@@ -5541,6 +5557,7 @@
       const inp = document.getElementById('input')
       if (inp) { inp.disabled = false; inp.placeholder = '说点什么 . . .' }
       document.getElementById('send').disabled = false
+      document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('disabled'))
     }
 
     // textarea 自动调整高度
