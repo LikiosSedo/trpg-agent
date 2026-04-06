@@ -37,7 +37,15 @@ export const LookTool: Tool = {
       if (poi) {
         return { output: `兴趣点：${poi.nameZh}(${poi.name})。${poi.description}` }
       }
-      return { output: `在${loc.nameZh}未发现"${input.target}"。` }
+      // 目标不在注册表中 — 标记降级，让 engine 注入 POI 上下文给 DM
+      const knownPois = loc.pointsOfInterest
+        .filter((p: any) => p.discovered)
+        .map((p: any) => p.nameZh)
+        .join('、')
+      return {
+        output: `在${loc.nameZh}未找到精确匹配"${input.target}"。已知地点：${knownPois || '无'}。`,
+        notFound: true,
+      }
     }
 
     // General look

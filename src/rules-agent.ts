@@ -37,6 +37,7 @@ export interface ActionResult {
   toolsCalled: string[]
   firstInnocentKill?: boolean  // 首次击败无辜NPC标记
   unknownDestination?: boolean // Move 目的地不在地图注册表中（降级为叙事）
+  notFound?: boolean           // Look 目标不在注册表中（降级为叙事）
 }
 
 // ─── 第一级：快速正则匹配 ────────────────────

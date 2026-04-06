@@ -1645,6 +1645,26 @@ export class GameEngine {
         action = { type: 'NARRATIVE' }
         actionResult = null
         console.log(`[rules-agent] Move 降级为 NARRATIVE: 目的地「${dest}」不在注册表中`)
+
+      // Look 失败降级：目标不在 POI/NPC 注册表中 → 注入位置上下文，让 DM 自由描写
+      } else if (action.type === 'LOOK' && actionResult.notFound) {
+        const currentLoc = locations[session.worldState.currentLocation]
+        const locName = currentLoc?.nameZh ?? session.worldState.currentLocation
+        const target = (action as any).target ?? input
+        const pois = (currentLoc?.pointsOfInterest ?? [])
+          .filter((p: any) => p.discovered)
+          .map((p: any) => `${p.nameZh}(${p.description?.slice(0, 30) ?? ''})`)
+          .join('、')
+        parts.push(
+          `[叙事引导] 玩家想在「${locName}」观察「${target}」。` +
+          `当前位置已知地点：${pois || '无'}。` +
+          `请根据当前位置的氛围和世界观自由描写玩家观察到的场景。` +
+          `如果玩家提到的事物可能对应某个已知地点，自然地融入描写中。` +
+          `不要提及"未发现"或"系统"等游戏外概念。`
+        )
+        action = { type: 'NARRATIVE' }
+        actionResult = null
+        console.log(`[rules-agent] Look 降级为 NARRATIVE: 目标「${target}」不在注册表中`)
       } else {
         parts.push(formatActionResult(actionResult))
 
