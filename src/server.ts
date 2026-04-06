@@ -13,7 +13,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { timingSafeEqual, createHash } from 'crypto'
-import { initItemRegistry, getFacts } from './game-state.js'
+import { initItemRegistry, getFacts, getRegistry } from './game-state.js'
 import { GameEngine, type TurnEvent, type CommandResult } from './engine.js'
 import { TransferItemTool } from './tools/transfer-item.js'
 
@@ -219,7 +219,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'combat_init':
           send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative }); break
         case 'combat_action_req':
-          send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp }); break
+          send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp, activeEffects: ev.activeEffects }); break
         case 'quest_completed':
           send('system', { text: `✓ 任务完成: ${ev.questName} — ${ev.text}` }); break
         case 'quest_progress':
@@ -373,6 +373,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 交易执行（玩家点击交易确认卡片） ──
     if (msg.type === 'trade_execute') {
       if (!gameStarted || !engine) return
+      if (engine.session.combat?.active) { send('error', { text: '战斗中无法交易。' }); return }
       if (processing) { send('error', { text: '处理中...' }); return }
       processing = true
       try {
@@ -380,6 +381,16 @@ wss.on('connection', (ws: WebSocket, req) => {
         const npc = msg.npc
         const results: string[] = []
         let allSuccess = true
+
+        // 商店交易只允许注册表中的物品（防止 DM 凭空编造物品）
+        const registry = getRegistry()
+        const unregistered = items.filter((i: any) => !registry.has(i.name))
+        if (unregistered.length > 0) {
+          const names = unregistered.map((i: any) => i.name).join('、')
+          send('system', { text: `交易失败：「${names}」不是已知商品。` })
+          processing = false
+          return
+        }
 
         // 价格合理性校验：单价不能低于 shopPricing 的 50%（防止 DM 传离谱低价）
         const shopNpc = engine.session.npcs.find((n: any) => n.name === npc)
@@ -407,7 +418,7 @@ wss.on('connection', (ws: WebSocket, req) => {
               sourceId: npc,
               goldAmount: item.price,
               itemType: item.type,
-              itemDescription: item.description || '',
+              itemDescription: item.description,
               itemBonus: item.bonus,
               skipNightCheck: true,  // NPC 已通过 ProposeTradeAction 同意，跳过深夜限制
             })
@@ -430,6 +441,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 取消交易 ──
     if (msg.type === 'trade_cancel') {
       if (!gameStarted || !engine) return
+      if (engine.session.combat?.active) return
       engine.clearBargain()
       // 取消交易不触发 DM 叙事——直接解锁输入，玩家继续操作
       send('dm_end', { combat: false, pendingMonster: false, actions: null })
@@ -439,6 +451,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     // ── 砍价输入 ──
     if (msg.type === 'bargain') {
       if (!gameStarted || !engine) return
+      if (engine.session.combat?.active) { send('error', { text: '战斗中无法砍价。' }); return }
       if (processing) { send('error', { text: '处理中...' }); return }
       processing = true
       try {
@@ -453,6 +466,11 @@ wss.on('connection', (ws: WebSocket, req) => {
     if (msg.type === 'input') {
       if (!gameStarted || !engine) {
         send('error', { text: '游戏未开始。请先创建角色（刷新页面）。' })
+        return
+      }
+      // 战斗中禁止非战斗输入（安全网：前端也有守卫）
+      if (engine.session.combat?.active) {
+        send('error', { text: '战斗中请使用操作按钮。' })
         return
       }
       if (processing) {
@@ -483,7 +501,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         engine.session.dossierData = engine.dossier.toJSON()
         getFacts().save('autosave')
         console.log('[server] auto-saved on disconnect')
-      } catch {}
+      } catch { }
     }
     console.log('[server] player disconnected')
   })

@@ -92,6 +92,13 @@
     "description": "一名死去雇佣兵的日志最后几页，内含矿道深处发现的奇异符号草图。"
   },
   {
+    "name": "草药绷带",
+    "type": "potion",
+    "description": "叶绿手工浸泡过草药的亚麻绷带，包扎伤口可恢复1d4+2生命值。",
+    "bonus": 1,
+    "basePrice": 8
+  },
+  {
     "name": "麻绳",
     "type": "misc",
     "description": "50尺坚韧的麻绳。可用于攀爬、捆绑或即兴陷阱。"

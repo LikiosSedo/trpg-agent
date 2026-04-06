@@ -56,14 +56,18 @@ export const TransferItemTool: Tool = {
     if (registered) {
       item = { name: registered.name, type: registered.type, description: registered.description, bonus: registered.bonus }
     } else if (itemType && itemDescription) {
-      item = { name: itemName, type: itemType, description: itemDescription, bonus: itemBonus }
+      // 动态物品：仅限非商店场景（found/gift/quest），商店买卖在 server.ts 层已拦截
       isDynamic = true
+      // bonus 上限：weapon/armor ≤ 3, potion ≤ 4, 其他无 bonus
+      const BONUS_CAP: Record<string, number> = { weapon: 3, armor: 3, potion: 4 }
+      const cappedBonus = itemBonus != null ? Math.min(itemBonus, BONUS_CAP[itemType] ?? 0) : undefined
+      item = { name: itemName, type: itemType, description: itemDescription, bonus: cappedBonus }
       // 动态药水兜底：没有 bonus 时默认给 2（2d4+2 HP）
       if (item.type === 'potion' && item.bonus === undefined) {
         item = { ...item, bonus: 2 }
       }
     } else {
-      return { output: `物品"${itemName}"不在注册表中。新物品需要提供 itemType 和 itemDescription。`, isError: true }
+      return { output: `物品"${itemName}"不在注册表中。商店交易只能使用已注册的物品。`, isError: true }
     }
 
     // 金币不能作为物品——应该直接加到 player.gold
