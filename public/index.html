@@ -2723,7 +2723,9 @@ function handleWsMessage(e) {
         combatItems = []
         // 不在这里 unlockInput()——等 combat_narrative_actions 或 sync 事件到达后再解锁
         // 战斗结束后 DM 还需要生成叙事和 SetActions
+        document.getElementById('input').disabled = true
         document.getElementById('input').placeholder = 'DM 正在描述战斗结局...'
+        document.getElementById('send').disabled = true
         document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
         updateCombatPanel()
         // 战斗结束 → 切回场景 BGM（从当前会话状态推导）
