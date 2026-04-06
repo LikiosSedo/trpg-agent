@@ -983,8 +983,30 @@
       gap: 8px;
     }
 
-    #input {
+    #input-wrap {
       flex: 1;
+      position: relative;
+    }
+
+    #input-ghost {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      color: #556;
+      white-space: nowrap;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #input-ghost.visible {
+      opacity: 1;
+    }
+
+    #input {
+      width: 100%;
       background: #0a0f20;
       border: 1px solid #2a3050;
       color: #d0d0d0;
@@ -2869,7 +2891,10 @@
       <span class="quick-btn" data-tpl="休息" data-hint="短休恢复体力；改为「长休」完全恢复"><i class="ra ra-health"></i>休息</span>
     </div>
     <div id="input-area">
-      <textarea id="input" placeholder="说点什么..." autocomplete="off" rows="1"></textarea>
+      <div id="input-wrap">
+        <textarea id="input" placeholder="说点什么 . . ." autocomplete="off" rows="1"></textarea>
+        <span id="input-ghost"></span>
+      </div>
       <button id="send" onclick="sendInput()">发送</button>
     </div>
   </div>
@@ -5457,16 +5482,28 @@
 
     // ─── 输入 ───
     // ─── 快捷操作栏：点击填入模板 + 显示提示 ───
+    function showInputGhost(tplLen, hint) {
+      const ghost = document.getElementById('input-ghost')
+      if (!ghost) return
+      // 用不可见的占位符推开 hint，使其显示在模板文本之后
+      const spacer = '\u00A0'.repeat(Math.ceil(tplLen * 1.8))
+      ghost.textContent = spacer + hint
+      ghost.classList.add('visible')
+    }
+    function hideInputGhost() {
+      const ghost = document.getElementById('input-ghost')
+      if (ghost) { ghost.classList.remove('visible'); ghost.textContent = '' }
+    }
+
     document.querySelectorAll('.quick-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const inp = document.getElementById('input')
         inp.value = btn.dataset.tpl
-        inp.placeholder = btn.dataset.hint
         inp.focus()
         inp.setSelectionRange(inp.value.length, inp.value.length)
-        // 输入变化或发送时恢复默认 placeholder
-        const restore = () => { inp.placeholder = '说点什么 . . .'; inp.removeEventListener('input', restore) }
-        inp.addEventListener('input', restore)
+        showInputGhost(btn.dataset.tpl.length, btn.dataset.hint)
+        const clear = () => { hideInputGhost(); inp.removeEventListener('input', clear) }
+        inp.addEventListener('input', clear)
       })
     })
 
@@ -5480,9 +5517,7 @@
       const text = input.value.trim()
       if (!text || !ws || sending) return
 
-      // 清除快捷操作提示
-      const inputHint = document.getElementById('input-hint')
-      if (inputHint) inputHint.classList.remove('visible')
+      hideInputGhost()
 
       playSfx('ui_send', 0.2)
       appendMsg('🗡️ ' + text, 'player')
