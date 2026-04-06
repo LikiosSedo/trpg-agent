@@ -2527,7 +2527,7 @@ export class GameEngine {
           combat.phase = 'ended'
           syncNPCConditionAfterCombat(session, combatMonsters)
           yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
-          yield* this.combatDMNarrative(`${enemyNames}的猛攻势不可挡。描写致命一击如何落下，玩家倒地的最后瞬间，以及意识消散前最后看到的画面。`)
+          yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，膝盖触地的声音像是从很远的地方传来。` }
           yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
           if (session.player.hp <= 0) {
             session.dossierData = this.dossier.toJSON()
@@ -2698,11 +2698,18 @@ export class GameEngine {
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
           ended: true, result: monsterResult.result,
         }
-        yield* this.combatDMNarrative(
-          monsterResult.result === 'victory'
-            ? `在激烈的缠斗后，${enemyNames}终于倒下。描写最后一个敌人倒地的画面，战斗留下的痕迹，以及劫后余生的片刻喘息。`
-            : `${enemyNames}发动了致命攻击。描写玩家在最后一击下倒下的瞬间，世界在眼前逐渐模糊。`
-        )
+        if (monsterResult.result === 'victory') {
+          // 胜利：用 DM 叙事（战斗已结束，不阻塞操作）
+          const isNpcFight2 = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
+          yield* this.combatDMNarrative(
+            isNpcFight2
+              ? `${enemyNames}终于倒下。描写这场人与人对决的结局和战后余韵。`
+              : `${enemyNames}终于倒下。描写最后一个敌人倒地的画面和劫后余生的片刻喘息。`
+          )
+        } else {
+          // 失败：模板，不调 LLM（玩家马上看到 death 界面）
+          yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，世界在眼前逐渐暗去。` }
+        }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         // endCombat already called by executeMonsterPhase for defeat
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
