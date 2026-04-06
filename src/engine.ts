@@ -1314,20 +1314,17 @@ export class GameEngine {
             }
             if (responder) {
               alert.arrivedResponder = responder.name
-              if (alreadyOnSite) {
-                // 当场目击 → 即时反应，跳过 moveNPC
-                alert.immediateResponse = true
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] ${responder.name} 就在当场，立即反应！`)
-              } else {
-                // 不在当场 → 移动过来，下一轮开打
-                const { moveNPC } = await import('./npc-mobility.js')
-                moveNPC(responder, alert.subLocation, session)
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] ${responder.name} 赶到现场，下一轮将发起战斗`)
-              }
 
-              // 触发信任度传播（响应者到达现场时）
+              // ── 阶段 1：发现 ──
+              // 响应者到达受害者处，发现暴行，触发信任度传播
+              // 这一阶段不触发战斗——只是"消息传开了"
+              const { moveNPC } = await import('./npc-mobility.js')
+              if (!alreadyOnSite) {
+                moveNPC(responder, alert.subLocation, session)
+              }
+              if (alreadyOnSite) alert.immediateResponse = true
+
+              // 触发信任度传播（发现暴行时）
               if (!alert.trustCascadeTriggered) {
                 const { propagateViolenceTrust } = await import('./trust-system.js')
                 const cascadeResult = propagateViolenceTrust(
@@ -1338,15 +1335,35 @@ export class GameEngine {
                   `暴力事件：${alert.victimName}被攻击`
                 )
                 alert.trustCascadeTriggered = true
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
                 console.log(`[trust-cascade] ${cascadeResult.summary}`)
               }
+
+              // ── 阶段 2：对峙或追踪（取决于玩家是否在场）──
+              const playerAtScene = session.worldState.currentLocation === alert.location &&
+                session.worldState.currentSubLocation === alert.subLocation
+              if (playerAtScene || alreadyOnSite) {
+                // 玩家在场 → 下一轮战斗
+                alert.responded = true
+                alert.combatJustStarted = responder.name
+                pendingCombatInterrupt = {
+                  responderName: responder.name,
+                  victimName: alert.victimName,
+                  subLocation: alert.subLocation,
+                  immediate: !!alert.immediateResponse,
+                }
+                console.log(`[consequence] ${responder.name} 发现暴行，玩家在场 → 准备战斗`)
+              } else {
+                // 玩家不在场 → 由追踪系统处理（canTrack 检查在下一轮自动触发）
+                // 不标记 responded，让追踪逻辑继续运行
+                console.log(`[consequence] ${responder.name} 发现暴行，玩家已逃离 → 等待追踪系统`)
+              }
+
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
             } else {
               alert.responded = true
 
               // 检查是否是追踪失败（有追踪尝试但无追踪者）
               if (alert.trackingAttempted) {
-                // 追踪失败的个性化叙事
                 const failedTrackerName = alert.forceResponder || '追踪者'
                 const trackingFailedNarratives: Record<string, string> = {
                   '韩猛': `韩猛在矿道入口停下，盯着黑暗深处，拳头握得咯咯作响。"该死...那里连我都不敢进。"`,
@@ -1373,24 +1390,7 @@ export class GameEngine {
 
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
               console.log(`[consequence] 无人响应（所有能战斗的NPC都不可用或追踪失败）`)
-              if (!alert.trackingAttempted) {
-                yield { type: 'narrative_warning', text: '镇民发现了你的暴行，消息正在传开...' }
-              }
             }
-          }
-          // 阶段 2：标记战斗待触发（不直接 return，让 DM 先叙事玩家行动再打断）
-          // 注意：用 if 而非 else if，使当场目击时阶段1→2同轮串联
-          if (alert.arrivedResponder && !alert.responded && (elapsed > alert.delay || alert.immediateResponse)) {
-            alert.responded = true
-            alert.combatJustStarted = alert.arrivedResponder
-            session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-            pendingCombatInterrupt = {
-              responderName: alert.arrivedResponder,
-              victimName: alert.victimName,
-              subLocation: alert.subLocation,
-              immediate: !!alert.immediateResponse,
-            }
-            console.log(`[consequence] ${alert.arrivedResponder} 准备发起战斗（等 DM 叙事后触发）`)
           }
         }
       } catch { /* malformed alert JSON, ignore */ }
