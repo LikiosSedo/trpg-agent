@@ -223,7 +223,7 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
 const SUGGESTION_CLASSIFY: Array<{ pattern: RegExp; type: string; icon: string }> = [
   { pattern: /前往|去|走|回|进入/,                type: 'move',      icon: 'ra-compass' },
   { pattern: /看|观察|查看|打量/,                  type: 'look',      icon: 'ra-eye-monster' },
-  { pattern: /搜索|搜查|检查|调查|探索/,           type: 'search',    icon: 'ra-magnifying-glass' },
+  { pattern: /搜索|搜查|检查|调查|探索/,           type: 'search',    icon: 'ra-telescope' },
   { pattern: /攻击|突袭|偷袭|战斗|冲|杀|先下手|进攻/, type: 'attack',  icon: 'ra-sword' },
   { pattern: /交谈|聊|说话|问|对话|找.{1,4}谈/,    type: 'talk',      icon: 'ra-speech-bubble' },
   { pattern: /休息|睡|歇/,                         type: 'rest',      icon: 'ra-health' },
