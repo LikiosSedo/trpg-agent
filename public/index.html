@@ -217,6 +217,12 @@
       border-color: rgba(184, 134, 11, 0.5);
       background: rgba(26, 40, 80, 0.7);
     }
+    .action-btn.selected {
+      color: #e6b800;
+      border-color: rgba(184, 134, 11, 0.6);
+      background: rgba(26, 40, 80, 0.8);
+      box-shadow: 0 0 8px rgba(184, 134, 11, 0.2);
+    }
 
     .action-btn.detail {
       background: transparent;
@@ -4144,6 +4150,7 @@
 
     // ─── DM 思考动画 ───
     let thinkingTimer = null
+    let thinkingRetryTimer = null
     function showThinking() {
       hideThinking()
       const container = document.getElementById('messages')
@@ -4157,10 +4164,20 @@
         const el = document.getElementById('thinking-indicator')
         if (el) el.innerHTML = 'DM 还在思考，请稍候<span class="dots"><span>·</span><span>·</span><span>·</span></span>'
       }, 10000)
+      // 45 秒后显示重试/取消按钮（不自动触发，由用户决定）
+      thinkingRetryTimer = setTimeout(() => {
+        const el = document.getElementById('thinking-indicator')
+        if (!el) return
+        el.innerHTML = 'DM 响应时间过长 ' +
+          '<button onclick="retryLastInput()" style="background:#2a1a0e;color:#ff8c42;border:1px solid #ff8c42;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:8px">重试</button>' +
+          '<button onclick="unlockInput();hideThinking()" style="background:transparent;color:#888;border:1px solid #444;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">取消等待</button>'
+        smartScrollToBottom()
+      }, 45000)
     }
 
     function hideThinking() {
       if (thinkingTimer) { clearTimeout(thinkingTimer); thinkingTimer = null }
+      if (thinkingRetryTimer) { clearTimeout(thinkingRetryTimer); thinkingRetryTimer = null }
       const el = document.getElementById('thinking-indicator')
       if (el) el.remove()
     }
@@ -5045,10 +5062,16 @@
             btn.textContent = displayText
           }
           btn.onclick = () => {
-            div.remove()
+            // 高亮选中按钮，但不移除选项栏（发送时才移除）
+            sugRow.querySelectorAll('.action-btn').forEach(b => b.classList.remove('selected'))
+            btn.classList.add('selected')
             const inp = document.getElementById('input')
             inp.value = displayText
             inp.focus()
+            inp.setSelectionRange(inp.value.length, inp.value.length)
+            showInputGhost(displayText.length, '可直接发送，或补充想说的话...')
+            const clear = () => { hideInputGhost(); inp.removeEventListener('input', clear) }
+            inp.addEventListener('input', clear)
           }
           sugRow.appendChild(btn)
         }
@@ -5524,6 +5547,8 @@
       if (!text || !ws || sending) return
 
       hideInputGhost()
+      // 发送时移除 DM 推荐选项栏
+      document.querySelectorAll('.actions').forEach(el => el.remove())
 
       playSfx('ui_send', 0.2)
       appendMsg('🗡️ ' + text, 'player')
@@ -5558,6 +5583,12 @@
       if (inp) { inp.disabled = false; inp.placeholder = '说点什么 . . .' }
       document.getElementById('send').disabled = false
       document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('disabled'))
+    }
+
+    function retryLastInput() {
+      hideThinking()
+      unlockInput()
+      appendMsg('DM 响应超时，已解锁输入。你可以重新发送或刷新页面。', 'system')
     }
 
     // textarea 自动调整高度

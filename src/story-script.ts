@@ -120,7 +120,6 @@ export const CHAPTERS: ChapterDef[] = [
           '"你身上有……奇怪的味道。"她压低声音说，然后被格雷格轻声叫走："小莉，别吓人。"',
           '小莉走开时回头又看了玩家一眼',
         ],
-        optional: true,
       },
       {
         id: 'ch1_guild_direction',
@@ -132,7 +131,7 @@ export const CHAPTERS: ChapterDef[] = [
           '他指了指东边的方向',
           '格雷格提供免费住宿——"后头有空房，今晚先歇着"',
         ],
-        requiredFacts: 2,
+        requiredFacts: 1,
       },
       {
         id: 'ch1_night_event',
@@ -158,7 +157,7 @@ export const CHAPTERS: ChapterDef[] = [
     advanceWhen: ['ch1_guild_direction', 'ch1_night_event'],
 
     nudge: {
-      afterIdleTurns: 8,
+      afterIdleTurns: 5,
       hints: [
         '格雷格把擦好的杯子放回架上，不经意地说："镇上最近不太平，矿洞那边出了事。"他顿了顿，"你要是闲着没事……算了，喝你的汤吧。"',
         '小莉端着一杯热茶放在玩家桌上，小声说："老格之前当过冒险者的，他知道很多事。你多跟他聊聊。"',

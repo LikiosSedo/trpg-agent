@@ -2388,12 +2388,20 @@ export class GameEngine {
 
     console.log(`[bargain] 第${round}轮砍价，${npc}，上次总价${lastPrice}金`)
 
-    // DM 流式响应
+    // DM 流式响应（带超时保护）
     const dmStart = Date.now()
     let fullText = ''
     const toolsCalled: ToolCallRecord[] = []
     try {
+      const timeoutMs = 60000
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
       for await (const event of dmRespond(parts.join('\n\n'))) {
+        if (timedOut) {
+          console.error(`[bargain] DM 响应超时 (${timeoutMs}ms)`)
+          yield { type: 'dm_error', message: '砍价响应超时，请重试。' }
+          break
+        }
         if (event.type === 'thinking_delta') {
           const thinking = (event as any).thinking ?? ''
           if (thinking) yield { type: 'dm_thinking', text: thinking }
@@ -2412,6 +2420,7 @@ export class GameEngine {
           }
         }
       }
+      clearTimeout(timer)
       const bargainEmptyIdx = fullText.indexOf('(Empty response:')
       if (bargainEmptyIdx !== -1) fullText = fullText.substring(0, bargainEmptyIdx)
       console.log(`[bargain] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
@@ -2514,17 +2523,25 @@ export class GameEngine {
     let fullText = ''
     muteDMTools()  // 🔇 静音：只保留 SetActions
     try {
+      const timeoutMs = 60000
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
       for await (const event of dmRespond(
         `[战斗叙事请求]\n${context}\n${scene}\n\n` +
         `用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。不要提及HP/AC/骰子等数值。\n\n` +
         `叙事结束后，思考玩家此刻最自然的后续行动，调用 SetActions 提供选项。`
       )) {
+        if (timedOut) {
+          console.error(`[combat-dm] 战斗叙事超时 (${timeoutMs}ms)`)
+          break
+        }
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
           if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
           fullText += text
         }
       }
+      clearTimeout(timer)
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
       if (fullText.trim()) {
@@ -2899,18 +2916,26 @@ export class GameEngine {
 
     let fullText = ''
     try {
+      const timeoutMs = 90000 // 开场叙事给 90 秒（首次调用可能较慢）
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
       for await (const event of dmRespond(prompt)) {
+        if (timedOut) {
+          console.error(`[opening] DM 开场超时 (${timeoutMs}ms)`)
+          yield { type: 'dm_error', message: '开场叙事生成超时，请刷新重试。' }
+          break
+        }
         if (event.type === 'thinking_delta') {
           const thinking = (event as any).thinking ?? ''
           if (thinking) yield { type: 'dm_thinking', text: thinking }
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
-          // 过滤 SDK bug：thinking-only 响应
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
           yield { type: 'dm_text_delta', text }
           fullText += text
         }
       }
+      clearTimeout(timer)
       const openEmptyIdx = fullText.indexOf('(Empty response:')
       if (openEmptyIdx !== -1) fullText = fullText.substring(0, openEmptyIdx)
     } catch (err) {
