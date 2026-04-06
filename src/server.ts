@@ -234,6 +234,8 @@ wss.on('connection', (ws: WebSocket, req) => {
             title: engine!.dossier.getBaseInfo(ev.npcName)?.title ?? '',
             appearance: engine!.dossier.getBaseInfo(ev.npcName)?.appearance ?? '',
           }); break
+        case 'poi_unlock':
+          send('poi_unlock', { poiId: (ev as any).poiId, poiName: (ev as any).poiName, areaId: (ev as any).areaId, areaName: (ev as any).areaName, description: (ev as any).description }); break
         case 'npc_update':
           send('system', { text: ev.text }); break
         case 'npc_speaking':
