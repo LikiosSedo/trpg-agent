@@ -2572,7 +2572,8 @@ export class GameEngine {
           } catch { /* ignore */ }
         }
 
-        yield* this.combatDMNarrative(`玩家抓住空隙从${enemyNames}的包围中逃脱！描写逃跑的慌乱瞬间——如何冲出包围，身后追兵的怒吼或脚步声，以及脱离危险后大口喘气的片刻安宁。`)
+        // 逃跑叙事用模板，不调 LLM（战斗中需要快速响应）
+        yield { type: 'combat_narrative', text: `你抓住一个空隙，从${enemyNames}的攻势中挣脱出来。身后传来愤怒的吼叫和追逐的脚步，但你已经冲出了战圈。` }
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
