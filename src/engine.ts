@@ -421,13 +421,15 @@ function buildFallbackActions(session: GameSession): SceneActions {
               if (npcData.location !== loc) {
                 // 不同区域 → 跨区导航
                 const destArea = locations[npcData.location]
-                if (destArea) suggestions.push(`★前往${destArea.nameZh}找${target}`)
+                const navText = destArea ? `★前往${destArea.nameZh}找${target}` : ''
+                if (navText && !suggestions.includes(navText)) suggestions.push(navText)
               } else if (npcSub && npcSub !== subLoc) {
                 // 同区域不同子地点 → 子地点导航
                 const area = locations[loc]
                 if (area) {
                   const poi = area.pointsOfInterest.find((p: any) => p.id === npcSub)
-                  if (poi) suggestions.push(`★前往${(poi as any).nameZh}找${target}`)
+                  const navText = poi ? `★前往${(poi as any).nameZh}找${target}` : ''
+                  if (navText && !suggestions.includes(navText)) suggestions.push(navText)
                 }
               }
             }

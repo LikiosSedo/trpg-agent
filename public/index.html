@@ -1057,7 +1057,20 @@
       pointer-events: none;
     }
     .quick-btn i { margin-right: 3px; font-size: 11px; }
-    /* #input-hint removed — hint now uses input placeholder */
+    #input-hint {
+      font-size: 12px;
+      color: #556;
+      padding: 0 18px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.2s, opacity 0.2s;
+      opacity: 0;
+    }
+    #input-hint.visible {
+      max-height: 22px;
+      opacity: 1;
+      padding: 2px 18px 2px;
+    }
 
     #input-area {
       background: linear-gradient(180deg, #10162a 0%, #141e38 100%);
@@ -2962,6 +2975,7 @@
       <span class="quick-btn" data-tpl="查看：" data-hint="补充方向，或直接发送观察周围"><i class="ra ra-eye-monster"></i>查看</span>
       <span class="quick-btn" data-tpl="休息" data-hint="短休恢复体力；改为「长休」完全恢复"><i class="ra ra-health"></i>休息</span>
     </div>
+    <div id="input-hint"></div>
     <div id="input-area">
       <div id="input-wrap">
         <textarea id="input" placeholder="说点什么 . . ." autocomplete="off" rows="1"></textarea>
@@ -5650,12 +5664,13 @@
 
     // ─── 输入 ───
     // ─── 快捷操作栏：点击填入模板 + 显示提示 ───
-    const DEFAULT_PLACEHOLDER = '说点什么...'
     function showInputHint(hint) {
-      document.getElementById('input').placeholder = hint
+      const el = document.getElementById('input-hint')
+      if (el) { el.textContent = hint; el.classList.add('visible') }
     }
     function hideInputHint() {
-      document.getElementById('input').placeholder = DEFAULT_PLACEHOLDER
+      const el = document.getElementById('input-hint')
+      if (el) { el.classList.remove('visible'); el.textContent = '' }
     }
 
     document.querySelectorAll('.quick-btn').forEach(btn => {
