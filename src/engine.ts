@@ -1198,41 +1198,66 @@ export class GameEngine {
           const elapsed = session.turnCount - alert.triggerTurn
           console.log(`[consequence] 暴力后果检查: turn=${session.turnCount}, trigger=${alert.triggerTurn}, elapsed=${elapsed}/${alert.delay}, victim=${alert.victimName}, arrived=${alert.arrivedResponder || '无'}`)
 
-          // Player fled the area — check if tracking is possible
-          if (session.worldState.currentLocation !== alert.location) {
-            // 检查是否有追踪者且目标区域可追踪
-            const canTrackToNewLocation = await this.canTrackAcrossLocations(
-              alert.location,
-              session.worldState.currentLocation,
-              session.worldState.currentSubLocation
-            )
-
-            if (canTrackToNewLocation && !alert.trackingAttempted) {
-              // 尝试跨区域追踪
-              alert.trackingAttempted = true
-              alert.delay += 2  // 跨区域追踪额外延迟 +2 轮
-              alert.location = session.worldState.currentLocation  // 更新追踪目标位置
-              alert.subLocation = session.worldState.currentSubLocation
-              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              console.log(`[consequence] 玩家逃离，追踪者将追踪到新区域: ${alert.location}，额外延迟+2轮`)
-              yield { type: 'narrative_warning', text: `你逃离了现场，但你能感觉到身后有人在追踪你的足迹...` }
-            } else if (alert.trackingAttempted && canTrackToNewLocation) {
-              // 已经在追踪中，玩家再次移动
-              const additionalDelay = 2
-              alert.delay = (alert.triggerTurn + alert.delay - session.turnCount) + additionalDelay
-              alert.triggerTurn = session.turnCount
-              alert.location = session.worldState.currentLocation
-              alert.subLocation = session.worldState.currentSubLocation
-              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              console.log(`[consequence] 玩家再次移动，追踪延迟增加: +${additionalDelay}轮`)
-              yield { type: 'narrative_warning', text: `你继续逃跑，但追踪者不会放弃...` }
+          // 玩家是否已离开暴力现场？
+          const playerFledScene = session.worldState.currentLocation !== alert.location ||
+            session.worldState.currentSubLocation !== alert.subLocation
+          if (playerFledScene) {
+            const sameArea = session.worldState.currentLocation === alert.location
+            if (sameArea) {
+              // 同区域内逃跑（草药堂→酒馆）：响应者直接追过去，不需要 canTrack
+              if (!alert.intraAreaChase) {
+                alert.intraAreaChase = true
+                alert.delay += 1  // 同区域追击只需 +1 轮
+                alert.subLocation = session.worldState.currentSubLocation
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] 玩家在镇内逃跑，追击延迟+1轮`)
+                yield { type: 'narrative_warning', text: `身后传来急促的脚步声和怒喊——有人正在赶来！` }
+              } else {
+                // 已在追击中，玩家继续在镇内移动
+                alert.subLocation = session.worldState.currentSubLocation
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              }
             } else {
-              // 追踪失败（目标区域不可追踪或没有追踪能力的响应者）
-              alert.responded = true
-              alert.trackingFailed = true
-              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              console.log(`[consequence] 追踪失败：目标区域不可追踪或无追踪者`)
-              yield { type: 'narrative_warning', text: `你逃进了更深处，暂时甩掉了追踪...` }
+              // 跨区域逃跑（镇→森林）：需要 canTrack 能力
+              const { getPersonality: getTrackP } = await import('./npc-relationships.js')
+              const hasTracker = alert.arrivedResponder
+                ? getTrackP(alert.arrivedResponder).canTrack
+                : session.npcs.some(n =>
+                    n.name !== alert.victimName &&
+                    n.condition !== 'unconscious' &&
+                    getTrackP(n.name).canFight &&
+                    getTrackP(n.name).canTrack
+                  )
+              const canTrackToNewLocation = hasTracker && await this.canTrackAcrossLocations(
+                alert.location,
+                session.worldState.currentLocation,
+                session.worldState.currentSubLocation
+              )
+
+              if (canTrackToNewLocation && !alert.trackingAttempted) {
+                alert.trackingAttempted = true
+                alert.delay += 2
+                alert.location = session.worldState.currentLocation
+                alert.subLocation = session.worldState.currentSubLocation
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] 玩家跨区域逃离，追踪延迟+2轮`)
+                yield { type: 'narrative_warning', text: `你逃离了现场，但你能感觉到身后有人在追踪你的足迹...` }
+              } else if (alert.trackingAttempted && canTrackToNewLocation) {
+                const additionalDelay = 2
+                alert.delay = (alert.triggerTurn + alert.delay - session.turnCount) + additionalDelay
+                alert.triggerTurn = session.turnCount
+                alert.location = session.worldState.currentLocation
+                alert.subLocation = session.worldState.currentSubLocation
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] 玩家再次移动，追踪延迟+${additionalDelay}轮`)
+                yield { type: 'narrative_warning', text: `你继续逃跑，但追踪者不会放弃...` }
+              } else {
+                alert.responded = true
+                alert.trackingFailed = true
+                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+                console.log(`[consequence] 追踪失败：${!hasTracker ? '无追踪能力的NPC' : '目标区域不可追踪'}`)
+                yield { type: 'narrative_warning', text: `你逃进了更深处，暂时甩掉了追踪...` }
+              }
             }
           }
           // Pre-warning (仅 delay>=2 时，提前 1 轮预警)
