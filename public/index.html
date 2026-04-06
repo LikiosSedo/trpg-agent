@@ -4546,13 +4546,22 @@
           appendMsg(`◆ ${msg.quest}: ${msg.text}`, 'system')
           break
 
-        // ─── 死亡 ───
-        case 'death':
+        // ─── 死亡（等待结局生成） ───
+        case 'death_pending':
           playSfx('death', 0.5)
-          switchAudio('sad', 'silence')  // 切换到悲伤 BGM，关闭环境音
-          appendMsg(msg.text, 'error')
+          switchAudio('sad', 'silence')
+          appendMsg('主持人正在书写你的结局...', 'system')
+          break
+
+        // ─── 死亡（结局已生成） ───
+        case 'death':
+          // 移除"正在书写"提示
+          { const msgs = document.getElementById('messages')
+            const last = msgs?.lastElementChild
+            if (last?.textContent?.includes('正在书写')) last.remove()
+          }
           clearSave()
-          showGameOver({ reason: msg.text, canContinue: false })
+          showGameOver({ reason: msg.epilogue || '冒险到此结束。', canContinue: false })
           break
 
         // ─── 游戏终局 ───
@@ -5431,11 +5440,10 @@
       const canContinue = data.canContinue
       const hint = data.continueHint || ''
       overlay.innerHTML = `
-    <div class="npc-card-popup" style="max-width:400px;text-align:center" onclick="event.stopPropagation()">
-      <div style="padding:40px 24px 20px">
-        <div style="font-size:48px;margin-bottom:16px">⚰️</div>
-        <div style="font-size:20px;font-weight:bold;color:#f44336;margin-bottom:12px">游戏终局</div>
-        <div style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:20px">${esc(data.reason)}</div>
+    <div class="npc-card-popup" style="max-width:440px;text-align:center" onclick="event.stopPropagation()">
+      <div style="padding:40px 28px 24px">
+        <div style="font-size:11px;color:#8a7eb5;letter-spacing:3px;margin-bottom:20px">— 冒险终章 —</div>
+        <div style="font-size:14px;color:#c0b8d0;line-height:1.9;margin-bottom:24px;font-style:italic;white-space:pre-line">${esc(data.reason)}</div>
         ${hint ? '<div style="font-size:12px;color:#888;margin-bottom:20px;font-style:italic">' + esc(hint) + '</div>' : ''}
         <div style="display:flex;flex-direction:column;gap:10px">
           <button onclick="location.reload()" style="background:#533483;color:white;border:none;padding:12px;border-radius:8px;font-size:15px;cursor:pointer">重新开始新冒险</button>

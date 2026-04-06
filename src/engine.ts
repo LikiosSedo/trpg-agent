@@ -2394,9 +2394,7 @@ export class GameEngine {
 
     // 死亡检测
     if (session.player.hp <= 0) {
-      session.dossierData = this.dossier.toJSON()
-      facts.save('death-save')
-      yield { type: 'death' }
+      yield* this.handleDeath()
       return
     }
 
@@ -2623,6 +2621,71 @@ export class GameEngine {
     }
   }
 
+  // ─── 死亡结局生成 ────────────────────────────
+
+  /**
+   * 统一的死亡处理：存档 → 通知前端等待 → DM 生成结局 → 发送 death 事件
+   * 所有 hp<=0 的分支都应调用此方法，避免散落的 yield { type: 'death' }
+   */
+  private async *handleDeath(): AsyncGenerator<TurnEvent> {
+    const session = this.session
+    const facts = getFacts()
+
+    session.dossierData = this.dossier.toJSON()
+    facts.save('death-save')
+
+    // 通知前端：DM 正在生成结局
+    yield { type: 'death_pending' }
+
+    // 用主 DM 生成结局（它拥有完整上下文）
+    let epilogue = ''
+    muteDMTools()
+    try {
+      const recentEvents = session.events.slice(-10).map((e: any) => e.fact).join('；')
+      const prompt =
+        `[死亡结局]\n` +
+        `玩家「${session.player.name}」在「${locations[session.worldState.currentLocation]?.nameZh ?? '未知'}」倒下了。\n` +
+        `HP 归零，冒险到此结束。\n\n` +
+        `近期经历：${recentEvents}\n\n` +
+        `请写一段简短的结局（3-4句话），包含：\n` +
+        `1. 用文学化的语言描写倒下的最后时刻\n` +
+        `2. 用一句"如果……"的反思提示，暗示玩家本可以做出不同选择（基于实际发生的事件）\n\n` +
+        `语气：悲壮但不绝望，像小说的章节结尾。不要提及数值、系统或游戏机制。`
+
+      const timeoutMs = 30000
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
+      for await (const event of dmRespond(prompt)) {
+        if (timedOut) break
+        if (event.type === 'text_delta') {
+          const text = event.text ?? ''
+          if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
+          epilogue += text
+        }
+      }
+      clearTimeout(timer)
+
+      const emptyIdx = epilogue.indexOf('(Empty response:')
+      if (emptyIdx !== -1) epilogue = epilogue.substring(0, emptyIdx)
+      epilogue = epilogue.trim()
+    } catch (err) {
+      console.error('[death] 结局生成失败:', (err as Error).message?.slice(0, 80))
+    } finally {
+      unmuteDMTools()
+      consumeActions()  // 清理 DM 可能调用的 SetActions
+    }
+
+    // 兜底：DM 生成失败时用固定文本
+    if (!epilogue) {
+      epilogue = '意识在黑暗中渐渐远去，像一盏被风吹灭的烛火。' +
+        '你倒在冰冷的地面上，周围的声音逐渐模糊——' +
+        '也许，故事本不该在这里结束。'
+    }
+
+    console.log(`[death] 结局: ${epilogue.slice(0, 100)}...`)
+    yield { type: 'death', epilogue }
+  }
+
   // ─── 战斗初始化事件辅助 ────────────────────
 
   /** 生成 combat_init + combat_action_req 事件对 */
@@ -2777,9 +2840,7 @@ export class GameEngine {
         yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，膝盖触地的声音像是从很远的地方传来。` }
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         if (session.player.hp <= 0) {
-          session.dossierData = this.dossier.toJSON()
-          getFacts().save('death-save')
-          yield { type: 'death' }
+          yield* this.handleDeath()
         }
         return
       }
@@ -2796,8 +2857,14 @@ export class GameEngine {
       const allyCheck = checkCombatEnd(session)
       if (allyCheck.ended && allyCheck.result === 'victory') {
         combat.phase = 'ended'
+        const loot = awardLoot(session)
+        const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
+        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
-        yield { type: 'combat_status', text: '同伴帮你解决了所有敌人！', ended: true, result: 'victory' }
+        endCombat(session)
+        yield* this.combatDMNarrative(`同伴们帮你解决了${enemyNames}。描写战斗结束后同伴间的默契和战后余韵。`)
+        if (session.chapter) new ChapterManager(session).onEvent('combat_end')
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
     }
@@ -2922,9 +2989,7 @@ export class GameEngine {
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
       yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
       if (session.player.hp <= 0) {
-        session.dossierData = this.dossier.toJSON()
-        getFacts().save('death-save')
-        yield { type: 'death' }
+        yield* this.handleDeath()
       }
       return
     }
@@ -2977,9 +3042,7 @@ export class GameEngine {
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         if (session.player.hp <= 0) {
-          session.dossierData = this.dossier.toJSON()
-          getFacts().save('death-save')
-          yield { type: 'death' }
+          yield* this.handleDeath()
         }
         return
       }
@@ -3024,9 +3087,7 @@ export class GameEngine {
 
     // Death check
     if (session.player.hp <= 0) {
-      session.dossierData = this.dossier.toJSON()
-      getFacts().save('death-save')
-      yield { type: 'death' }
+      yield* this.handleDeath()
     }
   }
 
