@@ -24,7 +24,10 @@ export const BGM_TRACKS: Record<string, { file: string; label: string }> = {
   'boss-battle':   { file: 'boss-battle.mp3',    label: 'BOSS战' },
   // 特殊剧情 BGM（DM 调用）
   'tension':       { file: 'tension.mp3',        label: '紧张悬疑' },
-  'sad':           { file: 'sad.mp3',            label: '悲伤' },
+  'sad':           { file: 'sad.mp3',            label: '阵亡哀乐' },
+  'sorrow':        { file: 'sorrow.mp3',         label: '沉痛悲怆' },
+  'revelation':    { file: 'revelation.mp3',     label: '史诗揭示' },
+  'reflection':    { file: 'reflection.mp3',     label: '往事回望' },
   'triumph':       { file: 'triumph.mp3',        label: '凯旋' },
   'mystery':       { file: 'mystery.mp3',        label: '神秘' },
   'danger':        { file: 'danger.mp3',         label: '危险逼近' },
@@ -92,11 +95,13 @@ export function resolveAudio(
 
 /** DM 只在这些高冲击场景调用 SetAmbiance */
 export const DM_OVERRIDE_OPTIONS = [
-  { id: 'boss-battle', when: 'BOSS级怪物或关键NPC战斗' },
-  { id: 'tension',     when: '揭示重大阴谋、教团真相、关键证据' },
-  { id: 'sad',         when: 'NPC死亡、重大牺牲、悲伤回忆' },
-  { id: 'triumph',     when: '章节通关、重大胜利、获得关键道具' },
-  { id: 'mystery',     when: '发现神秘遗迹、未知力量、虚空棱镜相关' },
-  { id: 'danger',      when: '即将遭遇伏击、陷入绝境、教团包围' },
-  { id: 'peaceful',    when: '温馨对话、信任突破、NPC打开心扉' },
+  { id: 'boss-battle',  when: 'BOSS级怪物或关键NPC战斗' },
+  { id: 'tension',      when: '揭示重大阴谋、教团真相、关键证据' },
+  { id: 'sorrow',       when: 'NPC死亡、重大牺牲、沉痛叙事（弦乐+钢琴，5分钟）' },
+  { id: 'revelation',   when: '重大真相揭示、命运转折、从沉寂到壮烈的史诗展开（管弦乐渐强，99秒）' },
+  { id: 'reflection',   when: '章节回顾、往事回忆、凝望不可能的未来（RPG管弦乐，4分钟）' },
+  { id: 'triumph',      when: '章节通关、重大胜利、获得关键道具' },
+  { id: 'mystery',      when: '发现神秘遗迹、未知力量、虚空棱镜相关' },
+  { id: 'danger',       when: '即将遭遇伏击、陷入绝境、教团包围' },
+  { id: 'peaceful',     when: '温馨对话、信任突破、NPC打开心扉' },
 ]

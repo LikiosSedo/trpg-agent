@@ -9,6 +9,15 @@
     "loot": ["锈蚀匕首", "3 gold"]
   },
   {
+    "name": "Hobgoblin",
+    "hp": 30,
+    "dc": 14,
+    "damageDice": "1d8+3",
+    "specialAbility": "Martial Advantage: deals +2d6 damage once per turn if an ally is within 5ft of target",
+    "description": "A disciplined, militaristic goblinoid that commands lesser goblins with iron authority.",
+    "loot": ["铁制弯刀", "8 gold"]
+  },
+  {
     "name": "Wolf",
     "hp": 20,
     "dc": 13,

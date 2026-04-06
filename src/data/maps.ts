@@ -13,6 +13,8 @@ export interface PointOfInterest {
   isDefault?: boolean;
   /** Short arrival text */
   arrivalText?: string;
+  /** Combat encounter bound to this POI (triggered when player engages) */
+  encounter?: { monsters: string[] };
 }
 
 export interface Location {
@@ -200,6 +202,7 @@ export const twilightWoods: Location = {
       description: '废弃多年，现在是6-8只哥布林和1只大地精头领的临时营地。',
       position: { x: 3, y: 3 },
       discovered: false,
+      encounter: { monsters: ['Goblin', 'Goblin', 'Goblin', 'Goblin', 'Goblin', 'Goblin', 'Hobgoblin'] },
     },
     {
       id: 'hunter-stone-house',
@@ -430,6 +433,13 @@ export const connections: Connection[] = [
  *    └──────────────┘
  * ```
  */
+/** 注册表中最长地名长度（区域名 + POI名），供规则层判断输入是否为纯目的地 */
+export const MAX_LOCATION_NAME_LENGTH = Math.max(
+  ...Object.values(locations).flatMap(loc =>
+    [loc.nameZh, ...loc.pointsOfInterest.map((p: any) => p.nameZh)]
+  ).map(n => n.length)
+)
+
 export const WORLD_OVERVIEW = `
      ████████████████
      █  灰脊矿道    █

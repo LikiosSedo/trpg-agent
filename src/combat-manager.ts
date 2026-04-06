@@ -255,7 +255,7 @@ export type MonsterHitRecord = {
   playerKilled: boolean
 }
 
-export function executeMonsterTurns(session: GameSession): {
+export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: MonsterHitRecord[]
 } {
@@ -271,6 +271,7 @@ export function executeMonsterTurns(session: GameSession): {
 
   for (const entry of combat.initiativeOrder) {
     if (entry.isPlayer) continue
+    if (onlyIds && !onlyIds.includes(entry.id)) continue
 
     const monster = combat.monsters.find(m => m.id === entry.id)
     if (!monster || monster.hp <= 0) continue
@@ -517,7 +518,16 @@ export function executePlayerTurn(
  * 执行所有怪物的攻击回合，处理战斗结束和回合递增。
  * 由 server.ts 在 DM 叙事完成后调用，实现分段发送。
  */
-export function executeMonsterPhase(session: GameSession): {
+/**
+ * 执行怪物阶段。
+ * @param onlyIds  只让这些怪物行动（undefined = 全部）
+ * @param endRound 是否执行回合结算（效果递减、清除防御、回合+1），默认 true
+ */
+export function executeMonsterPhase(
+  session: GameSession,
+  onlyIds?: string[],
+  endRound = true,
+): {
   log: string[]
   hits: MonsterHitRecord[]
   ended: boolean
@@ -527,14 +537,14 @@ export function executeMonsterPhase(session: GameSession): {
   if (!combat?.active) return { log: [], hits: [], ended: true, result: 'ongoing' }
 
   combat.pendingMonsterTurn = false
-  const monsterResult = executeMonsterTurns(session)
+  const monsterResult = executeMonsterTurns(session, onlyIds)
   const log = monsterResult.log
 
   const check = checkCombatEnd(session)
   if (check.ended && check.result === 'defeat') {
     log.push('\n=== 战斗失败 ===')
     endCombat(session)
-  } else if (!check.ended) {
+  } else if (!check.ended && endRound) {
     // 回合结束：递减效果持续时间
     const expired = tickEffects(session.player)
     if (expired.length > 0) {

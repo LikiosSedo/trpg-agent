@@ -13,6 +13,7 @@ import { Agent } from 'open-claude-cli/engine'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { MAX_LOCATION_NAME_LENGTH } from './data/maps.js'
 
 // ─── 动作类型 ──────────────────────────────
 
@@ -43,11 +44,23 @@ export interface ActionResult {
 // ─── 第一级：快速正则匹配 ────────────────────
 
 const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, input: string) => PlayerAction | null }> = [
-  // 移动
+  // 战斗意图（无具体目标 → ATTACK target=''，由 engine 解析为 POI 遭遇）
+  { pattern: /^(?:突袭|偷袭|袭击|发动攻击|先下手|冲上去|发动突袭|进攻|开打)/,
+    build: () => ({ type: 'ATTACK', target: '', method: 'weapon' as const }) },
+
+  // 移动（含标点或超过最长地名长度 → 可能有附加意图，交给 LLM）
   { pattern: /^(?:去|前往|走到|移动到|回到)\s*(.+)/,
-    build: (m) => ({ type: 'MOVE', destination: m[1].trim() }) },
+    build: (m) => {
+      const dest = m[1].trim()
+      if (/[，。、！？；：…]/.test(dest) || dest.length > MAX_LOCATION_NAME_LENGTH) return null
+      return { type: 'MOVE', destination: dest }
+    } },
   { pattern: /^(?:我(?:要)?去)\s*(.+)/,
-    build: (m) => ({ type: 'MOVE', destination: m[1].trim() }) },
+    build: (m) => {
+      const dest = m[1].trim()
+      if (/[，。、！？；：…]/.test(dest) || dest.length > MAX_LOCATION_NAME_LENGTH) return null
+      return { type: 'MOVE', destination: dest }
+    } },
 
   // 泛化观察（四处看看/看看周围）→ 交给 DM 叙事，不走 Look 工具
   { pattern: /^(?:四处看看|看看(?:四周|周围|环境)|观察(?:四周|周围|环境))$/,

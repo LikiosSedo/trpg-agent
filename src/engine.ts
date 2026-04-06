@@ -17,7 +17,7 @@ import { checkBrokenPromises, changeTrust } from './trust-system.js'
 import { checkSafety } from './safety.js'
 import { getEarlyGuidance, checkIdleEvent, resetIdleTracking } from './events.js'
 import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages, muteDMTools, unmuteDMTools } from './dm-agent.js'
-import { consumeActions, type SceneActions } from './tools/set-actions.js'
+import { consumeActions, type SceneActions, type ClassifiedSuggestion, type ClassifiedSceneActions } from './tools/set-actions.js'
 import { consumeTrustChanges } from './tools/change-trust.js'
 import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
 import { consumeSpeakingNPCs } from './tools/talk.js'
@@ -218,6 +218,34 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
   }
 }
 
+// ─── 选项分类（regex，无 LLM） ──────────────────
+
+const SUGGESTION_CLASSIFY: Array<{ pattern: RegExp; type: string; icon: string }> = [
+  { pattern: /前往|去|走|回|进入/,                type: 'move',      icon: 'ra-compass' },
+  { pattern: /看|观察|查看|打量/,                  type: 'look',      icon: 'ra-eye-monster' },
+  { pattern: /搜索|搜查|检查|调查|探索/,           type: 'search',    icon: 'ra-magnifying-glass' },
+  { pattern: /攻击|突袭|偷袭|战斗|冲|杀|先下手|进攻/, type: 'attack',  icon: 'ra-sword' },
+  { pattern: /交谈|聊|说话|问|对话|找.{1,4}谈/,    type: 'talk',      icon: 'ra-speech-bubble' },
+  { pattern: /休息|睡|歇/,                         type: 'rest',      icon: 'ra-health' },
+  { pattern: /买|购买/,                            type: 'buy',       icon: 'ra-gold-bar' },
+  { pattern: /逃|跑|撤/,                           type: 'flee',      icon: 'ra-footprint' },
+]
+
+function classifySuggestion(text: string): ClassifiedSuggestion {
+  const clean = text.startsWith('★') ? text.slice(1) : text
+  for (const { pattern, type, icon } of SUGGESTION_CLASSIFY) {
+    if (pattern.test(clean)) return { text, actionType: type, icon }
+  }
+  return { text, actionType: 'narrative', icon: 'ra-scroll-unfurled' }
+}
+
+function classifyActions(actions: SceneActions): ClassifiedSceneActions {
+  return {
+    details: actions.details,
+    suggestions: actions.suggestions.map(s => classifySuggestion(s)),
+  }
+}
+
 // ─── NPC 立绘映射 ──────────────────────────────
 
 const NPC_PORTRAITS: Record<string, string> = {
@@ -257,7 +285,7 @@ export type TurnEvent =
   | { type: 'broken_promise'; npcName: string; reason: string }
   | { type: 'safety_block'; reason: string }
   | { type: 'dm_text_delta'; text: string }
-  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | null; hasPendingTrade?: boolean }
+  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | ClassifiedSceneActions | null; hasPendingTrade?: boolean }
   | { type: 'dm_error'; message: string }
   | { type: 'combat_monster'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
@@ -1646,6 +1674,27 @@ export class GameEngine {
         actionResult = null
         console.log(`[rules-agent] Move 降级为 NARRATIVE: 目的地「${dest}」不在注册表中`)
 
+      // ATTACK 空目标 → POI 遭遇触发：当前 location 有已发现且未触发的 encounter POI
+      } else if (action.type === 'ATTACK' && !(action as any).target && !session.combat?.active) {
+        const currentLoc = locations[session.worldState.currentLocation]
+        const encounterPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
+          p.discovered && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+        )
+        if (encounterPoi) {
+          session.worldState.flags[`poi_encounter_triggered_${encounterPoi.id}`] = true
+          session.worldState.flags['pending_encounter'] = encounterPoi.encounter!.monsters.join(',')
+          console.log(`[combat] POI encounter triggered at ${encounterPoi.nameZh}: ${encounterPoi.encounter!.monsters.join(',')}`)
+          parts.push(
+            `[叙事引导] 玩家在「${encounterPoi.nameZh}」发起攻击。` +
+            `这里有${encounterPoi.encounter!.monsters.join('和')}。` +
+            `战斗即将开始，请用2-3句描写玩家冲入战斗的场景。`
+          )
+          action = { type: 'NARRATIVE' }
+          actionResult = null
+        } else {
+          parts.push(formatActionResult(actionResult))
+        }
+
       // Look 失败降级：目标不在 POI/NPC 注册表中 → 注入位置上下文，让 DM 自由描写
       } else if (action.type === 'LOOK' && actionResult.notFound) {
         const currentLoc = locations[session.worldState.currentLocation]
@@ -1678,6 +1727,23 @@ export class GameEngine {
         }
       }
     } else {
+      // NARRATIVE 路径：检查输入是否含战斗意图 + 当前位置有 POI 遭遇
+      if (!session.combat?.active && /突袭|偷袭|袭击|攻击|冲上去|杀|先下手|进攻|开打/.test(input)) {
+        const currentLoc = locations[session.worldState.currentLocation]
+        const encounterPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
+          p.discovered && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+        )
+        if (encounterPoi) {
+          session.worldState.flags[`poi_encounter_triggered_${encounterPoi.id}`] = true
+          session.worldState.flags['pending_encounter'] = encounterPoi.encounter!.monsters.join(',')
+          console.log(`[combat] POI encounter triggered via narrative intent at ${encounterPoi.nameZh}`)
+          parts.push(
+            `[叙事引导] 玩家在「${encounterPoi.nameZh}」展现了战斗意图。` +
+            `这里有${encounterPoi.encounter!.monsters.join('和')}。` +
+            `战斗即将开始，请用2-3句描写紧张的战斗前奏。`
+          )
+        }
+      }
       console.log(`[rules-agent] 跳过预执行: ${action.type} (TALK/NARRATIVE 交给 DM)`)
     }
 
@@ -2067,7 +2133,7 @@ export class GameEngine {
       type: 'dm_end',
       combat: !!session.combat?.active,
       pendingMonster: !!session.combat?.pendingMonsterTurn,
-      actions,
+      actions: actions ? classifyActions(actions) : null,
       hasPendingTrade,
     }
 
@@ -2388,7 +2454,7 @@ export class GameEngine {
       type: 'dm_end',
       combat: false,
       pendingMonster: false,
-      actions,
+      actions: actions ? classifyActions(actions) : null,
     }
 
     // 同步
@@ -2556,45 +2622,51 @@ export class GameEngine {
     const combatMonsters = combat.monsters
     const enemyNames = combatMonsters.map(m => m.id).join('、')
 
-    let skipMonsterPhase = false
+    let skipAfterPhase = false
 
-    // 先攻顺序：敌方先攻 > 玩家 → 每轮怪物先出手
+    // ── 按先攻值拆分：玩家前 / 玩家后 ──
     const playerInit = combat.initiativeOrder.find(e => e.isPlayer)?.initiative ?? 0
-    const firstEnemyInit = combat.initiativeOrder.find(e => !e.isPlayer)?.initiative ?? 0
-    const enemyGoesFirst = firstEnemyInit > playerInit
+    const beforePlayerIds = combat.initiativeOrder
+      .filter(e => !e.isPlayer && e.initiative > playerInit)
+      .map(e => e.id)
+    const afterPlayerIds = combat.initiativeOrder
+      .filter(e => !e.isPlayer && e.initiative <= playerInit)
+      .map(e => e.id)
 
-    if (enemyGoesFirst) {
-      skipMonsterPhase = true  // 怪物已在本轮开头行动，末尾不再重复
+    // 怪物命中叙事 helper
+    const emitMonsterNarratives = function* (hits: any[]) {
+      for (const mhit of hits) {
+        const isNpc = session.npcs.some(n => n.name === mhit.monsterName)
+        const prefix = isNpc ? 'npc' : 'monster'
+        const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
+        const text = pickNarrative(outcome as any, { monster: mhit.monsterName })
+        if (text) yield { type: 'combat_narrative' as const, text }
+      }
+    }
+
+    // ── Phase 1: 先攻高于玩家的敌人先行动 ──
+    if (beforePlayerIds.length > 0) {
       combat.phase = 'monster_turn'
-      const monsterResult = executeMonsterPhase(session)
+      const monsterResult = executeMonsterPhase(session, beforePlayerIds, false)
 
-        // 怪物先手叙事
-        for (const mhit of monsterResult.hits ?? []) {
-          const isNpcAttacker = session.npcs.some(n => n.name === mhit.monsterName)
-          const prefix = isNpcAttacker ? 'npc' : 'monster'
-          const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
-          const mNarrative = pickNarrative(outcome as any, { monster: mhit.monsterName })
-          if (mNarrative) yield { type: 'combat_narrative', text: mNarrative }
-        }
-        if (monsterResult.log.length > 0) {
-          yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
-        }
+      yield* emitMonsterNarratives(monsterResult.hits ?? [])
+      if (monsterResult.log.length > 0) {
+        yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+      }
 
-        // 怪物先手打死玩家
-        if (monsterResult.ended && monsterResult.result === 'defeat') {
-          combat.phase = 'ended'
-          syncNPCConditionAfterCombat(session, combatMonsters)
-          yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
-          yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，膝盖触地的声音像是从很远的地方传来。` }
-          yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
-          if (session.player.hp <= 0) {
-            session.dossierData = this.dossier.toJSON()
-            getFacts().save('death-save')
-            yield { type: 'death' }
-          }
-          return
+      if (monsterResult.ended && monsterResult.result === 'defeat') {
+        combat.phase = 'ended'
+        syncNPCConditionAfterCombat(session, combatMonsters)
+        yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
+        yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，膝盖触地的声音像是从很远的地方传来。` }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+        if (session.player.hp <= 0) {
+          session.dossierData = this.dossier.toJSON()
+          getFacts().save('death-save')
+          yield { type: 'death' }
         }
-      // 怪物打完，轮到玩家——不 return，继续往下走到 player action
+        return
+      }
       combat.phase = 'player_turn'
     }
 
@@ -2610,7 +2682,7 @@ export class GameEngine {
       if (result.ended) {
         // 逃跑成功 → 结束战斗
         combat.phase = 'ended'
-        skipMonsterPhase = true
+        skipAfterPhase = true
         syncNPCConditionAfterCombat(session, combatMonsters)
 
         // 逃跑不等于脱罪：重置暴力警报，2 轮后另一个 NPC 来追
@@ -2635,7 +2707,7 @@ export class GameEngine {
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
-      // 逃跑失败 → 浪费回合，怪物正常回合继续（skipMonsterPhase=false）
+      // 逃跑失败 → 浪费回合，怪物正常回合继续（skipAfterPhase=false）
     } else if (action.action === 'defend') {
       combat.playerDefending = true
       yield { type: 'combat_status', text: '你摆出防御姿态，AC临时+2。', ended: false }
@@ -2725,29 +2797,17 @@ export class GameEngine {
       return
     }
 
-    // Monster phase (skip if flee already handled it)
-    if (!skipMonsterPhase) {
+    // ── Phase 3: 先攻低于/等于玩家的敌人后行动 ──
+    if (!skipAfterPhase && afterPlayerIds.length > 0) {
       combat.phase = 'monster_turn'
       combat.pendingMonsterTurn = false
-      const monsterResult = executeMonsterPhase(session)
+      const monsterResult = executeMonsterPhase(session, afterPlayerIds, true)
 
-      // 怪物/NPC 行动叙事
-      for (const mhit of monsterResult.hits ?? []) {
-        const isNpcAttacker = session.npcs.some(n => n.name === mhit.monsterName)
-        const prefix = isNpcAttacker ? 'npc' : 'monster'
-        let monsterNarrativeOutcome: string
-        if (mhit.isCritical) monsterNarrativeOutcome = `${prefix}_critical`
-        else if (mhit.hit) monsterNarrativeOutcome = `${prefix}_hit`
-        else monsterNarrativeOutcome = `${prefix}_miss`
-        const mNarrative = pickNarrative(monsterNarrativeOutcome as any, { monster: mhit.monsterName })
-        if (mNarrative) yield { type: 'combat_narrative', text: mNarrative }
-      }
-
+      yield* emitMonsterNarratives(monsterResult.hits ?? [])
       if (monsterResult.log.length > 0) {
         yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
       }
 
-      // Check end after monster phase
       if (monsterResult.ended) {
         combat.phase = 'ended'
         syncNPCConditionAfterCombat(session, combatMonsters)
@@ -2757,7 +2817,6 @@ export class GameEngine {
           ended: true, result: monsterResult.result,
         }
         if (monsterResult.result === 'victory') {
-          // 胜利：用 DM 叙事（战斗已结束，不阻塞操作）
           const isNpcFight2 = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
           yield* this.combatDMNarrative(
             isNpcFight2
@@ -2765,11 +2824,9 @@ export class GameEngine {
               : `${enemyNames}终于倒下。描写最后一个敌人倒地的画面和劫后余生的片刻喘息。`
           )
         } else {
-          // 失败：模板，不调 LLM（玩家马上看到 death 界面）
           yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，世界在眼前逐渐暗去。` }
         }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
-        // endCombat already called by executeMonsterPhase for defeat
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         if (session.player.hp <= 0) {
           session.dossierData = this.dossier.toJSON()
@@ -2778,6 +2835,9 @@ export class GameEngine {
         }
         return
       }
+    } else if (!skipAfterPhase && afterPlayerIds.length === 0 && session.combat?.active) {
+      // 所有敌人先攻都高于玩家，Phase 1 跳过了回合结算，这里补上
+      executeMonsterPhase(session, [], true)
     }
 
     // Next round — send updated state for player's next turn
@@ -2891,7 +2951,7 @@ export class GameEngine {
         }
       }
     }
-    yield { type: 'dm_end', combat: false, pendingMonster: false, actions }
+    yield { type: 'dm_end', combat: false, pendingMonster: false, actions: actions ? classifyActions(actions) : null }
 
     // 开场 NPC 解锁（只有同区域的 NPC 才解锁——车夫提到格雷格不算见面）
     const openChapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1

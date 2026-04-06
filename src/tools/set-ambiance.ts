@@ -29,7 +29,9 @@ export const SetAmbianceTool: Tool = {
 可用 BGM（仅选以下之一）：
 - boss-battle: BOSS级战斗
 - tension: 揭示重大阴谋、教团真相
-- sad: NPC死亡、重大牺牲、悲伤回忆
+- sorrow: NPC死亡、重大牺牲、沉痛叙事（弦乐+钢琴长曲）
+- revelation: 重大真相揭示、命运转折、史诗展开（管弦乐从沉寂渐强到壮烈）
+- reflection: 章节回顾、往事回忆、凝望不可能的未来（RPG管弦乐）
 - triumph: 章节通关、重大胜利
 - mystery: 神秘遗迹、虚空棱镜相关
 - danger: 即将遭遇伏击、陷入绝境
@@ -37,7 +39,7 @@ export const SetAmbianceTool: Tool = {
 
 不要频繁调用。普通战斗、普通移动、普通对话不需要切换音乐。`,
   inputSchema: z.object({
-    bgm: z.enum(['boss-battle', 'tension', 'sad', 'triumph', 'mystery', 'danger', 'peaceful'])
+    bgm: z.enum(['boss-battle', 'tension', 'sorrow', 'revelation', 'reflection', 'triumph', 'mystery', 'danger', 'peaceful'])
       .describe('要切换的 BGM'),
     reason: z.string().optional().describe('切换原因（日志用）'),
   }),

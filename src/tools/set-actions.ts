@@ -9,9 +9,20 @@
 import { z } from 'zod'
 import type { Tool } from 'open-claude-cli/engine'
 
+export interface ClassifiedSuggestion {
+  text: string
+  actionType: string
+  icon: string       // RPG Awesome class, e.g. 'ra-sword'
+}
+
 export interface SceneActions {
   details: Array<{ label: string; content: string }>
   suggestions: string[]
+}
+
+export interface ClassifiedSceneActions {
+  details: Array<{ label: string; content: string }>
+  suggestions: ClassifiedSuggestion[]
 }
 
 // 当前轮次的 actions（工具写入，server 读取后清空）

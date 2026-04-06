@@ -234,6 +234,16 @@
       animation: none;
     }
 
+    .action-btn i.ra {
+      margin-right: 3px;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    .action-btn-quest i.ra {
+      opacity: 1;
+      color: #e6b800;
+    }
+
     @keyframes questPulse {
 
       0%,
@@ -908,6 +918,51 @@
         flex: 1;
         text-align: center;
       }
+    }
+
+    /* ─── 快捷操作栏 ─── */
+    #quick-actions {
+      display: flex;
+      gap: 6px;
+      padding: 6px 16px 2px;
+      background: linear-gradient(180deg, transparent 0%, #10162a 100%);
+    }
+    #quick-actions.combat-hidden { display: none !important; }
+    .quick-btn {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 14px;
+      background: rgba(30, 38, 65, 0.8);
+      border: 1px solid rgba(100, 110, 150, 0.25);
+      color: #7a7f99;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .quick-btn:hover {
+      background: rgba(42, 50, 80, 0.95);
+      color: #b8a060;
+      border-color: rgba(184, 134, 11, 0.35);
+    }
+    .quick-btn:active {
+      transform: scale(0.96);
+    }
+    .quick-btn i { margin-right: 3px; font-size: 11px; }
+    #input-hint {
+      font-size: 12px;
+      color: #556;
+      padding: 0 18px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s, opacity 0.25s, padding 0.25s;
+      opacity: 0;
+    }
+    #input-hint.visible {
+      max-height: 24px;
+      opacity: 1;
+      padding: 2px 18px 4px;
     }
 
     #input-area {
@@ -2799,6 +2854,12 @@
       <div class="combat-selector" id="combat-selector"></div>
     </div>
 
+    <div id="quick-actions">
+      <span class="quick-btn" data-tpl="搜索" data-hint="补充搜索目标，如「灌木丛」「箱子」"><i class="ra ra-magnifying-glass"></i>搜索</span>
+      <span class="quick-btn" data-tpl="四处看看" data-hint="直接发送观察周围，或补充想看的方向"><i class="ra ra-eye-monster"></i>查看</span>
+      <span class="quick-btn" data-tpl="休息" data-hint="短休恢复体力；改为「长休」完全恢复"><i class="ra ra-health"></i>休息</span>
+    </div>
+    <div id="input-hint"></div>
     <div id="input-area">
       <textarea id="input" placeholder="说点什么..." autocomplete="off" rows="1"></textarea>
       <button id="send" onclick="sendInput()">发送</button>
@@ -4352,6 +4413,7 @@
         // ─── 死亡 ───
         case 'death':
           playSfx('death', 0.5)
+          switchAudio('sad', 'silence')  // 切换到悲伤 BGM，关闭环境音
           appendMsg(msg.text, 'error')
           clearSave()
           showGameOver({ reason: msg.text, canContinue: false })
@@ -4549,7 +4611,9 @@
       const inputArea = document.getElementById('input-area')
       panel.classList.toggle('show', combatMode)
       inputArea.style.display = combatMode ? 'none' : ''
-      // 战斗中隐藏非战斗交互元素：quest hint bar、场景操作按钮
+      // 战斗中隐藏非战斗交互元素：快捷操作栏、quest hint bar、场景操作按钮
+      const quickBar = document.getElementById('quick-actions')
+      if (quickBar) quickBar.classList.toggle('combat-hidden', combatMode)
       const hintBar = document.getElementById('quest-hint-bar')
       if (hintBar) hintBar.classList.toggle('combat-hidden', combatMode)
       document.querySelectorAll('.scene-actions').forEach(el => {
@@ -4918,17 +4982,30 @@
         div.appendChild(btn)
       }
 
-      // 推荐操作按钮（★ 前缀 = 主线任务，特殊样式）
+      // 推荐操作按钮（兼容 string[] 旧格式 + ClassifiedSuggestion[] 新格式）
       for (const s of suggestions) {
-        const isMainQuest = s.startsWith('★')
-        const displayText = isMainQuest ? s.slice(1) : s
+        const isObj = typeof s === 'object' && s !== null
+        const rawText = isObj ? s.text : s
+        const icon = isObj ? s.icon : null
+        const isMainQuest = rawText.startsWith('★')
+        const displayText = isMainQuest ? rawText.slice(1) : rawText
+
         const btn = document.createElement('span')
-        btn.className = isMainQuest ? 'action-btn action-btn-quest' : 'action-btn'
-        btn.textContent = isMainQuest ? `🗡 ${displayText}` : displayText
+        if (isMainQuest) {
+          btn.className = 'action-btn action-btn-quest'
+          btn.innerHTML = '<i class="ra ra-crossed-swords"></i> ' + esc(displayText)
+        } else if (icon) {
+          btn.className = 'action-btn'
+          btn.innerHTML = '<i class="ra ' + esc(icon) + '"></i> ' + esc(displayText)
+        } else {
+          btn.className = 'action-btn'
+          btn.textContent = displayText
+        }
         btn.onclick = () => {
           div.remove()
-          document.getElementById('input').value = displayText
-          sendInput()
+          const inp = document.getElementById('input')
+          inp.value = displayText
+          inp.focus()
         }
         div.appendChild(btn)
       }
@@ -5362,6 +5439,25 @@
     }
 
     // ─── 输入 ───
+    // ─── 快捷操作栏：点击填入模板 + 显示提示 ───
+    document.querySelectorAll('.quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inp = document.getElementById('input')
+        inp.value = btn.dataset.tpl
+        inp.focus()
+        // 把光标放到文本末尾
+        inp.setSelectionRange(inp.value.length, inp.value.length)
+        // 显示浅色提示
+        const hint = document.getElementById('input-hint')
+        hint.textContent = btn.dataset.hint
+        hint.classList.add('visible')
+        // 发送或输入变化时清除提示
+        const clear = () => { hint.classList.remove('visible'); inp.removeEventListener('input', clear) }
+        inp.addEventListener('input', clear)
+        setTimeout(clear, 5000)
+      })
+    })
+
     function sendInput() {
       // 战斗中禁止所有非战斗输入（地图移动、NPC 交互、推荐操作等）
       if (combatMode) {
@@ -5371,6 +5467,10 @@
       const input = document.getElementById('input')
       const text = input.value.trim()
       if (!text || !ws || sending) return
+
+      // 清除快捷操作提示
+      const inputHint = document.getElementById('input-hint')
+      if (inputHint) inputHint.classList.remove('visible')
 
       playSfx('ui_send', 0.2)
       appendMsg('🗡️ ' + text, 'player')
