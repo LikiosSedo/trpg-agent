@@ -2776,6 +2776,7 @@ export class GameEngine {
     const prompt = [
       `新游戏开始。玩家角色: ${session.player.name}，${classZh}。`,
       '请开始第一幕：马车上醒来。简短3-4段。',
+      '叙事结束后调用 SetActions 提供初始选项。',
     ].join('\n')
 
     let fullText = ''
