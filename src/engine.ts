@@ -1708,20 +1708,18 @@ export class GameEngine {
           const { getPersonality } = await import('./npc-relationships.js')
           // 同子地点且能战斗的 NPC → 当场目击，0轮立即反应
           const onSiteFighters = witnesses.filter(n => getPersonality(n.name).canFight)
+          // 受害者有亲近 NPC（bond>=1.0 的战斗型 NPC）→ 更快赶来
+          const bondedFighter = session.npcs.find(n => {
+            if (n.name === action.target || n.condition === 'unconscious') return false
+            const p = getPersonality(n.name)
+            return p.canFight && p.bonds.some(b => b.npcName === action.target && b.weight >= 1.0)
+          })
           if (onSiteFighters.length > 0) {
             delay = 0
-            console.log(`[consequence] 当场目击者(战斗型): ${onSiteFighters.map(n => n.name).join(',')} → 0轮立即反应`)
           } else {
             if (witnesses.length > 0) delay -= 3
-            // Civilian witness reports faster
             if (witnesses.some(n => !getPersonality(n.name).canFight)) delay -= 1
-            // 受害者有亲近 NPC（bond>=1.0 的战斗型 NPC）→ 更快赶来
-            const hasBondedFighter = session.npcs.some(n => {
-              if (n.name === action.target || n.condition === 'unconscious') return false
-              const p = getPersonality(n.name)
-              return p.canFight && p.bonds.some(b => b.npcName === action.target && b.weight >= 1.0)
-            })
-            if (hasBondedFighter) delay -= 2
+            if (bondedFighter) delay -= 2
             delay = Math.max(1, delay)
           }
 
@@ -1752,13 +1750,15 @@ export class GameEngine {
           })
 
           // 详细日志
-          const delayBreakdown = [
-            `基础5`,
-            time === 'night' ? '+4(夜间)' : time === 'evening' ? '+2(傍晚)' : '',
-            witnesses.length > 0 ? `-3(目击者${witnessNames.join(',')})` : '',
-            witnesses.some(n => !getPersonality(n.name).canFight) ? '-1(平民报信)' : '',
-            onSiteFighters.length > 0 ? '→0(当场目击)' : '',
-          ].filter(Boolean).join(' ')
+          const delayBreakdown = onSiteFighters.length > 0
+            ? `→0(当场目击: ${onSiteFighters.map(n => n.name).join(',')})`
+            : [
+              `基础5`,
+              time === 'night' ? '+4(夜间)' : time === 'evening' ? '+2(傍晚)' : '',
+              witnesses.length > 0 ? `-3(目击者${witnessNames.join(',')})` : '',
+              witnesses.some(n => !getPersonality(n.name).canFight) ? '-1(平民报信)' : '',
+              bondedFighter ? `-2(亲近战友${bondedFighter.name})` : '',
+            ].filter(Boolean).join(' ')
           console.log(`[consequence] 暴力警报: 受害者=${action.target}, 延迟=${delay}轮(${delayBreakdown}), 目击者=[${witnessNames.join(',')}], 首选响应者=${likelyResponder?.name ?? '无'}(canTrack=${likelyResponder ? getPersonality(likelyResponder.name).canTrack : false})`)
         }
       }
