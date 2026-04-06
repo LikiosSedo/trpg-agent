@@ -972,20 +972,7 @@
       transform: scale(0.96);
     }
     .quick-btn i { margin-right: 3px; font-size: 11px; }
-    #input-hint {
-      font-size: 12px;
-      color: #556;
-      padding: 0 18px;
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.25s, opacity 0.25s, padding 0.25s;
-      opacity: 0;
-    }
-    #input-hint.visible {
-      max-height: 24px;
-      opacity: 1;
-      padding: 2px 18px 4px;
-    }
+    /* #input-hint removed — hint now uses input placeholder */
 
     #input-area {
       background: linear-gradient(180deg, #10162a 0%, #141e38 100%);
@@ -2877,11 +2864,10 @@
     </div>
 
     <div id="quick-actions">
-      <span class="quick-btn" data-tpl="搜索" data-hint="补充搜索目标，如「灌木丛」「箱子」"><i class="ra ra-telescope"></i>搜索</span>
-      <span class="quick-btn" data-tpl="四处看看" data-hint="直接发送观察周围，或补充想看的方向"><i class="ra ra-eye-monster"></i>查看</span>
+      <span class="quick-btn" data-tpl="搜索：" data-hint="补充目标，如「灌木丛」「箱子」"><i class="ra ra-telescope"></i>搜索</span>
+      <span class="quick-btn" data-tpl="查看：" data-hint="补充方向，或直接发送观察周围"><i class="ra ra-eye-monster"></i>查看</span>
       <span class="quick-btn" data-tpl="休息" data-hint="短休恢复体力；改为「长休」完全恢复"><i class="ra ra-health"></i>休息</span>
     </div>
-    <div id="input-hint"></div>
     <div id="input-area">
       <textarea id="input" placeholder="说点什么..." autocomplete="off" rows="1"></textarea>
       <button id="send" onclick="sendInput()">发送</button>
@@ -5475,17 +5461,12 @@
       btn.addEventListener('click', () => {
         const inp = document.getElementById('input')
         inp.value = btn.dataset.tpl
+        inp.placeholder = btn.dataset.hint
         inp.focus()
-        // 把光标放到文本末尾
         inp.setSelectionRange(inp.value.length, inp.value.length)
-        // 显示浅色提示
-        const hint = document.getElementById('input-hint')
-        hint.textContent = btn.dataset.hint
-        hint.classList.add('visible')
-        // 发送或输入变化时清除提示
-        const clear = () => { hint.classList.remove('visible'); inp.removeEventListener('input', clear) }
-        inp.addEventListener('input', clear)
-        setTimeout(clear, 5000)
+        // 输入变化或发送时恢复默认 placeholder
+        const restore = () => { inp.placeholder = '说点什么 . . .'; inp.removeEventListener('input', restore) }
+        inp.addEventListener('input', restore)
       })
     })
 
