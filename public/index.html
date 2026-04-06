@@ -422,9 +422,9 @@
     }
     .chud-enemy-name.dead-name { text-decoration: line-through; color: #555; }
 
-    .chud-enemy .chud-hp-bar { width: 100%; height: 3px; margin-top: 2px; }
-    .chud-enemy .chud-hp-fill { background: #f44336; }
-    .chud-enemy .chud-hp-text { font-size: 8px; }
+    .chud-enemy .chud-hp-bar { width: 100%; height: 5px; margin-top: 3px; border-radius: 2px; }
+    .chud-enemy .chud-hp-fill { background: #f44336; border-radius: 2px; transition: width 0.4s ease; }
+    .chud-enemy .chud-hp-text { font-size: 10px; color: #cc7755; margin-top: 1px; }
 
     @media (max-width: 420px) {
       #combat-hud.show { padding: 8px; }
@@ -989,23 +989,6 @@
       position: relative;
     }
 
-    #input-ghost {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      padding: 10px 12px;
-      font-family: inherit;
-      font-size: 16px;
-      line-height: 1.4;
-      color: #445;
-      white-space: nowrap;
-      overflow: hidden;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    #input-ghost.visible {
-      opacity: 1;
-    }
 
     #input {
       width: 100%;
@@ -2895,7 +2878,6 @@
     <div id="input-area">
       <div id="input-wrap">
         <textarea id="input" placeholder="说点什么 . . ." autocomplete="off" rows="1"></textarea>
-        <span id="input-ghost"></span>
       </div>
       <button id="send" onclick="sendInput()">发送</button>
     </div>
@@ -5069,8 +5051,8 @@
             inp.value = displayText
             inp.focus()
             inp.setSelectionRange(inp.value.length, inp.value.length)
-            showInputGhost(displayText.length, '可直接发送，或补充想说的话...')
-            const clear = () => { hideInputGhost(); inp.removeEventListener('input', clear) }
+            showInputHint('可直接发送，或补充想说的话...')
+            const clear = () => { hideInputHint(); inp.removeEventListener('input', clear) }
             inp.addEventListener('input', clear)
           }
           sugRow.appendChild(btn)
@@ -5508,17 +5490,12 @@
 
     // ─── 输入 ───
     // ─── 快捷操作栏：点击填入模板 + 显示提示 ───
-    function showInputGhost(tplLen, hint) {
-      const ghost = document.getElementById('input-ghost')
-      if (!ghost) return
-      // 用不可见的占位符推开 hint，使其显示在模板文本之后
-      const spacer = '\u00A0'.repeat(Math.ceil(tplLen * 1.8))
-      ghost.textContent = spacer + hint
-      ghost.classList.add('visible')
+    const DEFAULT_PLACEHOLDER = '说点什么...'
+    function showInputHint(hint) {
+      document.getElementById('input').placeholder = hint
     }
-    function hideInputGhost() {
-      const ghost = document.getElementById('input-ghost')
-      if (ghost) { ghost.classList.remove('visible'); ghost.textContent = '' }
+    function hideInputHint() {
+      document.getElementById('input').placeholder = DEFAULT_PLACEHOLDER
     }
 
     document.querySelectorAll('.quick-btn').forEach(btn => {
@@ -5530,8 +5507,8 @@
         inp.value = btn.dataset.tpl
         inp.focus()
         inp.setSelectionRange(inp.value.length, inp.value.length)
-        showInputGhost(btn.dataset.tpl.length, btn.dataset.hint)
-        const clear = () => { hideInputGhost(); inp.removeEventListener('input', clear) }
+        showInputHint(btn.dataset.hint)
+        const clear = () => { hideInputHint(); inp.removeEventListener('input', clear) }
         inp.addEventListener('input', clear)
       })
     })
@@ -5546,7 +5523,7 @@
       const text = input.value.trim()
       if (!text || !ws || sending) return
 
-      hideInputGhost()
+      hideInputHint()
       // 发送时移除 DM 推荐选项栏
       document.querySelectorAll('.actions').forEach(el => el.remove())
 
