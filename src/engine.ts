@@ -1728,6 +1728,19 @@ export class GameEngine {
           // 收集目击者名称列表（用于信任度传播）
           const witnessNames = witnesses.map(n => n.name)
 
+          // 预计算首选响应者（用于日志）
+          const candidateResponders = session.npcs
+            .filter(n => n.name !== action.target && n.condition !== 'unconscious' && getPersonality(n.name).canFight)
+            .sort((a, b) => {
+              const pA = getPersonality(a.name), pB = getPersonality(b.name)
+              const bondA = pA.bonds.find(bd => bd.npcName === action.target)
+              const bondB = pB.bonds.find(bd => bd.npcName === action.target)
+              const sA = (bondA ? 5 + bondA.weight * 3 : 0) + (pA.canTrack ? 2 : 0)
+              const sB = (bondB ? 5 + bondB.weight * 3 : 0) + (pB.canTrack ? 2 : 0)
+              return sB - sA
+            })
+          const likelyResponder = candidateResponders[0]
+
           session.worldState.flags['violence_alert'] = JSON.stringify({
             triggerTurn: session.turnCount,
             victimName: action.target,
@@ -1737,8 +1750,16 @@ export class GameEngine {
             responded: false,
             witnesses: witnessNames,
           })
-          console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应, 目击者: ${witnessNames.join(', ') || '无'}`)
-          console.log(`[consequence] 暴力警报设置: ${action.target}, ${delay}轮后响应`)
+
+          // 详细日志
+          const delayBreakdown = [
+            `基础5`,
+            time === 'night' ? '+4(夜间)' : time === 'evening' ? '+2(傍晚)' : '',
+            witnesses.length > 0 ? `-3(目击者${witnessNames.join(',')})` : '',
+            witnesses.some(n => !getPersonality(n.name).canFight) ? '-1(平民报信)' : '',
+            onSiteFighters.length > 0 ? '→0(当场目击)' : '',
+          ].filter(Boolean).join(' ')
+          console.log(`[consequence] 暴力警报: 受害者=${action.target}, 延迟=${delay}轮(${delayBreakdown}), 目击者=[${witnessNames.join(',')}], 首选响应者=${likelyResponder?.name ?? '无'}(canTrack=${likelyResponder ? getPersonality(likelyResponder.name).canTrack : false})`)
         }
       }
     }
