@@ -240,6 +240,244 @@ bargainState = { npc, items, lastPrice, round: 0 }
 
 ---
 
+## 四、暴力后果与追踪系统
+
+### 设计原则
+
+暴力后果是一条**时间线**，不是一个瞬时事件。玩家的暴力行为会随时间产生层层扩散的后果：
+
+```
+攻击 NPC → [延迟] → 发现 → [信任传播] → 追踪/对峙 → 战斗
+```
+
+每个环节由不同的代码模块控制，DM 只负责叙事包装。
+
+### 数据结构：violence_alert
+
+存储在 `session.worldState.flags['violence_alert']`（JSON 字符串）：
+
+```typescript
+{
+  triggerTurn: number        // 暴力发生的回合
+  victimName: string         // 受害者名字
+  location: string           // 暴力发生的区域（会随追踪更新）
+  subLocation: string        // 暴力发生的子地点（会随追踪更新）
+  delay: number              // 延迟轮数（动态调整）
+  responded: boolean         // 是否已完成响应
+  forceResponder?: string    // 强制指定的响应者（call_guards 时设置）
+  witnesses: string[]        // 目击者列表（用于信任度传播）
+  arrivedResponder?: string  // 已到达的响应者名字
+  immediateResponse?: boolean // 当场目击，无延迟
+  trustCascadeTriggered?: boolean  // 防重复传播
+  trackingAttempted?: boolean // 是否已尝试跨区域追踪
+  trackingFailed?: boolean   // 追踪是否失败
+  intraAreaChase?: boolean   // 是否已触发同区域追击
+  combatJustStarted?: string // 标记战斗待触发
+}
+```
+
+### 完整时间线
+
+#### 第 0 轮：暴力发生
+
+**触发位置**：`engine.ts` processTurn 中，ATTACK 预执行成功后
+
+```
+玩家攻击 NPC
+  → changeTrust(victim, -5, channel=reputation)  ← 只影响当事人
+  → startCombat()
+  → 创建 violence_alert：
+    基础延迟 5 轮
+    + 夜间 4 / 傍晚 2
+    - 有目击者 3
+    - 平民目击 1
+    - 受害者有 bond≥1.0 的战斗型 NPC 2
+    - 同子地点战斗型 NPC 目击 → delay = 0
+    最少 1 轮
+```
+
+**关键设计**：`channel: 'reputation'` 不触发 cascadeReputation，全镇传播延后处理。
+
+#### 第 1~N 轮：玩家逃跑检测
+
+**触发位置**：`engine.ts` processTurn 开头的暴力后果检查
+
+每轮开始时检查玩家是否离开了暴力现场：
+
+**同区域逃跑**（草药堂→酒馆）：
+```
+条件：currentLocation === alert.location 且 currentSubLocation !== alert.subLocation
+行为：不需要 canTrack，追击延迟 +1 轮
+标记：alert.intraAreaChase = true
+叙事：narrative_warning "身后传来急促的脚步声和怒喊"
+```
+
+**跨区域逃跑**（镇→森林）：
+```
+条件：currentLocation !== alert.location
+检查：是否有 canTrack=true 的战斗型 NPC
+  有追踪者 + 区域可达 → 追踪延迟 +2 轮，更新目标位置
+  有追踪者 + 区域不可达（矿道深处）→ 追踪失败
+  无追踪者 → 追踪失败
+标记：alert.trackingAttempted = true
+```
+
+**不可追踪区域**：`abandoned-barracks`, `abyss-altar`, `void-prism`（矿道深处）
+
+#### 第 N 轮：预警
+
+**条件**：`elapsed === delay - 1` 且 `delay >= 2`
+
+```
+个性化预警（如果有 arrivedResponder）：
+  韩猛："站住！懦夫！"
+  艾琳娜："跑不掉的。"
+  格雷格：沉重脚步声 + 杀意
+  卡恩：背后寒意
+通用预警："远处传来急促的脚步声"
+```
+
+#### 第 N+1 轮：阶段 1 — 发现
+
+**条件**：`elapsed >= delay` 且 `!arrivedResponder`
+
+**响应者选择**（优先级评分）：
+```
+同一子地点:          +10
+受害者 bond NPC:     +5 + weight*3
+守卫:                +3
+canTrack:            +2
+```
+
+**发现阶段只做两件事**：
+1. 响应者移动到受害者处（`moveNPC`）
+2. 触发信任度传播（`propagateViolenceTrust`，`trustCascadeTriggered` 防重复）
+
+**不触发战斗** — 战斗由下一步决定。
+
+#### 第 N+1 轮（续）：阶段 2 — 对峙或追踪
+
+**取决于玩家是否在场**：
+
+| 玩家位置 | 行为 | 结果 |
+|---------|------|------|
+| 在暴力现场 | `pendingCombatInterrupt` | DM 叙事后自动触发战斗 |
+| 同区域其他子地点 | 追击（+1 轮） | 下轮触发战斗 |
+| 不同区域 | 跨区域追踪（+2 轮，需 canTrack） | 追踪到达后触发战斗 |
+| 不可追踪区域 | 追踪失败 | `alert.responded = true` |
+
+#### DM 注入文本
+
+**玩家在场**：
+```
+[世界事件：{响应者}赶到现场！{受害者}目前状态：{condition}。
+描写{响应者}到达——脚步声、质问、愤怒。
+这一轮只描写到达，不要描写攻击动作，下一轮战斗才开始。]
+```
+
+**玩家不在场**：
+```
+[世界事件：{受害者}的遭遇被发现了。{响应者}赶到了{受害者}身边。
+消息正在镇上传开。不需要描写镇上的情景——
+只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声）。]
+```
+
+### 追踪机制详解
+
+#### canTrack 配置
+
+| NPC | canTrack | 理由 |
+|-----|----------|------|
+| 格雷格 | true | 前佣兵，有追踪经验 |
+| 艾琳娜 | true | 高等精灵，感知敏锐 |
+| 韩猛 | true | 退役战士，追踪专家 |
+| 卡恩 | true | 教团成员（不轻易暴露） |
+| 格罗姆 | false | 矮人铁匠，不离开铺子 |
+| 小莉 | false | 孩子 |
+| 叶绿 | false | 草药师 |
+| 维克多 | false | 文官 |
+| 陈妈 | false | 普通镇民 |
+
+#### 追踪的三种情况
+
+```
+1. 同区域追击（不需要 canTrack）
+   草药堂 → 酒馆：响应者直接追过去，+1 轮
+
+2. 跨区域追踪（需要 canTrack）
+   镇 → 森林：追踪者锁定方向，+2 轮
+   镇 → 荒原：同上
+   
+3. 追踪失败
+   逃到矿道深处（不可追踪区域）
+   无 canTrack 的 NPC 可用
+```
+
+#### 追踪中玩家再次移动
+
+```
+已在追踪中 + 玩家再次移动到可追踪区域
+  → 追踪延迟 +2 轮（追踪者重新定位）
+  → 更新目标位置
+
+已在追踪中 + 玩家移到不可追踪区域
+  → 追踪失败
+```
+
+### NPC 回避机制（avoidance）
+
+信任度达到 avoidance 阈值时的 NPC 行为，**根据战斗能力区分**：
+
+| NPC 类型 | canFight | avoidance 行为 |
+|---------|----------|---------------|
+| 战斗型 | true | `hostile_dialogue`（敌对质问，不逃跑） |
+| 非战斗型 | false | `avoidance`（逃到 homeBase 或广场） |
+
+**回避目的地**：
+- 如果 homeBase ≠ 玩家当前位置 → 回到 homeBase
+- 如果 homeBase = 玩家当前位置 → 逃到 town-square
+
+### 踩坑记录
+
+1. **channel: 'combat' 导致即时传播**
+   - 攻击/击败 NPC 时用 `channel: 'combat'` 会触发 cascadeReputation
+   - 导致全镇信任度瞬间崩塌，跳过延迟机制
+   - **修复**：所有暴力相关统一用 `channel: 'reputation'`
+
+2. **同区域逃跑不触发追踪**
+   - 旧代码只检查 `currentLocation !== alert.location`（跨区域）
+   - 草药堂→酒馆属于同区域不同子地点，追踪逻辑不运行
+   - **修复**：增加 `intraAreaChase` 分支处理同区域追击
+
+3. **跨区域追踪没检查 canTrack**
+   - `canTrackAcrossLocations` 只检查路径连通性，不检查 NPC 能力
+   - 即使没有追踪能力的 NPC 也能跨区域追踪
+   - **修复**：在追踪前检查 `getPersonality(npc).canTrack`
+
+4. **avoidance 逃到 homeBase 就是当前位置**
+   - 艾琳娜的 homeBase 是公会，玩家到公会时 avoidance 移动到公会 = 原地不动
+   - **修复**：homeBase = 当前位置时，改为逃到 town-square
+
+5. **战斗型 NPC 不应该回避**
+   - 艾琳娜（340 岁公会会长）看到攻击挚友的人"匆匆离开"不合理
+   - **修复**：canFight=true 的 NPC 在 avoidance 区间改为 hostile_dialogue
+
+6. **世界事件注入文本假设玩家在场**
+   - "描写{响应者}对玩家的质问"但玩家可能已逃离
+   - DM 不知道怎么处理：跳切到镇上场景？违反禁止跳切规则
+   - **修复**：根据玩家是否在场注入不同文本
+
+### 修改检查清单
+
+- [ ] 暴力相关的 changeTrust 必须用 `reputation` channel
+- [ ] 追踪逻辑是否覆盖同区域和跨区域两种情况
+- [ ] 跨区域追踪是否检查了 canTrack 能力
+- [ ] 世界事件注入文本是否区分了玩家在场/不在场
+- [ ] avoidance 机制是否区分了战斗型/非战斗型 NPC
+- [ ] violence_alert 的 JSON 字段是否完整（新字段需要兼容旧存档）
+
+---
+
 ## 系统交互边界
 
 ### 信任度 → 战斗
