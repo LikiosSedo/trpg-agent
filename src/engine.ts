@@ -1528,7 +1528,17 @@ export class GameEngine {
             const bondNote = responderPersonality.bonds?.some((b: any) => b.npcName === alert.victimName)
               ? `（${alert.arrivedResponder}与${alert.victimName}有亲近关系，情绪格外激动）`
               : ''
-            parts.push(`[世界事件：${alert.arrivedResponder}已经赶到了${alert.victimName}所在的地方！${alert.victimName}目前状态：${victimCondition}。${bondNote}请描写${alert.arrivedResponder}到达的场景——他的愤怒、他的气势、他对玩家的质问或警告。这一轮只描写到达，不要描写攻击动作，下一轮战斗才开始。]`)
+
+            // 根据玩家是否在现场，注入不同的世界事件文本
+            const playerAtScene = session.worldState.currentLocation === alert.location &&
+              session.worldState.currentSubLocation === alert.subLocation
+            if (playerAtScene) {
+              // 玩家还在现场：响应者当面质问
+              parts.push(`[世界事件：${alert.arrivedResponder}赶到现场！${alert.victimName}目前状态：${victimCondition}。${bondNote}描写${alert.arrivedResponder}到达——脚步声、质问、愤怒。这一轮只描写到达，不要描写攻击动作，下一轮战斗才开始。]`)
+            } else {
+              // 玩家已逃离：响应者发现受害者，暴力事件被公开
+              parts.push(`[世界事件：${alert.victimName}的遭遇被发现了。${alert.arrivedResponder}赶到了${alert.victimName}身边，发现${victimCondition === 'unconscious' ? '其昏迷倒地' : '其受伤'}。${bondNote}消息正在镇上传开。你不在现场，不需要描写镇上的情景——只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声），暗示有什么事发生了。]`)
+            }
           }
         }
         // 阶段 2：战斗刚刚触发，DM 需要描写战斗开场
