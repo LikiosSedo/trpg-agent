@@ -320,10 +320,10 @@ export function propagateViolenceTrust(
   reason: string
 ): ViolenceTrustCascadeResult {
   const changes: Array<{ npcName: string; delta: number; reason: string }> = []
-  const processed = new Set<string>([victim])  // 避免重复处理
-  if (responder) processed.add(responder)
+  const processed = new Set<string>([victim])  // 避免重复处理（受害者本人已单独处理）
+  // 注意：不把 responder 加入 processed！响应者如果是受害者的 bond NPC，也需要传播
 
-  // 1. 受害者的亲近 NPC
+  // 1. 受害者的亲近 NPC（包括响应者自己）
   const victimPersonality = getPersonality(victim)
   for (const bond of victimPersonality.bonds) {
     if (bond.weight >= 0.5 && !processed.has(bond.npcName)) {
