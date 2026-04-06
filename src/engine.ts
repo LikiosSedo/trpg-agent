@@ -1198,87 +1198,77 @@ export class GameEngine {
           const elapsed = session.turnCount - alert.triggerTurn
           console.log(`[consequence] 暴力后果检查: turn=${session.turnCount}, trigger=${alert.triggerTurn}, elapsed=${elapsed}/${alert.delay}, victim=${alert.victimName}, arrived=${alert.arrivedResponder || '无'}`)
 
-          // 玩家是否已离开暴力现场？
-          const playerFledScene = session.worldState.currentLocation !== alert.location ||
-            session.worldState.currentSubLocation !== alert.subLocation
-          if (playerFledScene) {
-            const sameArea = session.worldState.currentLocation === alert.location
-            if (sameArea) {
-              // 同区域内逃跑（草药堂→酒馆）：响应者直接追过去，不需要 canTrack
-              if (!alert.intraAreaChase) {
-                alert.intraAreaChase = true
-                alert.delay += 1  // 同区域追击只需 +1 轮
-                alert.subLocation = session.worldState.currentSubLocation
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] 玩家在镇内逃跑，追击延迟+1轮`)
-                yield { type: 'narrative_warning', text: `身后传来急促的脚步声和怒喊——有人正在赶来！` }
-              } else {
-                // 已在追击中，玩家继续在镇内移动
-                alert.subLocation = session.worldState.currentSubLocation
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-              }
-            } else {
-              // 跨区域逃跑（镇→森林）：需要 canTrack 能力
-              const { getPersonality: getTrackP } = await import('./npc-relationships.js')
-              const hasTracker = alert.arrivedResponder
-                ? getTrackP(alert.arrivedResponder).canTrack
-                : session.npcs.some(n =>
-                    n.name !== alert.victimName &&
-                    n.condition !== 'unconscious' &&
-                    getTrackP(n.name).canFight &&
-                    getTrackP(n.name).canTrack
-                  )
-              const canTrackToNewLocation = hasTracker && await this.canTrackAcrossLocations(
-                alert.location,
-                session.worldState.currentLocation,
-                session.worldState.currentSubLocation
-              )
+          // ── 追击状态更新：根据玩家当前位置设定追击额外延迟 ──
+          // 设计：发现倒计时（alert.delay）固定不变，追击延迟取决于玩家最终位置
+          // alert.chaseDelay = 0（在场）/ 1（同区域）/ 2（跨区域）
+          const playerAtScene = session.worldState.currentLocation === alert.location &&
+            session.worldState.currentSubLocation === alert.subLocation
+          const sameArea = session.worldState.currentLocation === alert.location
 
-              if (canTrackToNewLocation && !alert.trackingAttempted) {
-                alert.trackingAttempted = true
-                alert.delay += 2
-                alert.location = session.worldState.currentLocation
-                alert.subLocation = session.worldState.currentSubLocation
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] 玩家跨区域逃离，追踪延迟+2轮`)
-                yield { type: 'narrative_warning', text: `你逃离了现场，但你能感觉到身后有人在追踪你的足迹...` }
-              } else if (alert.trackingAttempted && canTrackToNewLocation) {
-                const additionalDelay = 2
-                alert.delay = (alert.triggerTurn + alert.delay - session.turnCount) + additionalDelay
-                alert.triggerTurn = session.turnCount
-                alert.location = session.worldState.currentLocation
-                alert.subLocation = session.worldState.currentSubLocation
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] 玩家再次移动，追踪延迟+${additionalDelay}轮`)
-                yield { type: 'narrative_warning', text: `你继续逃跑，但追踪者不会放弃...` }
-              } else {
-                alert.responded = true
-                alert.trackingFailed = true
-                session.worldState.flags['violence_alert'] = JSON.stringify(alert)
-                console.log(`[consequence] 追踪失败：${!hasTracker ? '无追踪能力的NPC' : '目标区域不可追踪'}`)
-                yield { type: 'narrative_warning', text: `你逃进了更深处，暂时甩掉了追踪...` }
+          if (playerAtScene) {
+            // 玩家在现场
+            alert.chaseDelay = 0
+          } else if (sameArea) {
+            // 同区域逃跑（草药堂→酒馆）：不需要 canTrack
+            if (alert.chaseDelay !== 1) {
+              console.log(`[consequence] 玩家在镇内移动，追击延迟=1轮`)
+              if (!alert.chaseWarned) {
+                yield { type: 'narrative_warning', text: `身后传来急促的脚步声和怒喊——有人正在赶来！` }
+                alert.chaseWarned = true
               }
             }
-          }
-          // Pre-warning (仅 delay>=2 时，提前 1 轮预警)
-          else if (alert.delay >= 2 && elapsed === alert.delay - 1) {
-            // 个性化追踪预警
-            if (alert.trackingAttempted && alert.arrivedResponder) {
-              const trackerName = alert.arrivedResponder
-              const personalizedWarnings: Record<string, string> = {
-                '韩猛': '⚠️ 你听到韩猛的怒吼声从远处传来："站住！懦夫！"',
-                '艾琳娜': '⚠️ 森林中的鸟雀突然惊飞，一个冷静的声音在身后响起："跑不掉的。"',
-                '格雷格': '⚠️ 沉重的脚步声越来越近，你感觉到一股压迫性的杀意...',
-                '卡恩': '⚠️ 你感到背后一阵寒意，仿佛有双眼睛在黑暗中注视着你...',
+            alert.chaseDelay = 1
+            alert.chaseLocation = session.worldState.currentLocation
+            alert.chaseSubLocation = session.worldState.currentSubLocation
+          } else {
+            // 跨区域逃跑（镇→森林）：需要 canTrack
+            const { getPersonality: getTrackP } = await import('./npc-relationships.js')
+            const hasTracker = alert.arrivedResponder
+              ? getTrackP(alert.arrivedResponder).canTrack
+              : session.npcs.some(n =>
+                  n.name !== alert.victimName &&
+                  n.condition !== 'unconscious' &&
+                  getTrackP(n.name).canFight &&
+                  getTrackP(n.name).canTrack
+                )
+            const canReach = await this.canTrackAcrossLocations(
+              alert.location,
+              session.worldState.currentLocation,
+              session.worldState.currentSubLocation
+            )
+
+            if (hasTracker && canReach) {
+              if (alert.chaseDelay !== 2) {
+                console.log(`[consequence] 玩家跨区域逃离，追击延迟=2轮`)
+                if (!alert.chaseWarned) {
+                  yield { type: 'narrative_warning', text: `你逃离了现场，但你能感觉到身后有人在追踪你的足迹...` }
+                  alert.chaseWarned = true
+                }
               }
-              const warning = personalizedWarnings[trackerName] || '⚠️ 远处传来急促的脚步声，追踪者正在接近！'
-              yield { type: 'narrative_warning', text: warning }
+              alert.chaseDelay = 2
+              alert.chaseLocation = session.worldState.currentLocation
+              alert.chaseSubLocation = session.worldState.currentSubLocation
+              alert.trackingAttempted = true
             } else {
+              // 追踪失败
+              alert.responded = true
+              alert.trackingFailed = true
+              console.log(`[consequence] 追踪失败：${!hasTracker ? '无追踪能力的NPC' : '目标区域不可追踪'}`)
+              yield { type: 'narrative_warning', text: `你逃进了更深处，暂时甩掉了追踪...` }
+            }
+          }
+          session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+
+          // 发现前预警（发现倒计时快到时）
+          if (!alert.discoveryTurn) {
+            const remaining = alert.delay - (session.turnCount - alert.triggerTurn)
+            if (remaining === 1) {
               yield { type: 'narrative_warning', text: '⚠️ 远处传来急促的脚步声和喊叫声，有人正在赶来！' }
             }
           }
-          // 阶段 1：响应者确定（到达或当场目击）
-          else if (elapsed >= alert.delay && !alert.arrivedResponder) {
+
+          // 阶段 1：发现（延迟到期，确定响应者）
+          if (elapsed >= alert.delay && !alert.arrivedResponder) {
             const { getPersonality: getP } = await import('./npc-relationships.js')
 
             let responder = null
@@ -1363,27 +1353,10 @@ export class GameEngine {
                 console.log(`[trust-cascade] ${cascadeResult.summary}`)
               }
 
-              // ── 阶段 2：对峙或追踪（取决于玩家是否在场）──
-              const playerAtScene = session.worldState.currentLocation === alert.location &&
-                session.worldState.currentSubLocation === alert.subLocation
-              if (playerAtScene || alreadyOnSite) {
-                // 玩家在场 → 下一轮战斗
-                alert.responded = true
-                alert.combatJustStarted = responder.name
-                pendingCombatInterrupt = {
-                  responderName: responder.name,
-                  victimName: alert.victimName,
-                  subLocation: alert.subLocation,
-                  immediate: !!alert.immediateResponse,
-                }
-                console.log(`[consequence] ${responder.name} 发现暴行，玩家在场 → 准备战斗`)
-              } else {
-                // 玩家不在场 → 由追踪系统处理（canTrack 检查在下一轮自动触发）
-                // 不标记 responded，让追踪逻辑继续运行
-                console.log(`[consequence] ${responder.name} 发现暴行，玩家已逃离 → 等待追踪系统`)
-              }
-
+              // 标记发现完成，进入追击阶段
+              alert.discoveryTurn = session.turnCount
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] ${responder.name} 发现暴行（发现阶段完成，追击延迟=${alert.chaseDelay ?? 0}）`)
             } else {
               alert.responded = true
 
@@ -1415,6 +1388,45 @@ export class GameEngine {
 
               session.worldState.flags['violence_alert'] = JSON.stringify(alert)
               console.log(`[consequence] 无人响应（所有能战斗的NPC都不可用或追踪失败）`)
+            }
+          }
+
+          // ── 追击阶段：发现完成后，等 chaseDelay 轮追上玩家 ──
+          if (alert.discoveryTurn && !alert.responded && alert.arrivedResponder) {
+            const chaseSinceTurn = session.turnCount - alert.discoveryTurn
+            const chaseDelay = alert.chaseDelay ?? 0
+
+            // 追击预警（追上前 1 轮）
+            if (chaseDelay >= 2 && chaseSinceTurn === chaseDelay - 1) {
+              const trackerName = alert.arrivedResponder
+              const personalizedWarnings: Record<string, string> = {
+                '韩猛': '⚠️ 你听到韩猛的怒吼声从远处传来："站住！懦夫！"',
+                '艾琳娜': '⚠️ 森林中的鸟雀突然惊飞，一个冷静的声音在身后响起："跑不掉的。"',
+                '格雷格': '⚠️ 沉重的脚步声越来越近，你感觉到一股压迫性的杀意...',
+                '卡恩': '⚠️ 你感到背后一阵寒意，仿佛有双眼睛在黑暗中注视着你...',
+              }
+              yield { type: 'narrative_warning', text: personalizedWarnings[trackerName] || '⚠️ 追踪者正在接近！' }
+            }
+
+            // 追上了 → 触发战斗
+            if (chaseSinceTurn >= chaseDelay) {
+              alert.responded = true
+              alert.combatJustStarted = alert.arrivedResponder
+              // 响应者移动到玩家当前位置
+              const respNpc = session.npcs.find(n => n.name === alert.arrivedResponder)
+              if (respNpc) {
+                const { moveNPC } = await import('./npc-mobility.js')
+                respNpc.location = session.worldState.currentLocation
+                moveNPC(respNpc, session.worldState.currentSubLocation ?? '', session)
+              }
+              pendingCombatInterrupt = {
+                responderName: alert.arrivedResponder,
+                victimName: alert.victimName,
+                subLocation: session.worldState.currentSubLocation ?? alert.subLocation,
+                immediate: chaseDelay === 0,
+              }
+              session.worldState.flags['violence_alert'] = JSON.stringify(alert)
+              console.log(`[consequence] ${alert.arrivedResponder} 追上玩家！（追击延迟=${chaseDelay}轮）→ 准备战斗`)
             }
           }
         }
@@ -1539,38 +1551,38 @@ export class GameEngine {
     if (alertData) {
       try {
         const alert = JSON.parse(alertData as string)
-        if (!alert.responded) {
+
+        // ── DM 注入：发现前的倒计时预告 ──
+        if (!alert.responded && !alert.discoveryTurn) {
           const remaining = alert.delay - (session.turnCount - alert.triggerTurn)
           if (remaining > 0 && remaining <= 3) {
-            parts.push(`[世界事件：${alert.victimName}的遭遇即将被发现，约${remaining}轮后有人赶到]`)
-          }
-          // 阶段 1：响应者已到达但还没战斗 → 让 DM 叙事到达过程（含角色细节）
-          if (alert.arrivedResponder && !alert.responded) {
-            const { getPersonality: getPForDm } = await import('./npc-relationships.js')
-            const victimNpc = session.npcs.find((n: any) => n.name === alert.victimName)
-            const victimCondition = victimNpc?.condition ?? 'unknown'
-            const responderPersonality = getPForDm(alert.arrivedResponder)
-            const bondNote = responderPersonality.bonds?.some((b: any) => b.npcName === alert.victimName)
-              ? `（${alert.arrivedResponder}与${alert.victimName}有亲近关系，情绪格外激动）`
-              : ''
-
-            // 根据玩家是否在现场，注入不同的世界事件文本
-            const playerAtScene = session.worldState.currentLocation === alert.location &&
-              session.worldState.currentSubLocation === alert.subLocation
-            if (playerAtScene) {
-              // 玩家还在现场：响应者当面质问
-              parts.push(`[世界事件：${alert.arrivedResponder}赶到现场！${alert.victimName}目前状态：${victimCondition}。${bondNote}描写${alert.arrivedResponder}到达——脚步声、质问、愤怒。这一轮只描写到达，不要描写攻击动作，下一轮战斗才开始。]`)
-            } else {
-              // 玩家已逃离：响应者发现受害者，暴力事件被公开
-              parts.push(`[世界事件：${alert.victimName}的遭遇被发现了。${alert.arrivedResponder}赶到了${alert.victimName}身边，发现${victimCondition === 'unconscious' ? '其昏迷倒地' : '其受伤'}。${bondNote}消息正在镇上传开。你不在现场，不需要描写镇上的情景——只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声），暗示有什么事发生了。]`)
-            }
+            parts.push(`[世界事件预告：${alert.victimName}的遭遇即将被发现，约${remaining}轮后]`)
           }
         }
-        // 阶段 2：战斗刚刚触发，DM 需要描写战斗开场
+
+        // ── DM 注入：发现阶段（刚发现时注入一次）──
+        if (alert.discoveryTurn === session.turnCount && alert.arrivedResponder) {
+          const { getPersonality: getPForDm } = await import('./npc-relationships.js')
+          const victimNpc = session.npcs.find((n: any) => n.name === alert.victimName)
+          const victimCondition = victimNpc?.condition === 'unconscious' ? '昏迷倒地' : '受伤'
+          const responderP = getPForDm(alert.arrivedResponder)
+          const bondNote = responderP.bonds?.some((b: any) => b.npcName === alert.victimName)
+            ? `（${alert.arrivedResponder}与${alert.victimName}关系亲近，情绪格外激动）` : ''
+
+          const chaseDelay = alert.chaseDelay ?? 0
+          if (chaseDelay === 0) {
+            // 玩家在场：响应者当面质问
+            parts.push(`[世界事件：${alert.arrivedResponder}赶到现场，发现${alert.victimName}${victimCondition}！${bondNote}描写${alert.arrivedResponder}到达——脚步声、质问、愤怒。这一轮只描写到达，不描写攻击，下一轮战斗才开始。]`)
+          } else {
+            // 玩家不在场：暴力事件被发现
+            parts.push(`[世界事件：${alert.victimName}的遭遇被发现了。${alert.arrivedResponder}发现${alert.victimName}${victimCondition}。${bondNote}你不在现场——只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声）。${alert.arrivedResponder}正在追踪你。]`)
+          }
+        }
+
+        // ── DM 注入：追击到达，战斗即将开始 ──
         if (alert.combatJustStarted) {
           const responderName = alert.combatJustStarted
-          parts.push(`[战斗触发：${responderName}因你对${alert.victimName}的暴行而向你发起攻击！请用1-2句描写战斗开场——${responderName}的愤怒和第一个动作。战斗数值由系统处理，不要编造数字。]`)
-          // 清除标志，只注入一次
+          parts.push(`[战斗触发：${responderName}追上了你！因你对${alert.victimName}的暴行发起攻击。用1-2句描写${responderName}出现的瞬间和战斗开场。数值由系统处理。]`)
           delete alert.combatJustStarted
           session.worldState.flags['violence_alert'] = JSON.stringify(alert)
         }
