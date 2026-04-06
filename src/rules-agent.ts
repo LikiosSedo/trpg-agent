@@ -39,6 +39,7 @@ export interface ActionResult {
   firstInnocentKill?: boolean  // 首次击败无辜NPC标记
   unknownDestination?: boolean // Move 目的地不在地图注册表中（降级为叙事）
   notFound?: boolean           // Look 目标不在注册表中（降级为叙事）
+  discoveredPoi?: { id: string; nameZh: string; description: string } // Search 发现的新 POI
 }
 
 // ─── 第一级：快速正则匹配 ────────────────────

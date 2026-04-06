@@ -130,9 +130,11 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
 
       // Discover hidden POIs on success
       const hiddenPois = loc?.pointsOfInterest.filter(p => !p.discovered) ?? []
+      let discoveredPoi: { id: string; nameZh: string; description: string } | undefined
       if (result.success && hiddenPois.length > 0) {
         hiddenPois[0].discovered = true
         facts.addEvent(`发现${hiddenPois[0].nameZh}`)
+        discoveredPoi = { id: hiddenPois[0].id, nameZh: hiddenPois[0].nameZh, description: hiddenPois[0].description }
       }
 
       const lightNote = lightBonus > 0 ? `(含火把+${lightBonus}) ` : ''
@@ -159,6 +161,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
             poiLine,
             '仔细搜索后……如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。',
           ].filter(Boolean).join('\n'),
+          discoveredPoi,
         }
       }
 
@@ -169,6 +172,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       if (loot.alreadySearched) {
         return {
           output: [checkLine, poiLine, '这里已经被仔细搜过了，没有新的发现。'].filter(Boolean).join('\n'),
+          discoveredPoi,
         }
       }
 
@@ -199,6 +203,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
 
       return {
         output: [checkLine, poiLine, lootStr].filter(Boolean).join('\n'),
+        discoveredPoi,
       }
     }
 
