@@ -142,6 +142,141 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 
 ---
 
+---
+
+# 主角立绘 — 四职业 (白发红瞳)
+
+> 主角统一特征：白发（银白色短/长发）+ 红瞳（深红/猩红色虹膜）。
+> 同样使用上方的风格统一指令前缀。
+
+---
+
+## PC-1. 剑士 (Fighter)
+
+```
+Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
+
+Character: A young human adventurer, level 5 fighter. Lean and battle-hardened, with an aura of quiet intensity. The kind of person who lets their blade speak.
+
+Visual details:
+- Short, slightly messy silver-white hair — windswept and practical, a few strands falling across the forehead
+- Striking crimson-red eyes with a sharp, focused gaze — like embers smoldering in shadow
+- Angular jawline, youthful face (early 20s) marked with a thin scar along the left cheek
+- Athletic, broad-shouldered build clad in worn dark leather armor with steel pauldron on the leading shoulder
+- A longsword strapped across the back, its pommel wrapped in frayed dark cloth — the blade has faint eldritch etchings
+- Right hand resting on a belt pouch, left hand relaxed but ready
+- Expression: calm determination, eyes slightly narrowed — a survivor who has seen darkness and chose to walk toward it
+
+Background element: faint crimson sparks drifting upward like dying embers, with subtle dark tendrils creeping at the edges of the frame — the Lovecraftian corruption is always nearby
+
+Color palette: steel greys, dark leathers, silver-white hair as bright focal point. Crimson eyes and ember particles as warm accents against the cold dark tones. Subtle eldritch green in the sword etchings.
+
+Mood: A blade forged in silence. The white hair catches the last light in a world going dark. Those red eyes have stared into the abyss — and the abyss looked away first.
+
+Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
+```
+
+---
+
+## PC-2. 法师 (Mage)
+
+```
+Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
+
+Character: A young human adventurer, level 5 wizard. Brilliant, intense, and slightly unnerving — someone who reads forbidden tomes the way others read newspapers.
+
+Visual details:
+- Medium-length silver-white hair, slightly unkempt and flowing, parted to one side — strands occasionally lift as if touched by invisible arcane currents
+- Deep crimson irises that glow faintly in dim light — a side effect of channeling raw magical energy
+- Slim, almost gaunt build suggesting late nights and skipped meals — intellect over body
+- Wearing a dark navy-blue robe with silver thread arcane patterns along the collar and cuffs, over a simple black tunic
+- A leather-bound grimoire tucked under one arm, its cover marked with an eye-like sigil that seems to shift
+- Slender fingers with faint arcane burn marks — the cost of handling volatile spells
+- Expression: a thin, knowing half-smile with eyes that see deeper than the surface — curiosity laced with something dangerous
+
+Background element: floating arcane glyphs and geometric sigils orbiting slowly behind the head, glowing in dim violet and amber. One sigil is subtly wrong — twisted, non-Euclidean, as if borrowed from something older than human magic
+
+Color palette: deep navy, silver-white hair, violet and amber magical highlights. Crimson eyes as the unsettling focal point. The twisted sigil in sickly yellow-green.
+
+Mood: Knowledge is power, and power has a price written in languages that predate humanity. The white hair aged early from touching forces mortals weren't meant to wield. Those red eyes see the magical weave of reality — and the things hiding between its threads.
+
+Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
+```
+
+---
+
+## PC-3. 游侠 (Ranger)
+
+```
+Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
+
+Character: A young human adventurer, level 5 ranger. Swift, silent, and more at home in the wild than among people. A hunter who tracks things most people pray they never encounter.
+
+Visual details:
+- Shoulder-length silver-white hair tied back in a loose low ponytail, with shorter strands framing the face — practical for the wilderness
+- Sharp crimson-red eyes with a predatory alertness — constantly scanning, never truly at rest
+- Lean, agile build with wiry muscle — built for speed and precision rather than brute force
+- Wearing a dark forest-green hooded cloak over fitted dark leather armor, hood currently down
+- A recurve bow slung across the back, and a hunting knife visible at the belt
+- A thin leather cord necklace with a small animal fang pendant
+- One hand partially raised, fingers slightly curled — the gesture of someone perpetually ready to nock an arrow
+- Expression: watchful, reserved, a flicker of wildness in the eyes — half-civilized, comfortable with solitude
+
+Background element: shadowy forest silhouettes behind, with pairs of faintly glowing eyes watching from between the trees — things in the dark that the ranger is aware of. Wisps of pale fog curl at the bottom edge.
+
+Color palette: forest greens, earth browns, dark leather. Silver-white hair as bright contrast against the dark wilderness. Crimson eyes matching the faint glow of the watching eyes in the forest — hunter and hunted share the same red gaze.
+
+Mood: The forest whispers, and this one whispers back. White hair like moonlight through dead branches. Red eyes that can spot a corruption-touched beast at two hundred paces — and know exactly where to put the arrow.
+
+Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
+```
+
+---
+
+## PC-4. 牧师 (Cleric)
+
+```
+Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
+
+Character: A young human adventurer, level 5 cleric. A healer and protector whose faith burns like a torch against encroaching darkness. Sturdy, compassionate, but with a steel core that bends for no evil.
+
+Visual details:
+- Short, neatly kept silver-white hair with a slight wave, brushed back from the forehead — disciplined but soft
+- Warm crimson-red eyes that carry both compassion and an unshakable conviction — the eyes of someone who has prayed over the dying and refused to let them go
+- Sturdy, solid build — a cleric who wears heavy armor and stands in the front line
+- Wearing dark chainmail under a deep charcoal tabard bearing a faded holy sun symbol in dull gold thread
+- A round steel shield on the back, and a flanged mace at the belt
+- A worn holy symbol pendant (sun disc) hanging at the chest, emitting a faint warm golden glow against the surrounding darkness
+- One hand touching the pendant in a gesture of quiet prayer
+- Expression: gentle strength, a serene face with eyes that have witnessed horror and chosen hope — the calm at the center of a storm
+
+Background element: soft golden divine light radiating from behind like a fractured halo, pushing back creeping dark tendrils and shadow shapes that recoil from the radiance. The boundary between light and dark is sharp and contested.
+
+Color palette: charcoal, steel grey, dull gold for the holy elements. Silver-white hair lit by the warm golden glow. Crimson eyes as a striking contrast — faith and fire in one gaze. The dark tendrils in void-purple and eldritch green.
+
+Mood: Where this one walks, the darkness pulls back — but only just. The white hair glows like a candle flame in a cathedral of shadows. Those red eyes have seen what waits beyond death, and they chose to fight for the living anyway. The holy light is real, but so are the things it keeps at bay.
+
+Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
+```
+
+---
+
+## 主角立绘生成注意事项
+
+1. **白发红瞳一致性**：四个主角必须保持统一的银白色头发和猩红色眼睛，作为主角团的视觉标识
+2. **职业辨识度**：通过装备、体型、姿态一眼区分职业（剑士→重甲/剑、法师→法袍/魔典、游侠→弓/斗篷、牧师→链甲/圣符）
+3. **统一年龄感**：四人均为年轻冒险者（20 岁出头），保持主角团的青春冒险感
+4. **克苏鲁暗示**：每张图仍包含微妙的 Lovecraftian 元素，但主角的光明感应比 NPC 更强——他们是对抗黑暗的人
+5. **与 NPC 风格统一**：像素密度、画布尺寸、色调处理必须与上方 NPC 立绘保持一致
+
+### 文件命名规则
+- `pc-fighter.png`
+- `pc-mage.png`
+- `pc-ranger.png`
+- `pc-cleric.png`
+
+---
+
 ## 生成注意事项
 
 1. **一致性**：所有立绘应保持统一的像素密度和画布尺寸风格
@@ -150,9 +285,15 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 4. **情绪层次**：每个角色的表情应传达表面和深层两种情绪
 5. **保存位置**：`public/portraits/` 目录下，文件名格式 `{english_name}.png`
 
-### 文件命名规则
+### 文件命名规则 — NPC
 - `greg-ironfist.png`
 - `elena-silverleaf.png`
 - `victor-blackstone.png`
 - `xiao-li.png`
 - `kahn-the-traveler.png`
+
+### 文件命名规则 — 主角
+- `pc-fighter.png`
+- `pc-mage.png`
+- `pc-ranger.png`
+- `pc-cleric.png`

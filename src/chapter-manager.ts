@@ -89,6 +89,10 @@ export class ChapterManager {
       if (beat.trigger !== 'auto') continue
       if (this.state.completedBeats.includes(beat.id)) continue
       if (beat.requires && !beat.requires.every(r => this.state.completedBeats.includes(r))) continue
+      if (beat.trustGate) {
+        const npc = this.session.npcs.find(n => n.name === beat.trustGate!.npc)
+        if (!npc || npc.trust < beat.trustGate.minTrust) continue
+      }
 
       this.state.completedBeats.push(beat.id)
       // 将 auto beat 的 facts 暂存，等待 getPromptContext() 传递给 DM
@@ -232,6 +236,9 @@ export class ChapterManager {
   // ─── 内部方法 ────────────────────────────
 
   private findPendingBeat(ch: ChapterDef, trigger: string): Beat | null {
+    // 清除上一轮的信任阻挡记录
+    this.state.trustBlockedBeats = []
+
     for (const beat of ch.beats) {
       if (this.state.completedBeats.includes(beat.id)) continue
       if (beat.trigger !== trigger) continue
@@ -245,6 +252,21 @@ export class ChapterManager {
           const entry = dossierData?.[npcName]
           const unlockedCount = entry?.discovered?.length ?? 0
           if (unlockedCount < beat.requiredFacts) continue
+        }
+      }
+
+      // 信任度门控：指定 NPC 的信任度必须达标
+      if (beat.trustGate) {
+        const npc = this.session.npcs.find(n => n.name === beat.trustGate!.npc)
+        if (!npc || npc.trust < beat.trustGate.minTrust) {
+          // 记录被信任度阻挡的 beat（供 Talk 工具注入"欲言又止"提示）
+          this.state.trustBlockedBeats.push({
+            beatId: beat.id,
+            npc: beat.trustGate.npc,
+            currentTrust: npc?.trust ?? 0,
+            requiredTrust: beat.trustGate.minTrust,
+          })
+          continue
         }
       }
 

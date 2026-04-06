@@ -21,6 +21,8 @@ export interface Beat {
   optional?: boolean
   /** 完成条件：trigger NPC 在 dossier 中需要解锁的最少 facts 数。未设置时 trigger 即完成（向后兼容） */
   requiredFacts?: number
+  /** 信任度门控：指定 NPC 的信任度必须 >= minTrust 才能触发此 beat */
+  trustGate?: { npc: string; minTrust: number }
 }
 
 export interface Discovery {
@@ -264,6 +266,34 @@ export const CHAPTERS: ChapterDef[] = [
         ],
         requiredFacts: 4,
       },
+
+      // ── 信任驱动的可选 beats（不影响章节推进）──
+
+      {
+        id: 'ch2_greg_darian_hint',
+        trigger: 'talk:格雷格',
+        requires: ['ch2_forest_quest'],
+        trustGate: { npc: '格雷格', minTrust: 4 },
+        optional: true,
+        facts: [
+          '格雷格擦杯子的动作停了一下。他没看你，声音低了半个调',
+          '"你去森林了？……当心点。"他顿了顿，"我以前有个朋友，也总觉得自己能搞定一切。"',
+          '他没有继续说下去，但银质假指套在柜台上轻轻磕了一下',
+        ],
+      },
+      {
+        id: 'ch2_xiaoli_sense',
+        trigger: 'talk:格雷格',
+        requires: ['ch2_meet_elena'],
+        trustGate: { npc: '小莉', minTrust: 2 },
+        optional: true,
+        facts: [
+          '小莉端着托盘走过来，在玩家身边又停了一下',
+          '"你去公会了？"她压低声音，灰色眼睛左右看了看',
+          '"那个……我觉得镇长不太对劲。他每次从镇长府出来，身上那个灰色的东西就更浓了。"',
+          '格雷格从柜台后瞪了她一眼——"小莉。"她缩了缩脖子，但嘴巴抿成一条线，显然还想说什么',
+        ],
+      },
     ],
 
     discoveries: [
@@ -365,6 +395,49 @@ export const CHAPTERS: ChapterDef[] = [
           '韩猛握紧了独臂的拳头："那帮人到底想干什么？"',
         ],
         requiredFacts: 6,
+      },
+
+      // ── 信任/情境驱动的可选 beats（不影响章节推进）──
+
+      {
+        id: 'ch3_greg_journal',
+        trigger: 'talk:格雷格',
+        requires: ['ch3_mine_quest'],
+        trustGate: { npc: '格雷格', minTrust: 5 },
+        optional: true,
+        facts: [
+          '格雷格把你拉到角落，手里攥着一本发黄的旧笔记本',
+          '"达里安。我二十年前的搭档。"他的声音像是从石头缝里挤出来的',
+          '"他死在矿洞里。最后几天写了这些……你看看，也许对你有用。"',
+          '日志记录了矿道深层的异象——移动的符文、不自然的寒冷、似乎在"呼吸"的岩壁。最后几页的字迹越来越潦草',
+        ],
+      },
+      {
+        id: 'ch3_elena_ancient',
+        trigger: 'talk:艾琳娜',
+        requires: ['ch3_cult_traces'],
+        trustGate: { npc: '艾琳娜', minTrust: 4 },
+        optional: true,
+        facts: [
+          '艾琳娜沉默良久后开口，声音比平时更轻',
+          '"……我在破晓镇待了六十年。来的时候，是因为在找一样东西。"',
+          '她的食指敲了一下桌面，"很久以前——两百多年前，我在旧日精灵的典籍里读到过一种能够撕裂位面壁垒的东西。线索指向灰脊山脉。"',
+          '"如果蚀目者的目标和我追了两百年的东西有关……"她没有说下去，但表情从疲倦变成了某种近乎恐惧的东西',
+        ],
+      },
+      {
+        id: 'ch3_victor_plea',
+        trigger: 'talk:维克多',
+        requires: ['ch3_cult_traces'],
+        trustGate: { npc: '维克多', minTrust: 3 },
+        optional: true,
+        facts: [
+          '维克多确认四下无人后，抓住玩家的袖子。他的手在抖',
+          '"他们……"他嘴唇发白，像是每个字都在承受物理性的疼痛',
+          '"我女儿。索菲亚。他们抓了她。一年了。"',
+          '他猛地松开手，退后一步，脸上的表情在恐惧和解脱之间撕裂',
+          '"求你……别告诉任何人我说了这个。他们能感觉到。"',
+        ],
       },
     ],
 
