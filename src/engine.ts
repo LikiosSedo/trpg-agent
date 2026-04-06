@@ -221,7 +221,7 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
 // ─── 选项分类（regex，无 LLM） ──────────────────
 
 const SUGGESTION_CLASSIFY: Array<{ pattern: RegExp; type: string; icon: string }> = [
-  { pattern: /前往|去|走|回|进入|深入|离开|向.{0,4}走|朝.{0,4}去/, type: 'move', icon: 'ra-compass' },
+  { pattern: /前往|去|走向|回|进入|离开|向.{0,4}走|朝.{0,4}去/, type: 'move', icon: 'ra-compass' },
   { pattern: /看|观察|查看|打量/,                  type: 'look',      icon: 'ra-eye-monster' },
   { pattern: /搜索|搜查|检查|调查/,                type: 'search',    icon: 'ra-telescope' },
   { pattern: /攻击|突袭|偷袭|战斗|冲|杀|先下手|进攻/, type: 'attack',  icon: 'ra-sword' },
@@ -1725,6 +1725,22 @@ export class GameEngine {
             title: '低语',
             text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
           }
+        }
+        // Search 发现新 POI → 弹出解锁卡片（同时标记已访问，Move 时不再重复）
+        if (actionResult.discoveredPoi) {
+          const dp = actionResult.discoveredPoi
+          const areaId = session.worldState.currentLocation
+          const area = locations[areaId]
+          session.worldState.flags[`poi_visited_${dp.id}`] = true
+          yield {
+            type: 'poi_unlock',
+            poiId: dp.id,
+            poiName: dp.nameZh,
+            areaId,
+            areaName: area?.nameZh ?? areaId,
+            description: dp.description,
+          }
+          console.log(`[poi-unlock] 搜索发现: ${dp.nameZh} (${dp.id})`)
         }
       }
     } else {
