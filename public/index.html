@@ -5426,17 +5426,3 @@
 </body>
 
 </html>
-document.addEventListener('keydown', (e) => {
-if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-e.preventDefault()
-if (document.getElementById('create-screen').style.display !== 'none') {
-startGame()
-} else {
-sendInput()
-}
-}
-})
-</script>
-</body>
-
-</html>
