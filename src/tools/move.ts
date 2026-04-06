@@ -234,7 +234,7 @@ export const MoveTool: Tool = {
       return { output: `${destination}在${areaName}，你需要先前往那个区域。`, isError: true }
     }
 
-    // ── Nothing matched ──
+    // ── Nothing matched — 目的地不在地图注册表中 ──
     const available = currentArea.pointsOfInterest
       .filter((p: any) => p.discovered)
       .map((p: any) => `${p.nameZh}(${p.id})`)
@@ -244,6 +244,7 @@ export const MoveTool: Tool = {
     return {
       output: `无法前往"${destination}"。\n区域内可去：${available.join('、') || '无'}\n其他区域：${areaConnections.join('、') || '无'}`,
       isError: true,
+      unknownDestination: true,
     }
   },
 }

@@ -1597,7 +1597,7 @@ export class GameEngine {
     if (reminders.length) parts.push(`[系统提醒] ${reminders.join(' ')}`)
 
     // ── 规则预处理：分级意图识别 + 机械动作预执行 ──
-    const action = await classifyIntent(input, session)
+    let action = await classifyIntent(input, session)
     console.log(`[rules-agent] 输入: "${input}" → 分类: ${JSON.stringify(action)}`)
     let actionResult: ActionResult | null = null
 
@@ -1630,14 +1630,31 @@ export class GameEngine {
       actionResult = await executeAction(action, session)
       console.log(`[rules-agent] 预执行: ${action.type} → 成功:${actionResult.success} 工具:${actionResult.toolsCalled.join(',')}`)
       console.log(`[rules-agent] 结果: ${actionResult.output.slice(0, 200)}`)
-      parts.push(formatActionResult(actionResult))
 
-      // 首次击败无辜NPC提示（弹窗形式）
-      if (actionResult.firstInnocentKill) {
-        yield {
-          type: 'important_warning',
-          title: '低语',
-          text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
+      // Move 失败降级：目的地不在地图注册表中 → 不注入硬失败，降级为叙事探索
+      if (action.type === 'MOVE' && actionResult.unknownDestination) {
+        const currentLoc = locations[session.worldState.currentLocation]
+        const locName = currentLoc?.nameZh ?? session.worldState.currentLocation
+        const dest = (action as any).destination ?? input
+        parts.push(
+          `[叙事引导] 玩家想在「${locName}」附近探索「${dest}」方向，` +
+          `但这不是已知的可达地点。请在叙事中自由描写这次探索——` +
+          `可以是路径受阻、发现新线索、环境描写或角色感受。` +
+          `不要提及"系统"、"地图"或"无法前往"等游戏外概念。`
+        )
+        action = { type: 'NARRATIVE' }
+        actionResult = null
+        console.log(`[rules-agent] Move 降级为 NARRATIVE: 目的地「${dest}」不在注册表中`)
+      } else {
+        parts.push(formatActionResult(actionResult))
+
+        // 首次击败无辜NPC提示（弹窗形式）
+        if (actionResult.firstInnocentKill) {
+          yield {
+            type: 'important_warning',
+            title: '低语',
+            text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
+          }
         }
       }
     } else {
