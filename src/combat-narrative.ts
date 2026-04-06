@@ -6,7 +6,7 @@ type NarrativeOutcome = 'player_hit' | 'player_miss' | 'player_critical' | 'play
   | 'player_kill_npc'
   | 'monster_hit' | 'monster_miss' | 'monster_critical'
   | 'npc_hit' | 'npc_miss' | 'npc_critical'
-  | 'ally_hit' | 'ally_miss' | 'ally_critical' | 'ally_down'
+  | 'ally_hit' | 'ally_miss' | 'ally_critical' | 'ally_kill' | 'ally_down'
   | 'monster_hit_ally' | 'monster_miss_ally' | 'monster_critical_ally'
 
 const TEMPLATES: Record<NarrativeOutcome, string[]> = {
@@ -79,6 +79,11 @@ const TEMPLATES: Record<NarrativeOutcome, string[]> = {
   ally_critical: [
     '完美配合！{ally}抓住{target}的破绽，给出致命一击！',
     '{ally}爆发出全力，{target}被震得踉跄后退！',
+  ],
+  ally_kill: [
+    '{ally}给出了致命一击，{target}轰然倒地！',
+    '{target}在{ally}的攻势下终于支撑不住，倒了下去。',
+    '配合默契——{ally}抓住空隙，结束了{target}。',
   ],
   ally_down: [
     '{ally}倒下了！但你必须继续战斗。',

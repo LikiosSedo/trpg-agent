@@ -2817,7 +2817,7 @@ export class GameEngine {
     // 同伴行动叙事 helper
     const emitAllyNarratives = function* (hits: any[]) {
       for (const ahit of hits) {
-        const outcome = ahit.isCritical ? 'ally_critical' : ahit.hit ? 'ally_hit' : 'ally_miss'
+        const outcome = ahit.targetKilled ? 'ally_kill' : ahit.isCritical ? 'ally_critical' : ahit.hit ? 'ally_hit' : 'ally_miss'
         const text = pickNarrative(outcome as any, { ally: ahit.allyName, target: ahit.targetName })
         if (text) yield { type: 'combat_narrative' as const, text }
       }
@@ -3004,8 +3004,14 @@ export class GameEngine {
       const allyCheck = checkCombatEnd(session)
       if (allyCheck.ended && allyCheck.result === 'victory') {
         combat.phase = 'ended'
+        const loot = awardLoot(session)
+        const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
+        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
-        yield { type: 'combat_status', text: '同伴帮你击败了最后的敌人！', ended: true, result: 'victory' }
+        endCombat(session)
+        yield* this.combatDMNarrative(`同伴们协力击败了${enemyNames}。描写最后的敌人倒下的瞬间和团队战后的喘息。`)
+        if (session.chapter) new ChapterManager(session).onEvent('combat_end')
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
       }
     }
