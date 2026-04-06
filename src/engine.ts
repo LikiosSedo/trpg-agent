@@ -28,7 +28,9 @@ import { isBuffSpell } from './combat-manager.js'
 import {
   executeMonsterPhase, getCombatSummary, executePlayerTurn,
   attemptFlee, checkCombatEnd, awardLoot, endCombat, startCombat,
+  executeAllyTurns,
 } from './combat-manager.js'
+import { validateParty } from './party-manager.js'
 import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
@@ -204,7 +206,11 @@ async function checkHostileNPCs(session: GameSession): Promise<Array<{ npc: stri
 
 // ─── 战斗结束后 NPC 状态同步 ──────────────────────
 
-function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array<{ name: string; hp: number; maxHp: number }>): void {
+function syncNPCConditionAfterCombat(
+  session: GameSession,
+  combatMonsters: Array<{ name: string; hp: number; maxHp: number }>,
+  combatAllies?: Array<{ id: string; name: string; hp: number; maxHp: number }>,
+): void {
   for (const monster of combatMonsters) {
     const npc = session.npcs.find(n => n.name === monster.name)
     if (!npc) continue
@@ -212,6 +218,19 @@ function syncNPCConditionAfterCombat(session: GameSession, combatMonsters: Array
       npc.condition = 'unconscious'
       npc.conditionTurn = session.turnCount
     } else if (monster.hp < monster.maxHp / 2) {
+      npc.condition = 'wounded'
+      npc.conditionTurn = session.turnCount
+    }
+  }
+  // 同伴状态同步：倒地 → 昏迷 + 离队
+  for (const ally of (combatAllies ?? [])) {
+    const npc = session.npcs.find(n => n.name === ally.name)
+    if (!npc) continue
+    if (ally.hp <= 0) {
+      npc.condition = 'unconscious'
+      npc.conditionTurn = session.turnCount
+      session.party = (session.party ?? []).filter(n => n !== ally.name)
+    } else if (ally.hp < ally.maxHp / 2) {
       npc.condition = 'wounded'
       npc.conditionTurn = session.turnCount
     }
@@ -293,9 +312,10 @@ export type TurnEvent =
   | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | ClassifiedSceneActions | null; hasPendingTrade?: boolean }
   | { type: 'dm_error'; message: string }
   | { type: 'combat_monster'; text: string }
+  | { type: 'combat_ally'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
-  | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[]; narrative?: string }
-  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[]; playerHp: number; playerMaxHp: number; activeEffects?: any[] }
+  | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[]; narrative?: string; allies?: any[] }
+  | { type: 'combat_action_req'; targets: any[]; spells: any[]; items: any[]; playerHp: number; playerMaxHp: number; activeEffects?: any[]; allies?: any[] }
   | { type: 'quest_completed'; questName: string; text: string }
   | { type: 'quest_progress'; questName: string; text: string; current?: number; required?: number }
   | { type: 'npc_unlock'; npcName: string; portrait: string; firstFacts: string[] }
@@ -309,7 +329,8 @@ export type TurnEvent =
   | { type: 'important_warning'; title: string; text: string }
   | { type: 'item_acquired'; text: string }
   | { type: 'trade_proposal'; npc: string; items: any[]; totalPrice: number; canBargain: boolean }
-  | { type: 'death' }
+  | { type: 'death_pending' }
+  | { type: 'death'; epilogue?: string }
   | { type: 'sync'; session: GameSession; dossier: any; questHint: QuestHint | null }
   | { type: 'combat_narrative'; text: string }
   | { type: 'combat_narrative_actions'; actions: SceneActions }
@@ -1217,8 +1238,9 @@ export class GameEngine {
 
     session.turnCount++
 
-    // NPC 状态恢复检查
+    // NPC 状态恢复检查 + 队伍校验
     checkNPCConditionRecovery(session)
+    validateParty(session)
 
     // 暴力后果战斗打断标记（阶段2不再直接 return，让 DM 先叙事再触发）
     let pendingCombatInterrupt: { responderName: string; victimName: string; subLocation: string; immediate: boolean } | null = null
@@ -2289,7 +2311,7 @@ export class GameEngine {
         yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
       }
       if (monsterResult.ended) {
-        syncNPCConditionAfterCombat(session, combatMonstersSnapshot)
+        syncNPCConditionAfterCombat(session, combatMonstersSnapshot, session.combat?.allies)
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
@@ -2631,11 +2653,17 @@ export class GameEngine {
       })),
     }
 
+    const aliveAllies = (combat.allies ?? []).filter(a => a.hp > 0)
+
     yield {
       type: 'combat_init',
       monsters: aliveMonsters.map(m => ({
         id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp,
         portrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
+      })),
+      allies: aliveAllies.map(a => ({
+        id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp,
+        portrait: NPC_PORTRAITS[a.name] ?? '',
       })),
       round: combat.round,
       initiative: combat.initiativeOrder,
@@ -2644,6 +2672,7 @@ export class GameEngine {
     yield {
       type: 'combat_action_req',
       targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
+      allies: aliveAllies.map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })),
       spells: this.session.player.spells
         .filter(s => s.remaining > 0 || s.usesPerRest === 0)
         .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0, isBuff: isBuffSpell(s.name) })),
@@ -2682,22 +2711,51 @@ export class GameEngine {
 
     let skipAfterPhase = false
 
-    // ── 按先攻值拆分：玩家前 / 玩家后 ──
+    // ── 按先攻值拆分：玩家前 / 玩家后（怪物和同伴分开）──
     const playerInit = combat.initiativeOrder.find(e => e.isPlayer)?.initiative ?? 0
-    const beforePlayerIds = combat.initiativeOrder
-      .filter(e => !e.isPlayer && e.initiative > playerInit)
+    const beforeMonsterIds = combat.initiativeOrder
+      .filter(e => !e.isPlayer && !e.isAlly && e.initiative > playerInit)
       .map(e => e.id)
-    const afterPlayerIds = combat.initiativeOrder
-      .filter(e => !e.isPlayer && e.initiative <= playerInit)
+    const afterMonsterIds = combat.initiativeOrder
+      .filter(e => !e.isPlayer && !e.isAlly && e.initiative <= playerInit)
       .map(e => e.id)
+    const beforeAllyIds = combat.initiativeOrder
+      .filter(e => e.isAlly === true && e.initiative > playerInit)
+      .map(e => e.id)
+    const afterAllyIds = combat.initiativeOrder
+      .filter(e => e.isAlly === true && e.initiative <= playerInit)
+      .map(e => e.id)
+    // 兼容旧接口
+    const beforePlayerIds = beforeMonsterIds
+    const afterPlayerIds = afterMonsterIds
 
     // 怪物命中叙事 helper
     const emitMonsterNarratives = function* (hits: any[]) {
       for (const mhit of hits) {
-        const isNpc = session.npcs.some(n => n.name === mhit.monsterName)
-        const prefix = isNpc ? 'npc' : 'monster'
-        const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
-        const text = pickNarrative(outcome as any, { monster: mhit.monsterName })
+        if (mhit.targetIsAlly) {
+          // 怪物攻击同伴的叙事
+          const outcome = mhit.isCritical ? 'monster_critical_ally' : mhit.hit ? 'monster_hit_ally' : 'monster_miss_ally'
+          const text = pickNarrative(outcome as any, { monster: mhit.monsterName, ally: mhit.targetName })
+          if (text) yield { type: 'combat_narrative' as const, text }
+          if (mhit.allyKilled) {
+            const downText = pickNarrative('ally_down' as any, { ally: mhit.targetName })
+            if (downText) yield { type: 'combat_narrative' as const, text: downText }
+          }
+        } else {
+          const isNpc = session.npcs.some(n => n.name === mhit.monsterName)
+          const prefix = isNpc ? 'npc' : 'monster'
+          const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
+          const text = pickNarrative(outcome as any, { monster: mhit.monsterName })
+          if (text) yield { type: 'combat_narrative' as const, text }
+        }
+      }
+    }
+
+    // 同伴行动叙事 helper
+    const emitAllyNarratives = function* (hits: any[]) {
+      for (const ahit of hits) {
+        const outcome = ahit.isCritical ? 'ally_critical' : ahit.hit ? 'ally_hit' : 'ally_miss'
+        const text = pickNarrative(outcome as any, { ally: ahit.allyName, target: ahit.targetName })
         if (text) yield { type: 'combat_narrative' as const, text }
       }
     }
@@ -2714,7 +2772,7 @@ export class GameEngine {
 
       if (monsterResult.ended && monsterResult.result === 'defeat') {
         combat.phase = 'ended'
-        syncNPCConditionAfterCombat(session, combatMonsters)
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
         yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，膝盖触地的声音像是从很远的地方传来。` }
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
@@ -2726,6 +2784,22 @@ export class GameEngine {
         return
       }
       combat.phase = 'player_turn'
+    }
+
+    // ── Phase 1.5: 高先攻同伴行动 ──
+    if (beforeAllyIds.length > 0 && combat.active) {
+      const allyResult = executeAllyTurns(session, beforeAllyIds)
+      yield* emitAllyNarratives(allyResult.hits)
+      if (allyResult.log.length > 0) {
+        yield { type: 'combat_ally', text: allyResult.log.join('\n') }
+      }
+      const allyCheck = checkCombatEnd(session)
+      if (allyCheck.ended && allyCheck.result === 'victory') {
+        combat.phase = 'ended'
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
+        yield { type: 'combat_status', text: '同伴帮你解决了所有敌人！', ended: true, result: 'victory' }
+        return
+      }
     }
 
     // Execute player action
@@ -2741,7 +2815,7 @@ export class GameEngine {
         // 逃跑成功 → 结束战斗
         combat.phase = 'ended'
         skipAfterPhase = true
-        syncNPCConditionAfterCombat(session, combatMonsters)
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
 
         // 逃跑不等于脱罪：重置暴力警报，2 轮后另一个 NPC 来追
         const alertJson = session.worldState.flags['violence_alert'] as string | undefined
@@ -2794,7 +2868,7 @@ export class GameEngine {
 
       // executePlayerTurn already handles victory (endCombat + loot)
       if (turnResult.ended) {
-        syncNPCConditionAfterCombat(session, combatMonsters)
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         // Combine round log + loot into a single ended message
         const lines = [...turnResult.roundLog]
         if (turnResult.result === 'victory' && turnResult.loot) {
@@ -2838,7 +2912,7 @@ export class GameEngine {
       } else if (endCheck.result === 'defeat') {
         yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
       }
-      syncNPCConditionAfterCombat(session, combatMonsters)
+      syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
       endCombat(session)
       yield* this.combatDMNarrative(
         endCheck.result === 'victory'
@@ -2855,6 +2929,22 @@ export class GameEngine {
       return
     }
 
+    // ── Phase 2.5: 低先攻同伴行动 ──
+    if (!skipAfterPhase && afterAllyIds.length > 0 && combat.active) {
+      const allyResult = executeAllyTurns(session, afterAllyIds)
+      yield* emitAllyNarratives(allyResult.hits)
+      if (allyResult.log.length > 0) {
+        yield { type: 'combat_ally', text: allyResult.log.join('\n') }
+      }
+      const allyCheck = checkCombatEnd(session)
+      if (allyCheck.ended && allyCheck.result === 'victory') {
+        combat.phase = 'ended'
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
+        yield { type: 'combat_status', text: '同伴帮你击败了最后的敌人！', ended: true, result: 'victory' }
+        return
+      }
+    }
+
     // ── Phase 3: 先攻低于/等于玩家的敌人后行动 ──
     if (!skipAfterPhase && afterPlayerIds.length > 0) {
       combat.phase = 'monster_turn'
@@ -2868,7 +2958,7 @@ export class GameEngine {
 
       if (monsterResult.ended) {
         combat.phase = 'ended'
-        syncNPCConditionAfterCombat(session, combatMonsters)
+        syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
@@ -2904,9 +2994,11 @@ export class GameEngine {
       activeCombat.phase = 'player_turn'
       activeCombat.playerDefending = false
       const aliveMonsters = activeCombat.monsters.filter(m => m.hp > 0)
+      const roundAliveAllies = (activeCombat.allies ?? []).filter(a => a.hp > 0)
       yield {
         type: 'combat_action_req',
         targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
+        allies: roundAliveAllies.map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })),
         spells: session.player.spells
           .filter(s => s.remaining > 0 || s.usesPerRest === 0)
           .map(s => ({ name: s.name, desc: s.description, remaining: s.remaining, max: s.usesPerRest, isCantrip: s.usesPerRest === 0, isBuff: isBuffSpell(s.name) })),

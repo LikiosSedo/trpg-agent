@@ -326,8 +326,31 @@
       50% { background-color: rgba(244, 67, 54, 0.3); }
     }
 
+    .chud-party {
+      flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .chud-allies { display: flex; gap: 4px; align-items: center; }
+    .chud-ally {
+      display: flex; flex-direction: column; align-items: center;
+      background: rgba(78, 205, 196, 0.06);
+      border: 1px solid rgba(78, 205, 196, 0.3);
+      border-radius: 6px; padding: 3px 5px;
+      min-width: 48px; max-width: 64px;
+    }
+    .chud-ally.dead { opacity: 0.3; }
+    .chud-ally-portrait {
+      width: 28px; height: 28px; border-radius: 4px;
+      background: #0a1a1a; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .chud-ally-portrait img { width: 28px; height: 28px; image-rendering: pixelated; }
+    .chud-ally-name {
+      font-size: 9px; color: #4ecdc4; margin-top: 2px; text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
+    }
+    .chud-ally .chud-hp-bar { width: 100%; height: 3px; margin-top: 2px; }
+    .chud-ally .chud-hp-fill { background: #4ecdc4; }
+    .chud-ally .chud-hp-text { font-size: 9px; color: #4ecdc4; margin-top: 1px; }
     .chud-player {
-      flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -501,6 +524,15 @@
       font-size: 13px;
       background: #2a1a0e;
       border-left: 3px solid #ff8c42;
+      padding: 8px 12px;
+      border-radius: 4px;
+      animation: combatFadeIn 0.4s ease-out;
+    }
+    .msg.combat-ally {
+      color: #4ecdc4 !important;
+      font-size: 13px;
+      background: #0e2a2a;
+      border-left: 3px solid #4ecdc4;
       padding: 8px 12px;
       border-radius: 4px;
       animation: combatFadeIn 0.4s ease-out;
@@ -2889,17 +2921,20 @@
     </div>
     <!-- 战斗对峙 HUD -->
     <div id="combat-hud">
-      <div class="chud-player">
-        <div class="chud-class-icon" id="chud-player-icon"><i class="ra ra-sword"></i></div>
-        <div class="chud-player-info">
-          <div class="chud-name" id="chud-player-name">--</div>
-          <div class="chud-hp-row">
-            <div class="chud-hp-bar"><div class="chud-hp-fill" id="chud-player-hp-fill"></div></div>
-            <span class="chud-hp-text" id="chud-player-hp-text">--/--</span>
+      <div class="chud-party">
+        <div class="chud-player">
+          <div class="chud-class-icon" id="chud-player-icon"><i class="ra ra-sword"></i></div>
+          <div class="chud-player-info">
+            <div class="chud-name" id="chud-player-name">--</div>
+            <div class="chud-hp-row">
+              <div class="chud-hp-bar"><div class="chud-hp-fill" id="chud-player-hp-fill"></div></div>
+              <span class="chud-hp-text" id="chud-player-hp-text">--/--</span>
+            </div>
+            <div class="chud-weapon" id="chud-player-weapon"></div>
+            <div class="chud-effects" id="chud-player-effects"></div>
           </div>
-          <div class="chud-weapon" id="chud-player-weapon"></div>
-          <div class="chud-effects" id="chud-player-effects"></div>
         </div>
+        <div class="chud-allies" id="chud-allies"></div>
       </div>
       <div class="chud-center">
         <div class="chud-vs"><i class="ra ra-crossed-swords"></i></div>
@@ -3033,6 +3068,7 @@
     let combatAllMonsters = [] // full monster list (includes dead) from combat_init
     let combatMonsterPortraits = {} // {monsterId: portraitUrl}
     let combatSelectedTarget = null // pre-selected attack target via HUD click
+    let combatAllies = []      // ally instances from combat events
     let combatPlayerHp = 0     // player HP from combat_action_req
     let combatPlayerMaxHp = 0  // player maxHP from combat_action_req
     let currentPanelId = null  // track which panel is open
@@ -4345,10 +4381,21 @@
           // Store full monster list + portraits for HUD
           combatAllMonsters = (msg.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
           for (const m of (msg.monsters || [])) { if (m.portrait) combatMonsterPortraits[m.id] = m.portrait }
+          combatAllies = (msg.allies || []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp, portrait: a.portrait }))
           combatSelectedTarget = null
           updateCombatPanel()
           if (msg.narrative) appendMsg(msg.narrative, 'combat-monster')
           playSfx('combat_start', 0.5)
+          break
+
+        case 'combat_ally':
+          setTimeout(function () {
+            appendMsg('── 同伴行动 ──', 'combat-divider')
+            setTimeout(function () {
+              playSfx('attack_hit', 0.3)
+              appendMsg(msg.text, 'combat-ally')
+            }, 300)
+          }, 400)
           break
 
         case 'combat_action_req':
@@ -4356,6 +4403,7 @@
           combatTargets = msg.targets || []
           combatSpells = msg.spells || []
           combatItems = msg.items || []
+          combatAllies = msg.allies || combatAllies
           combatPlayerHp = msg.playerHp || 0
           combatPlayerMaxHp = msg.playerMaxHp || 0
           window._combatActiveEffects = msg.activeEffects || []
@@ -4410,6 +4458,7 @@
             combatTargets = []
             combatSpells = []
             combatItems = []
+            combatAllies = []
             // Reset HUD state
             combatAllMonsters = []
             combatMonsterPortraits = {}
@@ -4804,6 +4853,30 @@
           const turns = e.remaining === -1 ? '' : ' ' + e.remaining + '轮'
           return '<span class="chud-effect-chip ' + src + '">' + esc(e.name) + turns + '</span>'
         }).join('')
+      }
+
+      // Ally side
+      const allyContainer = document.getElementById('chud-allies')
+      if (allyContainer) {
+        allyContainer.innerHTML = ''
+        for (const a of combatAllies) {
+          const dead = a.hp <= 0
+          const pct = a.maxHp > 0 ? Math.max(0, Math.round(a.hp / a.maxHp * 100)) : 0
+          var allyPortrait = a.portrait || ''
+          var card = document.createElement('div')
+          card.className = 'chud-ally' + (dead ? ' dead' : '')
+          var apHtml = allyPortrait
+            ? '<img src="' + esc(allyPortrait) + '" onerror="this.parentElement.innerHTML=\'<i class=\\\'ra ra-player fallback-icon\\\'></i>\'">'
+            : '<i class="ra ra-player fallback-icon"></i>'
+          card.innerHTML =
+            '<div class="chud-ally-portrait">' + apHtml + '</div>' +
+            '<div class="chud-ally-name">' + esc(a.name) + '</div>' +
+            (dead
+              ? '<div class="chud-hp-text" style="color:#555">倒地</div>'
+              : '<div class="chud-hp-bar"><div class="chud-hp-fill" style="width:' + pct + '%"></div></div>' +
+                '<div class="chud-hp-text">' + a.hp + '/' + a.maxHp + '</div>')
+          allyContainer.appendChild(card)
+        }
       }
 
       // Round counter

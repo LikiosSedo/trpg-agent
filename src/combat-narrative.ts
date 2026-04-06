@@ -6,6 +6,8 @@ type NarrativeOutcome = 'player_hit' | 'player_miss' | 'player_critical' | 'play
   | 'player_kill_npc'
   | 'monster_hit' | 'monster_miss' | 'monster_critical'
   | 'npc_hit' | 'npc_miss' | 'npc_critical'
+  | 'ally_hit' | 'ally_miss' | 'ally_critical' | 'ally_down'
+  | 'monster_hit_ally' | 'monster_miss_ally' | 'monster_critical_ally'
 
 const TEMPLATES: Record<NarrativeOutcome, string[]> = {
   player_hit: [
@@ -64,6 +66,38 @@ const TEMPLATES: Record<NarrativeOutcome, string[]> = {
     '{monster}暴怒之下命中了你的要害！',
     '暴击！{monster}的攻击带着绝对的杀意！',
   ],
+  // 同伴攻击怪物
+  ally_hit: [
+    '{ally}趁势一击命中{target}，配合默契。',
+    '{ally}从侧翼攻击{target}，精准地击中了要害。',
+    '{ally}与你形成夹击之势，{target}措手不及。',
+  ],
+  ally_miss: [
+    '{ally}的攻击被{target}闪过。',
+    '{ally}出手落空，但牵制了{target}的注意力。',
+  ],
+  ally_critical: [
+    '完美配合！{ally}抓住{target}的破绽，给出致命一击！',
+    '{ally}爆发出全力，{target}被震得踉跄后退！',
+  ],
+  ally_down: [
+    '{ally}倒下了！但你必须继续战斗。',
+    '{ally}失去意识瘫倒在地。战斗还没结束。',
+  ],
+  // 怪物攻击同伴
+  monster_hit_ally: [
+    '{monster}转向{ally}，一击命中。',
+    '{ally}挡不住{monster}的攻击，咬牙承受了一击。',
+    '{monster}把矛头指向{ally}，攻击得手。',
+  ],
+  monster_miss_ally: [
+    '{ally}灵活地闪开了{monster}的攻击。',
+    '{monster}试图攻击{ally}，但被挡了回去。',
+  ],
+  monster_critical_ally: [
+    '{monster}猛击{ally}的要害！暴击！',
+    '{ally}被{monster}的猛烈攻势打得踉跄！',
+  ],
 }
 
 // 避免短期内重复：记录最近用过的模板索引
@@ -71,7 +105,7 @@ const recentPicks: Map<NarrativeOutcome, number[]> = new Map()
 
 export function pickNarrative(
   outcome: NarrativeOutcome,
-  vars: { target?: string; weapon?: string; monster?: string },
+  vars: { target?: string; weapon?: string; monster?: string; ally?: string },
 ): string {
   const pool = TEMPLATES[outcome]
   if (!pool?.length) return ''
@@ -89,5 +123,6 @@ export function pickNarrative(
   if (vars.target) text = text.replace(/\{target\}/g, vars.target)
   if (vars.weapon) text = text.replace(/\{weapon\}/g, vars.weapon)
   if (vars.monster) text = text.replace(/\{monster\}/g, vars.monster)
+  if (vars.ally) text = text.replace(/\{ally\}/g, vars.ally)
   return text
 }

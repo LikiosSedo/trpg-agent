@@ -78,6 +78,15 @@ export class GameFactStore {
         return `- ${n.name}${condStr}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）`
       }).join('\n')}` : '',
       (() => {
+        const party = this.session.party ?? []
+        if (!party.length) return ''
+        const partyInfo = party.map(name => {
+          const npc = this.session.npcs.find(n => n.name === name)
+          return npc ? `${name}（信任:${npc.trust}）` : name
+        }).join('、')
+        return `队伍同伴: ${partyInfo}`
+      })(),
+      (() => {
         const shopNpcs = this.session.npcs.filter(n => n.shopPricing && (n.inventory ?? []).length > 0)
         if (!shopNpcs.length) return ''
         const shopInfo = shopNpcs.map(n => {

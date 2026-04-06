@@ -214,12 +214,14 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('combat_narrative', { text: ev.text }); break
         case 'combat_monster':
           send('combat_monster', { text: ev.text }); break
+        case 'combat_ally':
+          send('combat_ally', { text: (ev as any).text }); break
         case 'combat_status':
           send('combat_status', { text: ev.text, ended: ev.ended, result: ev.result }); break
         case 'combat_init':
-          send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative }); break
+          send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative, allies: (ev as any).allies }); break
         case 'combat_action_req':
-          send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp, activeEffects: ev.activeEffects }); break
+          send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp, activeEffects: ev.activeEffects, allies: (ev as any).allies }); break
         case 'quest_completed':
           send('system', { text: `✓ 任务完成: ${ev.questName} — ${ev.text}` }); break
         case 'quest_progress':

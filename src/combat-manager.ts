@@ -5,7 +5,7 @@
  * 所有战斗结果由此模块确定性计算，DM 只负责叙事描写。
  */
 
-import type { GameSession, Monster, MonsterInstance, CombatState, InitiativeEntry } from './types.js'
+import type { GameSession, Monster, MonsterInstance, AllyInstance, CombatState, InitiativeEntry } from './types.js'
 import {
   rollInitiative, attackRoll, rollDamage, rollDice,
   calculatePlayerAC, parseAttackMod, castSpell,
@@ -82,6 +82,52 @@ export function startCombat(
     throw new Error('没有有效的怪物加入战斗')
   }
 
+  // 创建同伴实例��从 session.party 读取）
+  const allies: AllyInstance[] = []
+  const partyNames = (session.party ?? []).filter(pn => {
+    // 叛变：如果 party 成员同时是敌方，自动移出队伍
+    if (monsterNames.some(mn => mn.toLowerCase() === pn.toLowerCase())) {
+      session.party = (session.party ?? []).filter(n => n !== pn)
+      log.push(`${pn} 背叛�����伍！`)
+      return false
+    }
+    return true
+  })
+
+  for (const allyName of partyNames) {
+    const npc = session.npcs.find(n => n.name === allyName)
+    if (!npc || npc.condition === 'unconscious' || npc.condition === 'recovering') continue
+    if (npc.location !== session.worldState.currentLocation) continue
+
+    const template = monstersDb.find(m => m.name.toLowerCase() === allyName.toLowerCase())
+    if (!template) continue
+
+    const abilityMod = parseAttackMod(template.damageDice)
+    const allyInit = rollInitiative(abilityMod)
+
+    allies.push({
+      id: allyName,
+      name: allyName,
+      hp: template.hp,
+      maxHp: template.hp,
+      ac: template.dc,
+      attackMod: abilityMod + PROFICIENCY,
+      damageDice: template.damageDice,
+      specialAbility: template.specialAbility,
+      combatBehavior: (template as any).combatBehavior ?? 'kill',
+    })
+
+    initiativeOrder.push({
+      id: allyName,
+      name: allyName,
+      initiative: allyInit.total,
+      isPlayer: false,
+      isAlly: true,
+    })
+
+    log.push(`同伴 ${allyName} 先攻: d20(${allyInit.roll})+${abilityMod}=${allyInit.total}`)
+  }
+
   // 按先攻降序排列，同值玩家优先
   initiativeOrder.sort((a, b) => {
     if (b.initiative !== a.initiative) return b.initiative - a.initiative
@@ -95,11 +141,13 @@ export function startCombat(
     round: 1,
     initiativeOrder,
     monsters,
+    allies,
     log,
   }
 
   session.combat = combat
-  getFacts().addEvent('战斗开始: ' + monsters.map(m => m.id).join(', '), 'critical')
+  const allyInfo = allies.length > 0 ? ` | 同伴: ${allies.map(a => a.name).join(', ')}` : ''
+  getFacts().addEvent('战斗开始: ' + monsters.map(m => m.id).join(', ') + allyInfo, 'critical')
 
   return combat
 }
@@ -249,10 +297,13 @@ export function executePlayerAttack(
 
 export type MonsterHitRecord = {
   monsterName: string
+  targetName: string      // 被攻击目标名
+  targetIsAlly: boolean   // true = 攻击的是同伴
   hit: boolean
   isCritical: boolean
   damage: number
   playerKilled: boolean
+  allyKilled: boolean
 }
 
 export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
@@ -264,62 +315,163 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
 
   const player = session.player
   let playerAC = calculatePlayerAC(player)
-  // 防御姿态 AC+2
   if (combat.playerDefending) playerAC += 2
   const log: string[] = []
   const hits: MonsterHitRecord[] = []
 
   for (const entry of combat.initiativeOrder) {
-    if (entry.isPlayer) continue
+    if (entry.isPlayer || entry.isAlly) continue  // 跳过玩家和同伴
     if (onlyIds && !onlyIds.includes(entry.id)) continue
 
     const monster = combat.monsters.find(m => m.id === entry.id)
     if (!monster || monster.hp <= 0) continue
 
-    const atk = attackRoll(monster.attackMod, playerAC)
+    // 选择攻击目标：玩家(权重2) vs 存活同伴(各权重1)（每次重新过滤，同伴可能在本轮被击倒）
+    const aliveAllies = (combat.allies ?? []).filter(a => a.hp > 0)
+    type Target = { id: string; name: string; ac: number; isPlayer: boolean; isAlly: boolean }
+    const targets: Target[] = [
+      { id: 'player', name: player.name, ac: playerAC, isPlayer: true, isAlly: false },
+      ...aliveAllies.map(a => ({ id: a.id, name: a.name, ac: a.ac, isPlayer: false, isAlly: true })),
+    ]
+    const weights = targets.map(t => t.isPlayer ? 2 : 1)
+    const totalWeight = weights.reduce((a, b) => a + b, 0)
+    let roll = Math.random() * totalWeight
+    let target = targets[0]
+    for (let i = 0; i < targets.length; i++) {
+      roll -= weights[i]
+      if (roll <= 0) { target = targets[i]; break }
+    }
+
+    const targetAC = target.ac
+    const atk = attackRoll(monster.attackMod, targetAC)
 
     if (!atk.hits) {
-      log.push(`${monster.id} 攻击${player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → 未命中`)
-      hits.push({ monsterName: monster.name, hit: false, isCritical: false, damage: 0, playerKilled: false })
+      log.push(`${monster.id} 攻击${target.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${targetAC} → 未命中`)
+      hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
       continue
     }
 
     let damage = rollDamage(monster.damageDice)
     if (atk.isCritical) {
-      // 暴击：额外掷骰子部分（不含修正值）
       const diceOnly = monster.damageDice.replace(/[+-]\d+$/, '')
       damage += rollDamage(diceOnly)
     }
     damage = Math.max(1, damage)
 
-    // 应用伤害抗性效果（如暗影防护药水：死灵伤害减半）
-    // 暗影系怪物的伤害视为 necrotic 类型
-    const monsterNameLower = monster.name.toLowerCase()
-    const isNecrotic = monsterNameLower.includes('shadow') || monsterNameLower.includes('暗影')
-      || monsterNameLower.includes('幽灵') || monsterNameLower.includes('亡灵')
-    if (isNecrotic && hasEffect(player, 'resistance', 'necrotic')) {
-      damage = Math.max(1, Math.floor(damage * 0.5))
-    }
-    // 毒素免疫
-    const isPoisonDmg = monsterNameLower.includes('spider') || monsterNameLower.includes('蜘蛛')
-      || monsterNameLower.includes('蛇') || monsterNameLower.includes('毒')
-    if (isPoisonDmg && hasEffect(player, 'poison_immunity', 'poison')) {
-      damage = 0
+    // 玩家独有的抗性效果
+    if (target.isPlayer) {
+      const monsterNameLower = monster.name.toLowerCase()
+      const isNecrotic = monsterNameLower.includes('shadow') || monsterNameLower.includes('暗影')
+        || monsterNameLower.includes('幽灵') || monsterNameLower.includes('亡灵')
+      if (isNecrotic && hasEffect(player, 'resistance', 'necrotic')) {
+        damage = Math.max(1, Math.floor(damage * 0.5))
+      }
+      const isPoisonDmg = monsterNameLower.includes('spider') || monsterNameLower.includes('蜘蛛')
+        || monsterNameLower.includes('蛇') || monsterNameLower.includes('毒')
+      if (isPoisonDmg && hasEffect(player, 'poison_immunity', 'poison')) {
+        damage = 0
+      }
     }
 
-    player.hp = Math.max(0, player.hp - damage)
-    const playerKilled = player.hp <= 0
+    let playerKilled = false
+    let allyKilled = false
+
+    if (target.isPlayer) {
+      player.hp = Math.max(0, player.hp - damage)
+      playerKilled = player.hp <= 0
+    } else {
+      const ally = aliveAllies.find(a => a.id === target.id)!
+      ally.hp = Math.max(0, ally.hp - damage)
+      allyKilled = ally.hp <= 0
+    }
+
+    const victimHpStr = target.isPlayer
+      ? `${player.name} HP: ${player.hp}/${player.maxHp}`
+      : `${target.name} HP: ${aliveAllies.find(a => a.id === target.id)!.hp}/${aliveAllies.find(a => a.id === target.id)!.maxHp}`
 
     log.push(
-      `${monster.id} 攻击${player.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${playerAC} → ${atk.isCritical ? '暴击！' : '命中'}`,
-      `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${player.name} HP: ${player.hp}/${player.maxHp}`,
+      `${monster.id} 攻击${target.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${targetAC} → ${atk.isCritical ? '暴击！' : '命中'}`,
+      `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${victimHpStr}`,
     )
-    hits.push({ monsterName: monster.name, hit: true, isCritical: atk.isCritical, damage, playerKilled })
+    hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: true, isCritical: atk.isCritical, damage, playerKilled, allyKilled })
 
+    if (allyKilled) {
+      log.push(`${target.name} 倒下了！`)
+      getFacts().addEvent(`同伴${target.name}在战斗中倒下`, 'critical')
+    }
     if (playerKilled) {
       log.push(`${player.name} 倒下了！`)
       getFacts().addEvent(`${player.name}在战斗中倒下`, 'critical')
       break
+    }
+  }
+
+  return { log, hits }
+}
+
+// ─── 同伴回合（全自动）─────────────────────────────
+
+export type AllyHitRecord = {
+  allyName: string
+  targetName: string
+  hit: boolean
+  isCritical: boolean
+  damage: number
+  targetKilled: boolean
+}
+
+export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
+  log: string[]
+  hits: AllyHitRecord[]
+} {
+  const combat = session.combat
+  if (!combat?.active) return { log: [], hits: [] }
+
+  const log: string[] = []
+  const hits: AllyHitRecord[] = []
+  const allies = combat.allies ?? []
+
+  for (const entry of combat.initiativeOrder) {
+    if (!entry.isAlly) continue
+    if (onlyIds && !onlyIds.includes(entry.id)) continue
+
+    const ally = allies.find(a => a.id === entry.id)
+    if (!ally || ally.hp <= 0) continue
+
+    // 选目标：有低血量怪 → 补刀，否则 → 打最高血量怪
+    const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+    if (aliveMonsters.length === 0) break
+
+    const lowHpMonster = aliveMonsters.find(m => m.hp / m.maxHp < 0.25)
+    const target = lowHpMonster
+      ?? aliveMonsters.reduce((best, m) => m.hp > best.hp ? m : best, aliveMonsters[0])
+
+    const atk = attackRoll(ally.attackMod, target.ac)
+
+    if (!atk.hits) {
+      log.push(`${ally.name} 攻击${target.id}: d20(${atk.roll})+${ally.attackMod}=${atk.total} vs AC${target.ac} → 未命中`)
+      hits.push({ allyName: ally.name, targetName: target.id, hit: false, isCritical: false, damage: 0, targetKilled: false })
+      continue
+    }
+
+    let damage = rollDamage(ally.damageDice)
+    if (atk.isCritical) {
+      const diceOnly = ally.damageDice.replace(/[+-]\d+$/, '')
+      damage += rollDamage(diceOnly)
+    }
+    damage = Math.max(1, damage)
+
+    target.hp = Math.max(0, target.hp - damage)
+    const targetKilled = target.hp <= 0
+
+    log.push(
+      `${ally.name} 攻击${target.id}: d20(${atk.roll})+${ally.attackMod}=${atk.total} vs AC${target.ac} → ${atk.isCritical ? '暴击！' : '命中'}`,
+      `伤害: ${ally.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${target.id} HP: ${target.hp}/${target.maxHp}`,
+    )
+    hits.push({ allyName: ally.name, targetName: target.id, hit: true, isCritical: atk.isCritical, damage, targetKilled })
+
+    if (targetKilled) {
+      log.push(`${target.id} 被${ally.name}击杀！`)
     }
   }
 

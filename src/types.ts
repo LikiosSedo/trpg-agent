@@ -91,12 +91,26 @@ export interface MonsterInstance {
   nonlethal?: boolean   // 是否为无辜NPC（击败后会恢复）
 }
 
+/** 战斗中的 NPC 同伴运行时实例 */
+export interface AllyInstance {
+  id: string            // NPC 名（唯一）
+  name: string          // 显示名
+  hp: number
+  maxHp: number
+  ac: number
+  attackMod: number
+  damageDice: string
+  specialAbility: string
+  combatBehavior: string  // 'subdue' | 'kill' | etc.
+}
+
 /** 先攻序列中的一个条目 */
 export interface InitiativeEntry {
   id: string
   name: string
   initiative: number
   isPlayer: boolean
+  isAlly?: boolean      // true = 友方 NPC 同伴
 }
 
 /** 当前战斗的完整状态 */
@@ -105,6 +119,7 @@ export interface CombatState {
   round: number
   initiativeOrder: InitiativeEntry[]
   monsters: MonsterInstance[]
+  allies: AllyInstance[]  // 友方 NPC 同伴
   log: string[]         // 当前回合的战斗日志
   pendingMonsterTurn?: boolean  // 玩家回合结束后，等待怪物回合执行
   phase?: CombatPhase           // 当前战斗阶段
@@ -214,6 +229,13 @@ export interface WorldState {
 
 // ─── 章节状态 ──────────────────────────────────
 
+export interface TrustBlockedBeat {
+  beatId: string
+  npc: string                   // 被门控的 NPC 名
+  currentTrust: number          // 当前信任度
+  requiredTrust: number         // 需要的信任度
+}
+
 export interface ChapterState {
   currentChapter: string        // 当前章节 id
   completedBeats: string[]      // 已触发的 beat ids
@@ -221,6 +243,7 @@ export interface ChapterState {
   idleTurns: number             // 自上次触发 beat 以来的空闲轮数
   nudgeIndex: number            // 当前 nudge 提示索引
   pendingFacts?: string[]       // auto beat 触发后暂存的 facts，下轮注入 DM prompt 后清空
+  trustBlockedBeats?: TrustBlockedBeat[]  // 本轮因信任不足被阻挡的 beats（供 Talk 工具注入"欲言又止"提示）
 }
 
 // ─── 游戏会话 ──────────────────────────────────
@@ -239,4 +262,5 @@ export interface GameSession {
   interactionNpc?: string       // 当前正在交互的 NPC（对话/交易状态绑定）
   timeAccum?: number            // 加权时间累积值（达到阈值自动推进时段）
   npcHostileCooldowns?: Map<string, number>  // NPC 敌对响应冷却记录（npcName -> 触发回合数）
+  party?: string[]       // 当前队伍中的 NPC 名（最多 2 名战斗型 NPC）
 }
