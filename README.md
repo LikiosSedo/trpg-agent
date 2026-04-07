@@ -120,6 +120,44 @@ npm run fetch-assets -- --force  # 强制重新下载所有 pack
 SKIP_ASSETS=1 npm install        # 跳过资源下载(只关心代码时)
 ```
 
+### 严格模式(production / CI / Render)
+
+`fetch-assets.mjs` 默认在 fetch 失败时只 warning + `exit 0`,避免本地开发时
+网络抖动打断 `npm install`。但在 production 部署上这是危险的:fetch 失败但
+build 仍然成功,会导致容器跑起来后所有 mp3/png 都 404。
+
+**严格模式下任何 pack 失败 → `exit 1`**,让 build/CI/deploy 整体失败、触发
+告警。触发条件(任一即可):
+
+| 环境变量 | 何时设置 | 来源 |
+|---|---|---|
+| `STRICT_ASSETS=1` | 显式开关 | 你自己设 |
+| `RENDER=true` | Render 部署时自动设置 | Render 平台 |
+| `CI=true` | 各类 CI/CD 平台自动设置 | GitHub Actions / GitLab / CircleCI / Render 等 |
+
+也就是说**部署到 Render 时不需要任何额外配置**,严格模式会自动启用。
+
+### 在 Render 上部署的注意事项
+
+当前 trpg-agent 在 Render 上的成功配置:
+
+```
+Build Command:  npm install
+Start Command:  npx tsx src/server.ts
+Auto-Deploy:    On Commit
+```
+
+`npm install` 会自动触发 `postinstall` → `fetch-assets.mjs`,因为
+`RENDER=true`(Render 自动注入)严格模式 ON,fetch 失败 deploy 会直接 fail。
+
+**Render Free 套餐磁盘占用估算**(总约 540 MB,在 1 GB 限额内):
+
+- `node_modules/` ~138 MB
+- `public/audio/` ~143 MB(下载并解压后)
+- `public/portraits/` ~56 MB
+- 临时 tarball 在解压后会被脚本删除,峰值短暂占用额外 ~190 MB
+- 代码本身 < 5 MB
+
 ### 资源版本管理
 
 每次资源更新会发布一个新的 `assets-vN` Release tag,manifest 同步更新版本号

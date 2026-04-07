@@ -13,6 +13,8 @@ public/audio/*.wav
 public/audio/sfx/**/*.mp3
 public/audio/sfx/**/*.ogg
 public/audio/sfx/**/*.wav
+# 第三方 SFX pack 整个目录都由 tarball 提供（含资产清单 PDF 等文档）
+public/audio/sfx/fantasy-pack/
 public/portraits/*.png
 public/portraits/scenes/*.png
 

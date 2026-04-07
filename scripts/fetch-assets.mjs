@@ -35,11 +35,33 @@ const FORCE = argv.has('--force')
 const QUIET = argv.has('--quiet')
 const SKIP = process.env.SKIP_ASSETS === '1' || process.env.SKIP_ASSETS === 'true'
 
+// ─── 严格模式 ────────────────────────────────────────────
+//
+// 严格模式下，任何 pack 失败 → exit 1，让 build/CI/deploy 整体失败、触发告警。
+// 非严格模式（默认 / 本地 dev）→ exit 0，只打 warning，不打断 npm install。
+//
+// 触发严格模式的条件（任一）:
+//   1. 显式开关 STRICT_ASSETS=1
+//   2. RENDER=true   ← Render 平台自动设置，部署时一定开严格
+//   3. CI=true       ← Render / GitHub Actions / GitLab / CircleCI 等通用 CI 标志
+//
+// 设计目的：本地开发不希望网络抖动打断 npm install，但 production 部署必须
+// 在 fetch 失败时立刻 fail 而不是"build 成功 but 容器启动后 mp3 全 404"。
+const STRICT =
+  process.env.STRICT_ASSETS === '1' ||
+  process.env.STRICT_ASSETS === 'true' ||
+  process.env.RENDER === 'true' ||
+  process.env.CI === 'true'
+
 function log(...args) {
   if (!QUIET) console.log('[fetch-assets]', ...args)
 }
 function warn(...args) {
   console.warn('[fetch-assets]', ...args)
+}
+
+if (STRICT) {
+  log(`严格模式 ON (RENDER=${process.env.RENDER ?? '-'} CI=${process.env.CI ?? '-'} STRICT_ASSETS=${process.env.STRICT_ASSETS ?? '-'})`)
 }
 
 if (SKIP) {
@@ -52,6 +74,10 @@ try {
   manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf-8'))
 } catch (err) {
   warn(`读取 ${MANIFEST_PATH} 失败：${err.message}`)
+  if (STRICT) {
+    warn('严格模式下 manifest 不可读 → exit 1')
+    process.exit(1)
+  }
   warn('postinstall 退出 0，npm install 继续。')
   process.exit(0)
 }
@@ -68,11 +94,20 @@ for (const pack of manifest.packs ?? []) {
 
 if (!allOk) {
   warn('')
-  warn('部分资源未能下载。游戏可以启动但 BGM/立绘可能缺失。')
+  warn('部分资源未能下载。')
+  if (STRICT) {
+    warn('严格模式下 deploy 必须 fail，否则容器启动后 mp3/png 全部 404。')
+    warn('排查方向：')
+    warn('  1. 检查 GitHub release 是否还在: https://github.com/LikiosSedo/trpg-agent/releases')
+    warn('  2. 确认 manifest sha256 与 release asset 一致')
+    warn('  3. 检查网络/防火墙是否能访问 github.com')
+    process.exit(1)
+  }
+  warn('游戏可以启动但 BGM/立绘可能缺失。')
   warn('网络好转后可手动重试：')
   warn('    npm run fetch-assets')
   warn('    npm run fetch-assets -- --force   # 强制重新下载')
-  // 不阻塞 npm install
+  // 非严格模式不阻塞 npm install
   process.exit(0)
 }
 
