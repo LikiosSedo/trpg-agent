@@ -3092,10 +3092,14 @@ export class GameEngine {
     }
 
     // ── Phase 3: 先攻低于/等于玩家的敌人后行动 ──
-    if (!skipAfterPhase && afterPlayerIds.length > 0) {
+    // 仅当战斗仍在进行 + 有存活的目标时执行（防御性：避免已死怪物列表或战斗结束后误触）
+    const livingAfterPlayerIds = afterPlayerIds.filter(id =>
+      (combat.monsters.find(m => m.id === id)?.hp ?? 0) > 0
+    )
+    if (!skipAfterPhase && combat.active && livingAfterPlayerIds.length > 0) {
       combat.phase = 'monster_turn'
       combat.pendingMonsterTurn = false
-      const monsterResult = executeMonsterPhase(session, afterPlayerIds, true)
+      const monsterResult = executeMonsterPhase(session, livingAfterPlayerIds, true)
 
       yield* emitMonsterNarratives(monsterResult.hits ?? [])
       if (monsterResult.log.length > 0) {
@@ -3127,8 +3131,8 @@ export class GameEngine {
         }
         return
       }
-    } else if (!skipAfterPhase && afterPlayerIds.length === 0 && session.combat?.active) {
-      // 所有敌人先攻都高于玩家，Phase 1 跳过了回合结算，这里补上
+    } else if (!skipAfterPhase && combat.active && livingAfterPlayerIds.length === 0) {
+      // 后段无存活敌人，但战斗仍在进行（不应该发生），补一次空结算清理状态
       executeMonsterPhase(session, [], true)
     }
 
