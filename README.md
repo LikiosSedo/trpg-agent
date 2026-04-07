@@ -197,6 +197,50 @@ npm run publish-assets -- --skip-clean-check
 
 前置条件:`gh` CLI 已安装并 `gh auth login`。
 
+### 资源校验
+
+`npm run verify-assets` 检查本地 `public/audio/` `public/portraits/` 是否
+与 manifest 一致(逐文件 path + size 对比,**不算 sha 因为 tar 打包带 mtime
+不确定**)。
+
+```bash
+npm run verify-assets             # 校验,问题时 exit 1
+npm run verify-assets -- --quiet  # 静默模式(供 hook 用)
+npm run verify-assets -- --rebuild  # 把当前工作区写回 manifest fileList
+                                    # (manifest 没 fileList 时一次性 backfill)
+```
+
+校验内容:
+- 每个 pack 的 `verifyPath` 文件存在
+- `manifest.packs[].fileList` 里的每个文件存在 + size 匹配
+- 工作区里有 manifest 不知道的额外文件(可能是漏 publish 的新资源)
+
+### Pre-commit hook(可选)
+
+为了防止"改了资源但忘了 publish",项目提供一个 git pre-commit hook
+作为软提示。**它不阻塞 commit**,只在资源不一致时打一段提示。
+
+```bash
+npm run install-hooks         # 一次性安装(创建 .git/hooks/pre-commit 符号链接)
+```
+
+效果:每次 `git commit` 时自动跑 `verify-assets --quiet`,有差异时打:
+
+```
+ℹ pre-commit note: 资源与 assets-manifest.json 不一致
+    [verify-assets] audio: ✗ 1 个文件大小不匹配:
+        - public/audio/town-day.mp3  期望 1316581 字节, 实际 1316580 字节
+    如果是有意改资源,记得发布新版本:
+        npm run publish-assets
+        git add assets-manifest.json
+    此提示不阻塞 commit。设 SKIP_ASSET_HOOK=1 可跳过本 hook。
+```
+
+跳过方式:
+- 单次:`git commit --no-verify`
+- 全局:`SKIP_ASSET_HOOK=1 git commit ...`
+- 卸载:`rm .git/hooks/pre-commit`
+
 ### CREDITS
 
 资源里只有 `*.md` 文档(`CREDITS.md`、prompt 文档等)留在 git 仓库里,

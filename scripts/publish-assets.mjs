@@ -28,7 +28,7 @@
  *   - public/audio/ 和 public/portraits/ 是当前要发布的状态
  */
 
-import { readFile, writeFile, stat, unlink } from 'node:fs/promises'
+import { readFile, writeFile, stat, unlink, readdir } from 'node:fs/promises'
 import { spawn, spawnSync } from 'node:child_process'
 import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -170,9 +170,9 @@ if (existCheck.ok) {
 }
 log(`✓ release ${newRelease} 不存在，可以创建`)
 
-// ─── 打包 + sha ────────────────────────────────────────
+// ─── 打包 + sha + 文件清单 ────────────────────────────
 
-const builtPacks = []  // { name, version, tmpFile, sha256, size }
+const builtPacks = []  // { name, version, tmpFile, sha256, size, fileList }
 for (const cfg of PACKS_CONFIG) {
   const tarFile = `/tmp/${cfg.name}-pack-${newVersion}.tar.gz`
   log(`打包 ${cfg.name} → ${tarFile}`)
@@ -183,6 +183,11 @@ for (const cfg of PACKS_CONFIG) {
   } catch {
     die(`${cfg.sourceDir} 不存在，无法打包`)
   }
+
+  // 扫描 sourceDir 生成 fileList（path + size）
+  // 用于 verify-assets / pre-commit hook 检测漏 publish 的资源改动
+  const fileList = await scanPackFiles(cfg.sourceDir, cfg.tarExcludes)
+  log(`  ${cfg.name}: 扫描到 ${fileList.length} 个文件`)
 
   // 删旧的同名 tarball（防止上次中断的残留）
   await unlink(tarFile).catch(() => {})
@@ -207,6 +212,7 @@ for (const cfg of PACKS_CONFIG) {
     tmpFile: tarFile,
     sha256: sha,
     size,
+    fileList,
   })
 }
 
@@ -282,6 +288,7 @@ newManifest.packs = manifest.packs.map((oldPack) => {
     url,
     sha256: built.sha256,
     size: built.size,
+    fileList: built.fileList,
   }
 })
 
@@ -309,6 +316,55 @@ log(`    git push`)
 log('')
 log('Auto-Deploy 触发后 Render 会自动拉新 release。')
 log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+// ─── 资源扫描（生成 fileList）────────────────────────
+//
+// 扫描 sourceDir 下所有非 excludes 文件，返回 [{path, size}] 数组（按 path 字典序）。
+// 这份清单写入 manifest.packs[].fileList，供 verify-assets / pre-commit hook 检测
+// "改了资源但忘了 publish" 的场景。
+
+async function scanPackFiles(sourceDir, tarExcludes) {
+  const result = []
+  const sourceAbs = join(ROOT, sourceDir)
+
+  // 把 tarExcludes（如 ['*.md']）展开成简单的 fnmatch 谓词
+  const isExcluded = (filename) => {
+    for (const pat of tarExcludes) {
+      // 当前只支持 *.ext 这种 glob，避免引入 minimatch
+      if (pat.startsWith('*.')) {
+        const ext = pat.slice(1)
+        if (filename.endsWith(ext)) return true
+      } else if (filename === pat) {
+        return true
+      }
+    }
+    return false
+  }
+
+  async function walk(curAbs, curRel) {
+    let entries
+    try {
+      entries = await readdir(curAbs, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const ent of entries) {
+      const childAbs = join(curAbs, ent.name)
+      const childRel = curRel ? `${curRel}/${ent.name}` : ent.name
+      if (ent.isDirectory()) {
+        await walk(childAbs, childRel)
+      } else if (ent.isFile()) {
+        if (isExcluded(ent.name)) continue
+        const st = await stat(childAbs)
+        result.push({ path: `${sourceDir}/${childRel}`, size: st.size })
+      }
+    }
+  }
+
+  await walk(sourceAbs, '')
+  result.sort((a, b) => a.path.localeCompare(b.path))
+  return result
+}
 
 // ─── 默认 release notes ──────────────────────────────
 

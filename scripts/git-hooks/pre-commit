@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# trpg-agent pre-commit hook — 资源一致性提醒
+#
+# 行为:
+#   - 跑 verify-assets --quiet
+#   - 通过 → 静默放行
+#   - 失败 → 打提示，**不阻塞 commit**（exit 0）
+#     这样代码改动型 commit 不会被资源问题打断，但你能看到提示
+#
+# 安装: scripts/install-hooks.sh
+# 卸载: rm .git/hooks/pre-commit
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# 跳过 hook 的环境变量（CI / 紧急 commit 时）
+if [ "$SKIP_ASSET_HOOK" = "1" ]; then
+  exit 0
+fi
+
+# 没有 verify 脚本时静默退出（兼容老 checkout）
+if [ ! -f scripts/verify-assets.mjs ]; then
+  exit 0
+fi
+
+# 跑校验（捕获输出）
+HOOK_OUT="$(mktemp)"
+trap 'rm -f "$HOOK_OUT"' EXIT
+
+if node scripts/verify-assets.mjs --quiet > "$HOOK_OUT" 2>&1; then
+  # 全部一致 → 静默放行
+  exit 0
+fi
+
+# 不一致 → 打软提示，不阻塞
+echo ""
+echo "ℹ pre-commit note: 资源与 assets-manifest.json 不一致"
+echo ""
+sed 's/^/    /' "$HOOK_OUT" | head -30
+echo ""
+echo "    如果是有意改资源，记得发布新版本:"
+echo "        npm run publish-assets"
+echo "        git add assets-manifest.json"
+echo ""
+echo "    此提示不阻塞 commit。设 SKIP_ASSET_HOOK=1 可跳过本 hook。"
+echo ""
+
+exit 0
