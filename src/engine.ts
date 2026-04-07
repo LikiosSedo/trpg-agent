@@ -368,7 +368,7 @@ export type TurnEvent =
 
 // ─── 默认选项 fallback ──────────────────────────
 
-function buildFallbackActions(session: GameSession): SceneActions {
+export function buildFallbackActions(session: GameSession): SceneActions {
   const loc = session.worldState.currentLocation
   const subLoc = session.worldState.currentSubLocation
   const time = session.worldState.timeOfDay
@@ -394,6 +394,9 @@ function buildFallbackActions(session: GameSession): SceneActions {
           if (session.chapter.completedBeats.includes(beat.id)) continue
           if (beat.requires && !beat.requires.every((r: string) => session.chapter!.completedBeats.includes(r))) continue
           if (beat.trigger === 'auto') continue
+          // 信任驱动的副本 beats 不应作为系统推荐 — 它们是玩家自然探索时
+          // 触发的隐藏内容，被推荐会暴露"你和某 NPC 信任度够了"的元信息
+          if (beat.trustGate) continue
           const [bType, bTarget] = beat.trigger.split(':')
           if (bType === 'talk' && bTarget) {
             const npc = session.npcs.find(n => n.name === bTarget)
@@ -435,6 +438,8 @@ function buildFallbackActions(session: GameSession): SceneActions {
         if (session.chapter.completedBeats.includes(beat.id)) continue
         if (beat.requires && !beat.requires.every((r: string) => session.chapter!.completedBeats.includes(r))) continue
         if (beat.trigger === 'auto') continue
+        // 跳过信任驱动的副本 beats（设计为玩家探索的奖励，不作系统推荐）
+        if (beat.trustGate) continue
 
         const [type, target] = beat.trigger.split(':')
         if (type === 'talk' && target) {
@@ -547,7 +552,7 @@ interface QuestHint {
  * 根据当前章节和已完成 beat 推算下一步主线方向。
  * 设计原则：始终给出明确的行动指引，即使玩家迷路也能找到方向。
  */
-function getQuestHint(session: GameSession): QuestHint | null {
+export function getQuestHint(session: GameSession): QuestHint | null {
   if (!session.chapter) return null
   const chapterDef = getChapter(session.chapter.currentChapter)
   if (!chapterDef) return null
@@ -555,12 +560,14 @@ function getQuestHint(session: GameSession): QuestHint | null {
   const completed = session.chapter.completedBeats
   const loc = session.worldState.currentLocation
 
-  // 找到第一个未完成的、前置满足的、非auto的beat
+  // 找到第一个未完成的、前置满足的、非auto的、非信任驱动副本的beat
   let nextBeat = null
   for (const beat of chapterDef.beats) {
     if (completed.includes(beat.id)) continue
     if (beat.trigger === 'auto') continue
     if (beat.requires && !beat.requires.every(r => completed.includes(r))) continue
+    // 跳过信任驱动的副本 beats（同 buildFallbackActions 的处理）
+    if (beat.trustGate) continue
     nextBeat = beat
     break
   }
