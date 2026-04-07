@@ -351,6 +351,7 @@
     .chud-ally .chud-hp-fill { background: #4ecdc4; border-radius: 0; }
     .chud-ally .chud-hp-text { font-size: 9px; color: #4ecdc4; margin-top: 1px; }
     .chud-player {
+      flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -4398,6 +4399,10 @@
           combatSelectedTarget = null
           updateCombatPanel()
           setCombatButtonsEnabled(false)  // 开场叙事期间禁用按钮，等 combat_action_req 再启用
+          // 清空玩家未发送的输入（被强制拉入战斗时避免残留文字困扰）
+          { const inp = document.getElementById('input')
+            if (inp && inp.value) { inp.value = ''; hideInputHint() }
+          }
           if (msg.narrative) appendMsg(msg.narrative, 'combat-monster')
           playSfx('combat_start', 0.5)
           break
