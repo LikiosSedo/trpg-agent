@@ -114,7 +114,7 @@ export function startCombat(
       attackMod: abilityMod + PROFICIENCY,
       damageDice: template.damageDice,
       specialAbility: template.specialAbility,
-      combatBehavior: (template as any).combatBehavior ?? 'kill',
+      combatBehavior: (template as any).combatBehavior ?? 'fight',
     })
 
     initiativeOrder.push({
@@ -420,6 +420,31 @@ export type AllyHitRecord = {
   targetKilled: boolean
 }
 
+/**
+ * 同伴目标选择 AI — 根据 combatBehavior 决定策略
+ *   - fight  (默认)：随机选活着的敌人，不倾向补刀也不回避
+ *   - kill   (格罗姆)：贪心补刀，优先解决低血敌人
+ *   - subdue (格雷格/韩猛/镇长府卫兵)：避免补刀，优先打满血/中血敌人；
+ *                                     全场都低血时 fallback 到正常打（不卡战斗）
+ */
+function selectAllyTarget(ally: AllyInstance, aliveMonsters: MonsterInstance[]): MonsterInstance {
+  const behavior = ally.combatBehavior
+
+  if (behavior === 'subdue') {
+    const healthy = aliveMonsters.filter(m => m.hp / m.maxHp >= 0.3)
+    const pool = healthy.length > 0 ? healthy : aliveMonsters
+    return pool.reduce((best, m) => m.hp > best.hp ? m : best, pool[0])
+  }
+
+  if (behavior === 'kill') {
+    const lowHp = aliveMonsters.find(m => m.hp / m.maxHp < 0.25)
+    return lowHp ?? aliveMonsters.reduce((best, m) => m.hp > best.hp ? m : best, aliveMonsters[0])
+  }
+
+  // fight (默认): 随机
+  return aliveMonsters[Math.floor(Math.random() * aliveMonsters.length)]
+}
+
 export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: AllyHitRecord[]
@@ -438,13 +463,10 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     const ally = allies.find(a => a.id === entry.id)
     if (!ally || ally.hp <= 0) continue
 
-    // 选目标：有低血量怪 → 补刀，否则 → 打最高血量怪
     const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
     if (aliveMonsters.length === 0) break
 
-    const lowHpMonster = aliveMonsters.find(m => m.hp / m.maxHp < 0.25)
-    const target = lowHpMonster
-      ?? aliveMonsters.reduce((best, m) => m.hp > best.hp ? m : best, aliveMonsters[0])
+    const target = selectAllyTarget(ally, aliveMonsters)
 
     const atk = attackRoll(ally.attackMod, target.ac)
 

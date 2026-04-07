@@ -2883,7 +2883,16 @@ export class GameEngine {
     // 同伴行动叙事 helper
     const emitAllyNarratives = function* (hits: any[]) {
       for (const ahit of hits) {
-        const outcome = ahit.targetKilled ? 'ally_kill' : ahit.isCritical ? 'ally_critical' : ahit.hit ? 'ally_hit' : 'ally_miss'
+        // 根据同伴的 combatBehavior 选择叙事风格（subdue 用专属压制模板）
+        const ally = session.combat?.allies.find(a => a.name === ahit.allyName)
+        const isSubdue = ally?.combatBehavior === 'subdue'
+        const outcome = ahit.targetKilled
+          ? 'ally_kill'
+          : ahit.isCritical
+            ? (isSubdue ? 'ally_subdue_critical' : 'ally_critical')
+            : ahit.hit
+              ? (isSubdue ? 'ally_subdue_hit' : 'ally_hit')
+              : 'ally_miss'
         const text = pickNarrative(outcome as any, { ally: ahit.allyName, target: ahit.targetName })
         if (text) yield { type: 'combat_narrative' as const, text }
       }

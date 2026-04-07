@@ -7,6 +7,7 @@ type NarrativeOutcome = 'player_hit' | 'player_miss' | 'player_critical' | 'play
   | 'monster_hit' | 'monster_miss' | 'monster_critical'
   | 'npc_hit' | 'npc_miss' | 'npc_critical'
   | 'ally_hit' | 'ally_miss' | 'ally_critical' | 'ally_kill' | 'ally_down'
+  | 'ally_subdue_hit' | 'ally_subdue_critical'
   | 'monster_hit_ally' | 'monster_miss_ally' | 'monster_critical_ally'
 
 const TEMPLATES: Record<NarrativeOutcome, string[]> = {
@@ -88,6 +89,16 @@ const TEMPLATES: Record<NarrativeOutcome, string[]> = {
   ally_down: [
     '{ally}倒下了！但你必须继续战斗。',
     '{ally}失去意识瘫倒在地。战斗还没结束。',
+  ],
+  // 同伴压制型攻击（subdue：收着力道、制服而非击杀）
+  ally_subdue_hit: [
+    '{ally}的拳头收着力道，重重砸在{target}的肩窝，让对方踉跄后退。',
+    '{ally}一记精准的肘击落在{target}的躯干，意在压制而非夺命。',
+    '{ally}控制着力道出手，{target}被击中时发出一声闷哼。',
+  ],
+  ally_subdue_critical: [
+    '{ally}抓住破绽，一记干脆的重击打在{target}的太阳穴——仍然收着致命的那一寸。',
+    '精准的一击！{ally}让{target}剧烈一震，几乎失去平衡，但留了手。',
   ],
   // 怪物攻击同伴
   monster_hit_ally: [
