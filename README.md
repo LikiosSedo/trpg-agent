@@ -166,25 +166,36 @@ Auto-Deploy:    On Commit
 打新版本的流程(只有 maintainer 需要):
 
 ```bash
-# 1. 在 public/audio/ public/portraits/ 改好资源
-# 2. 打新 tarball
-tar czf /tmp/audio-pack-v2.tar.gz \
-  --exclude='public/audio/*.md' --exclude='public/audio/sfx/*.md' \
-  public/audio/
-tar czf /tmp/portraits-pack-v2.tar.gz \
-  --exclude='public/portraits/*.md' \
-  public/portraits/
+# 1. 在 public/audio/ 或 public/portraits/ 改好资源（换 mp3 / 加立绘等）
 
-# 3. 计算 sha256
-shasum -a 256 /tmp/audio-pack-v2.tar.gz /tmp/portraits-pack-v2.tar.gz
+# 2. 一键发布（打包 → sha256 → gh release → 重写 manifest）
+npm run publish-assets
 
-# 4. 创建新 release
-gh release create assets-v2 \
-  /tmp/audio-pack-v2.tar.gz /tmp/portraits-pack-v2.tar.gz \
-  --title "Assets v2" --notes "..."
-
-# 5. 更新 assets-manifest.json 里的 url + sha256 + version,提交
+# 3. review manifest diff，确认无误后提交
+git add assets-manifest.json
+git commit -m "assets: bump to v2 — 换草药堂 BGM"
+git push   # → Render auto-deploy 自动拉新 release
 ```
+
+`scripts/publish-assets.mjs` 自动:
+- 读 `assets-manifest.json` 推算下一个版本号(`v1` → `v2`)
+- 检查 GitHub release 是否已存在(防止覆盖)
+- 用固定的 tar 命令打包(消除 `--exclude` 写错的可能)
+- 计算 sha256
+- `gh release create` 上传
+- 用 Node 重写 manifest,**保留 `verifyPath` 等字段**
+- **不自动 commit/push**,你看 diff 决定
+
+支持的参数:
+
+```bash
+npm run publish-assets -- --dry-run         # 只打包+sha,不上传不改 manifest
+npm run publish-assets -- --version v5      # 跳过自动版本号,显式指定
+npm run publish-assets -- --notes "..."     # 自定义 release notes
+npm run publish-assets -- --skip-clean-check
+```
+
+前置条件:`gh` CLI 已安装并 `gh auth login`。
 
 ### CREDITS
 
