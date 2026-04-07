@@ -3471,6 +3471,19 @@
 
     function newGame() {
       clearSave()
+      // 关闭旧 WebSocket（如果有），防止孤儿连接的 onclose 触发 unlockInput
+      // 解锁新会话的输入——这会破坏开场叙事期间的输入锁定
+      if (ws) {
+        ws.onclose = null
+        ws.onerror = null
+        ws.onmessage = null
+        try { ws.close() } catch (e) { /* ignore */ }
+        ws = null
+      }
+      // 重置游戏状态变量
+      sending = false
+      combatMode = false
+      currentDmDiv = null
       document.getElementById('resume-screen').style.display = 'none'
       document.getElementById('create-screen').style.display = 'flex'
       document.getElementById('player-name').focus()
