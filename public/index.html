@@ -645,6 +645,56 @@
     .scene-detail-overlay.discovery .sd-go {
       display: none;
     }
+    /* ─── 战利品/物品列表（discovery 模式下可选展示） ─── */
+    .sd-loot {
+      display: none;
+      margin-top: 14px;
+      max-width: 88vw;
+      width: 320px;
+      background: rgba(20, 15, 8, 0.55);
+      border: 1px solid rgba(184, 134, 11, 0.35);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .scene-detail-overlay.discovery.has-loot .sd-loot {
+      display: block;
+      animation: discoveryEntrance 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.15s backwards;
+    }
+    .sd-loot-header {
+      color: #b8860b;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .sd-loot-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 2px;
+      color: #d6c89c;
+      font-size: 13px;
+      border-bottom: 1px dashed rgba(184, 134, 11, 0.15);
+    }
+    .sd-loot-row:last-child {
+      border-bottom: none;
+    }
+    .sd-loot-row .sd-loot-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sd-loot-row .sd-loot-name i {
+      color: #e6b800;
+      font-size: 16px;
+    }
+    .sd-loot-row .sd-loot-qty {
+      color: #e6c866;
+      font-weight: 600;
+    }
+    .sd-loot-row.gold .sd-loot-qty {
+      color: #ffd54f;
+    }
     @keyframes discoveryEntrance {
       0%   { opacity: 0; transform: scale(0.86) translateY(20px); }
       60%  { opacity: 1; }
@@ -3008,6 +3058,7 @@
       <img id="sd-img" src="" alt="">
       <div class="sd-title" id="sd-title"></div>
       <div class="sd-desc" id="sd-desc"></div>
+      <div class="sd-loot" id="sd-loot"></div>
       <button class="sd-go" id="sd-go-btn">前往</button>
     </div>
     <div class="sd-bg" onclick="closeSceneDetail()"></div>
@@ -3642,6 +3693,10 @@
       const overlay = document.getElementById('scene-detail-overlay')
       overlay.classList.remove('open')
       overlay.classList.remove('discovery')
+      overlay.classList.remove('has-loot')
+      // 还原 img 显示（发现弹窗可能隐藏过它）
+      const img = document.getElementById('sd-img')
+      if (img) img.style.display = ''
     }
 
     // ─── POI 场景详情（复用 scene-detail-overlay） ───
@@ -4616,10 +4671,11 @@
           showNPCCard(msg)
           break
 
-        // ─── POI 发现弹窗（复用地图详情卡，非阻塞） ───
-        case 'poi_unlock':
-          playSfx('ui_send', 0.5)
-          showPoiDiscovery(msg)
+        // ─── 发现弹窗（POI/物品/战利品，复用地图详情卡，非阻塞） ───
+        case 'discovery':
+          // 物品/金币时换更"获得"感的音效；纯地点用 ui_send
+          playSfx((msg.items && msg.items.length) || msg.gold ? 'item_acquire' : 'ui_send', 0.5)
+          showDiscovery(msg)
           break
 
         // ─── 物品获取通知 ───
@@ -5240,21 +5296,67 @@
       smartScrollToBottom()
     }
 
-    // ─── POI 发现弹窗（首次发现子地点，复用 scene-detail-overlay） ───
-    // 异步、非阻塞：游戏流程继续（DM 仍在说话），玩家可随时点掉
-    function showPoiDiscovery(data) {
+    // ─── 发现弹窗（POI / 物品 / 战利品，复用 scene-detail-overlay） ───
+    // 异步、非阻塞：游戏流程继续（DM 仍在说话），玩家可随时点掉。
+    // 一次性发现的 POI + 物品/金币会合并到同一个弹窗里展示。
+    function showDiscovery(data) {
       const overlay = document.getElementById('scene-detail-overlay')
       const img = document.getElementById('sd-img')
       const title = document.getElementById('sd-title')
       const desc = document.getElementById('sd-desc')
+      const badge = document.getElementById('sd-discovery-badge')
+      const lootEl = document.getElementById('sd-loot')
 
-      const poiImg = POI_SCENE_IMAGES[data.poiId] || MAP_SCENE_IMAGES[data.areaId] || ''
-      if (poiImg) img.src = poiImg
-      img.alt = data.poiName || ''
+      const poi = data.poi
+      const items = Array.isArray(data.items) ? data.items : []
+      const gold = typeof data.gold === 'number' ? data.gold : 0
+      const hasLoot = items.length > 0 || gold > 0
 
-      const areaName = data.areaName || MAP_AREA_ZH[data.areaId] || ''
-      title.textContent = (data.poiName || '') + (areaName ? ` · ${areaName}` : '')
-      desc.textContent = data.description || ''
+      // ── POI 区域：有 POI 时展示图片 + 标题 + 描述；没有时退化为占位 ──
+      if (poi) {
+        const poiImg = POI_SCENE_IMAGES[poi.id] || MAP_SCENE_IMAGES[poi.areaId] || ''
+        if (poiImg) {
+          img.src = poiImg
+          img.style.display = ''
+          img.alt = poi.nameZh || ''
+        } else {
+          img.style.display = 'none'
+        }
+        const areaName = poi.areaName || MAP_AREA_ZH[poi.areaId] || ''
+        title.textContent = (poi.nameZh || '') + (areaName ? ` · ${areaName}` : '')
+        desc.textContent = poi.description || ''
+      } else {
+        // 纯物品弹窗：隐藏图片，标题占位为来源，描述清空
+        img.style.display = 'none'
+        title.textContent = '战利品'
+        desc.textContent = ''
+      }
+
+      // ── 徽章文案根据内容切换 ──
+      if (poi && hasLoot) {
+        badge.textContent = '✦ 发现新地点 & 战利品 ✦'
+      } else if (poi) {
+        badge.textContent = '✦ 新地点揭晓 ✦'
+      } else {
+        badge.textContent = '✦ 获得物品 ✦'
+      }
+
+      // ── 物品列表 ──
+      if (hasLoot) {
+        let html = '<div class="sd-loot-header">— 收入囊中 —</div>'
+        for (const it of items) {
+          const qty = it.quantity > 1 ? ` x${it.quantity}` : ''
+          html += `<div class="sd-loot-row"><span class="sd-loot-name"><i class="ra ra-ammo-bag"></i>${esc(it.name)}</span><span class="sd-loot-qty">${qty || '×1'}</span></div>`
+        }
+        if (gold > 0) {
+          html += `<div class="sd-loot-row gold"><span class="sd-loot-name"><i class="ra ra-gold-bar"></i>金币</span><span class="sd-loot-qty">+${gold}</span></div>`
+        }
+        lootEl.innerHTML = html
+        overlay.classList.add('has-loot')
+      } else {
+        lootEl.innerHTML = ''
+        overlay.classList.remove('has-loot')
+      }
 
       overlay.classList.add('open')
       overlay.classList.add('discovery')
@@ -5460,10 +5562,20 @@
       bar.innerHTML = `<img src="${esc(portraitSrc)}" alt="${esc(npcName)}" onerror="this.style.display='none'">` +
         `<div><div class="npc-speak-name">${esc(npcName)}</div>` +
         `<div class="npc-speak-hint">正在与你对话</div></div>` +
-        `<button onclick="document.getElementById('input').value='和${esc(npcName)}交谈';sendInput();this.closest('.npc-portrait-bar').remove()" ` +
+        `<button class="npc-talk-btn" ` +
         `style="margin-left:auto;background:#0f3460;color:#8ab;border:1px solid #445;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;flex-shrink:0">` +
         `<i class="ra ra-speech-bubble"></i> 交谈</button>`
       container.appendChild(bar)
+      // 交谈按钮：填入输入框而非直接发送（和其他选项行为一致）
+      bar.querySelector('.npc-talk-btn').addEventListener('click', () => {
+        const inp = document.getElementById('input')
+        inp.value = '和' + npcName + '交谈'
+        inp.focus()
+        inp.setSelectionRange(inp.value.length, inp.value.length)
+        showInputHint('可直接发送，或在后面补充想说的话')
+        const clear = () => { hideInputHint(); inp.removeEventListener('input', clear) }
+        inp.addEventListener('input', clear)
+      })
       smartScrollToBottom()
     }
 
