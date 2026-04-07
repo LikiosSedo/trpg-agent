@@ -26,9 +26,12 @@ import { buildDMPrompt } from './dm-prompt.js'
 function loadConfig() {
   // 优先用环境变量（Render 等云平台），其次读本地配置文件
   if (process.env.TRPG_API_KEY) {
+    if (!process.env.TRPG_BASE_URL) {
+      throw new Error('TRPG_API_KEY 已设置但缺少 TRPG_BASE_URL，请显式提供 LLM endpoint')
+    }
     const config: Record<string, unknown> = {
       apiKey: process.env.TRPG_API_KEY,
-      baseUrl: process.env.TRPG_BASE_URL ?? 'https://your-llm-endpoint/v1',
+      baseUrl: process.env.TRPG_BASE_URL,
       model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
       type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
     }

@@ -140,9 +140,12 @@ TALK approach 严格区分（常见错分：单纯的自我陈述≠persuade）�
 
 function loadConfig() {
   if (process.env.TRPG_API_KEY) {
+    if (!process.env.TRPG_BASE_URL) {
+      throw new Error('TRPG_API_KEY 已设置但缺少 TRPG_BASE_URL，请显式提供 LLM endpoint')
+    }
     return {
       apiKey: process.env.TRPG_API_KEY,
-      baseUrl: process.env.TRPG_BASE_URL ?? 'https://your-llm-endpoint/v1',
+      baseUrl: process.env.TRPG_BASE_URL,
       model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
       type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
       headers: process.env.TRPG_HEADERS ? JSON.parse(process.env.TRPG_HEADERS) : undefined,

@@ -6,7 +6,7 @@
 
 - **双 Agent 设计**：DM Agent（叙事）+ Rules Agent（意图分类）
 - **确定性 + 叙事分离**：战斗/规则由代码处理，描述/对话由 LLM 生成
-- **当前模型**：Kimi K2.5 via llm-endpoint API（OpenAI 兼容）
+- **当前模型**：Kimi K2.5 via OpenAI-compatible endpoint
 - **13 个工具调用**：骰子、移动、对话、攻击等
 - **实时流式传输**：WebSocket + async generator
 - **上下文需求**：游戏事实注入 + NPC 关系 + 章节状态，单次 prompt 约 8-15K tokens
@@ -376,7 +376,7 @@ vllm serve Qwen/Qwen3-30B-A3B \
 你的 WebSocket 已经支持流式，本地部署后延迟链路：
 
 ```
-云端: 玩家 → 你的服务器 → llm API → Kimi K2.5 → 返回
+云端: 玩家 → 你的服务器 → 远端 LLM API → Kimi K2.5 → 返回
      总延迟: 200-800ms 首 token + 网络抖动
 
 本地: 玩家 → 你的服务器 → localhost vLLM → 返回
