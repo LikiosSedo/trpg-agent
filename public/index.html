@@ -5510,8 +5510,24 @@
       overlay.classList.add('discovery')
     }
 
-    // ─── NPC 角色卡弹窗 ───
+    // ─── NPC 角色卡弹窗（支持排队） ───
+    // 当一次 Move/叙事触发多个 NPC 解锁时（如同时进入有艾琳娜+韩猛的公会分部），
+    // 后续卡片入队，等前一张 closeNPCCard() 后延迟展示下一张。
+    const npcCardQueue = []
+    let npcCardOpen = false
+
     function showNPCCard(data) {
+      if (npcCardOpen) {
+        // 去重：避免同一 NPC 被重复入队（防御性）
+        if (npcCardQueue.some(q => q.npcName === data.npcName)) return
+        npcCardQueue.push(data)
+        return
+      }
+      npcCardOpen = true
+      renderNPCCard(data)
+    }
+
+    function renderNPCCard(data) {
       const overlay = document.getElementById('npc-card-overlay')
       const portraitEl = document.getElementById('npc-card-portrait')
       const nameEl = document.getElementById('npc-card-name')
@@ -5545,6 +5561,17 @@
 
     function closeNPCCard() {
       document.getElementById('npc-card-overlay').classList.remove('open')
+      npcCardOpen = false
+      // 队列有下一张时延迟展示（让关闭动画完成 + 给玩家一个节奏间隙）
+      if (npcCardQueue.length > 0) {
+        setTimeout(() => {
+          const next = npcCardQueue.shift()
+          if (!next) return
+          npcCardOpen = true
+          playSfx('npc_card', 0.35)
+          renderNPCCard(next)
+        }, 350)
+      }
     }
 
     // ─── 交易确认卡片 ───

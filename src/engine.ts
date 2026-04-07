@@ -35,7 +35,7 @@ import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
 import { WORLD_OVERVIEW, locations, connections } from './data/maps.js'
-import { getDefaultSubLocation, getSubLocationName } from './npc-mobility.js'
+import { getDefaultSubLocation, getSubLocationName, getPlayerSubLocation, getNPCSubLocation } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
@@ -1652,6 +1652,16 @@ export class GameEngine {
       try {
         const alert = JSON.parse(alertData as string)
 
+        // 计算 bondNote（响应者和受害者的亲近关系），[世界事件] 和 [战斗触发] 都会用
+        let bondNote = ''
+        if (alert.arrivedResponder) {
+          const { getPersonality: getPForDm } = await import('./npc-relationships.js')
+          const responderP = getPForDm(alert.arrivedResponder)
+          if (responderP.bonds?.some((b: any) => b.npcName === alert.victimName)) {
+            bondNote = `${alert.arrivedResponder}与${alert.victimName}关系亲近，怒火中烧。`
+          }
+        }
+
         // ── DM 注入：发现前的倒计时预告 ──
         if (!alert.responded && !alert.discoveryTurn) {
           const remaining = alert.delay - (session.turnCount - alert.triggerTurn)
@@ -1661,28 +1671,28 @@ export class GameEngine {
         }
 
         // ── DM 注入：发现阶段（刚发现时注入一次）──
+        // ⚠️ chaseDelay === 0 时不注入 [世界事件]！
+        // 原因：如果响应者当场（玩家就在现场），下方的 [战斗触发] 会在同一回合触发，
+        //       两个 tag 同时出现会让 DM 遇到"这一轮只描写到达，不描写攻击" vs
+        //       "描写战斗开场的第一个动作" 的矛盾指令，陷入分析瘫痪直到超时。
+        //       所以 chaseDelay=0 的情况完全交给 [战斗触发] 处理（arrival + 开战合并叙事）。
         if (alert.discoveryTurn === session.turnCount && alert.arrivedResponder) {
-          const { getPersonality: getPForDm } = await import('./npc-relationships.js')
-          const victimNpc = session.npcs.find((n: any) => n.name === alert.victimName)
-          const victimCondition = victimNpc?.condition === 'unconscious' ? '昏迷倒地' : '受伤'
-          const responderP = getPForDm(alert.arrivedResponder)
-          const bondNote = responderP.bonds?.some((b: any) => b.npcName === alert.victimName)
-            ? `（${alert.arrivedResponder}与${alert.victimName}关系亲近，情绪格外激动）` : ''
-
           const chaseDelay = alert.chaseDelay ?? 0
-          if (chaseDelay === 0) {
-            // 玩家在场：响应者当面质问
-            parts.push(`[世界事件：${alert.arrivedResponder}赶到现场，发现${alert.victimName}${victimCondition}！${bondNote}描写${alert.arrivedResponder}到达——脚步声、质问、愤怒。这一轮只描写到达，不描写攻击，下一轮战斗才开始。]`)
-          } else {
-            // 玩家不在场：暴力事件被发现
-            parts.push(`[世界事件：${alert.victimName}的遭遇被发现了。${alert.arrivedResponder}发现${alert.victimName}${victimCondition}。${bondNote}你不在现场——只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声）。${alert.arrivedResponder}正在追踪你。]`)
+          if (chaseDelay > 0) {
+            // 玩家不在场：暴力事件被发现，只写远处氛围
+            const victimNpc = session.npcs.find((n: any) => n.name === alert.victimName)
+            const victimCondition = victimNpc?.condition === 'unconscious' ? '昏迷倒地' : '受伤'
+            const bondNoteParen = bondNote ? `（${bondNote}）` : ''
+            parts.push(`[世界事件：${alert.victimName}的遭遇被发现了。${alert.arrivedResponder}发现${alert.victimName}${victimCondition}。${bondNoteParen}你不在现场——只需让玩家感受到远处的不安氛围（犬吠、飞鸟惊起、风中隐约的喊声）。${alert.arrivedResponder}正在追踪你。]`)
           }
+          // chaseDelay === 0：不注入任何 [世界事件]，等下方 [战斗触发] 统一处理
         }
 
         // ── DM 注入：追击到达，战斗即将开始 ──
+        // 当 chaseDelay === 0 时这里是唯一的叙事源，需要同时承担"到达 + 开战"
         if (alert.combatJustStarted) {
           const responderName = alert.combatJustStarted
-          parts.push(`[战斗触发：${responderName}追上了你！因你对${alert.victimName}的暴行发起攻击。用1-2句描写${responderName}出现的瞬间和战斗开场。数值由系统处理。]`)
+          parts.push(`[战斗触发：${responderName}因你对${alert.victimName}的暴行冲上来！${bondNote}用1-2句直接描写——${responderName}出现的瞬间到挥出第一击，不需要铺垫到达/质问的步骤，一气呵成进入战斗。数值由系统处理。]`)
           delete alert.combatJustStarted
           session.worldState.flags['violence_alert'] = JSON.stringify(alert)
         }
@@ -2014,7 +2024,7 @@ export class GameEngine {
     const thinkParser = new ThinkTagParser()
     const localizer = new StreamingLocalizer()  // 术语中文化安全网
     try {
-      const timeoutMs = 60000 // 60 秒超时
+      const timeoutMs = 120000 // 120 秒超时（之前 60 秒对长 thinking 流太紧张）
       let timedOut = false
       const timer = setTimeout(() => { timedOut = true }, timeoutMs)
 
@@ -2074,6 +2084,15 @@ export class GameEngine {
       fullText = fullText.split('\n').filter(line => !line.startsWith('[DEBUG]')).join('\n')
       // 同步中文化到完整文本（记录/存档用），和流式输出保持一致
       fullText = localize(fullText)
+      // 超时兜底：DM 超时 0 字时发一段占位 narrative，避免玩家面对空白屏
+      if (!fullText.trim()) {
+        const fallback = timedOut
+          ? '空气凝固了片刻，世界仿佛屏住了呼吸。'
+          : '一阵静默之后，空气中残留着未说出口的话语。'
+        console.warn(`[dm] 空响应，发送兜底文本 (timedOut=${timedOut})`)
+        yield { type: 'dm_text_delta', text: fallback }
+        fullText = fallback
+      }
       console.log(`[dm] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[dm] DM 错误:`, (err as Error).message)
@@ -2451,14 +2470,24 @@ export class GameEngine {
     }
 
     // NPC 档案更新 — 先同步执行所有解锁（避免用户在 yield 间隙查询到旧状态），再 yield 通知
+    //
+    // 解锁条件（满足任一）：
+    //   1. spokeTo：Talk 工具已经调用过（Talk 内部已校验子地点匹配），无条件解锁
+    //   2. sameSpot：NPC 与玩家在同一房间（location + subLocation 都一致），叙事中提到即解锁
+    //
+    // 为什么要检查 subLocation：破晓镇这种"一个 location 下有多个子地点"的设计下，
+    // 仅靠 location 过滤会导致"在酒馆听人提到艾琳娜"就解锁艾琳娜（她实际在公会分部）。
     const chapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
     const spokeTo = new Set(speakers) // Talk 工具调用的 NPC 一定解锁
+    const turnPlayerSub = getPlayerSubLocation(session)
     const npcUnlocks: Array<{ npcName: string; portrait: string; firstFacts: string[] }> = []
     const npcUpdates: string[] = []
     for (const npc of session.npcs) {
       if (input.includes(npc.name) || fullText.includes(npc.name)) {
         const sameArea = npc.location === session.worldState.currentLocation
-        if (sameArea || spokeTo.has(npc.name)) {
+        const npcSub = getNPCSubLocation(npc)
+        const sameSpot = sameArea && (!npcSub || !turnPlayerSub || npcSub === turnPlayerSub)
+        if (sameSpot || spokeTo.has(npc.name)) {
           const unlock = this.dossier.unlock(npc.name, session.turnCount, chapterNum)
           if (unlock) npcUnlocks.push({ npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) })
         }
@@ -2559,12 +2588,12 @@ export class GameEngine {
     let fullText = ''
     const toolsCalled: ToolCallRecord[] = []
     const bargainLocalizer = new StreamingLocalizer()
+    let bargainTimedOut = false
     try {
-      const timeoutMs = 60000
-      let timedOut = false
-      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
+      const timeoutMs = 120000
+      const timer = setTimeout(() => { bargainTimedOut = true }, timeoutMs)
       for await (const event of dmRespond(parts.join('\n\n'))) {
-        if (timedOut) {
+        if (bargainTimedOut) {
           console.error(`[bargain] DM 响应超时 (${timeoutMs}ms)`)
           yield { type: 'dm_error', message: '砍价响应超时，请重试。' }
           break
@@ -2594,6 +2623,15 @@ export class GameEngine {
       const bargainEmptyIdx = fullText.indexOf('(Empty response:')
       if (bargainEmptyIdx !== -1) fullText = fullText.substring(0, bargainEmptyIdx)
       fullText = localize(fullText)
+      // 超时兜底
+      if (!fullText.trim()) {
+        const fallback = bargainTimedOut
+          ? `${npc}沉吟良久，似乎还在权衡利弊。`
+          : `${npc}没有立即回应。`
+        console.warn(`[bargain] 空响应，发送兜底文本 (timedOut=${bargainTimedOut})`)
+        yield { type: 'dm_text_delta', text: fallback }
+        fullText = fallback
+      }
       console.log(`[bargain] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[bargain] DM 错误:`, (err as Error).message)
@@ -2695,16 +2733,16 @@ export class GameEngine {
     const context = this.buildCombatContext()
     let fullText = ''
     muteDMTools()  // 🔇 静音：只保留 SetActions
+    let combatDmTimedOut = false
     try {
-      const timeoutMs = 60000
-      let timedOut = false
-      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
+      const timeoutMs = 120000
+      const timer = setTimeout(() => { combatDmTimedOut = true }, timeoutMs)
       for await (const event of dmRespond(
         `[战斗叙事请求]\n${context}\n${scene}\n\n` +
         `用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。不要提及HP/AC/骰子等数值。\n\n` +
         `叙事结束后，思考玩家此刻最自然的后续行动，调用 SetActions 提供选项。`
       )) {
-        if (timedOut) {
+        if (combatDmTimedOut) {
           console.error(`[combat-dm] 战斗叙事超时 (${timeoutMs}ms)`)
           break
         }
@@ -2723,9 +2761,14 @@ export class GameEngine {
       clearTimeout(timer)
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
-      if (fullText.trim()) {
-        yield { type: 'combat_narrative', text: localize(fullText.trim()) }
+      // 超时兜底：DM 没给战斗叙事时，发一段通用文本保证不空白
+      if (!fullText.trim()) {
+        fullText = combatDmTimedOut
+          ? '战斗中的时间仿佛被拉长，每一次呼吸都变得沉重。'
+          : '战况在片刻寂静中继续。'
+        console.warn(`[combat-dm] 空响应，发送兜底文本 (timedOut=${combatDmTimedOut})`)
       }
+      yield { type: 'combat_narrative', text: localize(fullText.trim()) }
       // 如果 DM 调用了 SetActions 生成了选项，传出去
       const narrativeActions = consumeActions()
       if (narrativeActions) {
@@ -2770,7 +2813,7 @@ export class GameEngine {
         `2. 用一句"如果……"的反思提示，暗示玩家本可以做出不同选择（基于实际发生的事件）\n\n` +
         `语气：悲壮但不绝望，像小说的章节结尾。不要提及数值、系统或游戏机制。`
 
-      const timeoutMs = 30000
+      const timeoutMs = 120000
       let timedOut = false
       const timer = setTimeout(() => { timedOut = true }, timeoutMs)
       for await (const event of dmRespond(prompt)) {
@@ -3258,12 +3301,12 @@ export class GameEngine {
 
     let fullText = ''
     const openingLocalizer = new StreamingLocalizer()
+    let openingTimedOut = false
     try {
-      const timeoutMs = 90000 // 开场叙事给 90 秒（首次调用可能较慢）
-      let timedOut = false
-      const timer = setTimeout(() => { timedOut = true }, timeoutMs)
+      const timeoutMs = 120000 // 开场叙事给 120 秒（首次调用可能较慢）
+      const timer = setTimeout(() => { openingTimedOut = true }, timeoutMs)
       for await (const event of dmRespond(prompt)) {
-        if (timedOut) {
+        if (openingTimedOut) {
           console.error(`[opening] DM 开场超时 (${timeoutMs}ms)`)
           yield { type: 'dm_error', message: '开场叙事生成超时，请刷新重试。' }
           break
@@ -3285,6 +3328,13 @@ export class GameEngine {
       const openEmptyIdx = fullText.indexOf('(Empty response:')
       if (openEmptyIdx !== -1) fullText = fullText.substring(0, openEmptyIdx)
       fullText = localize(fullText)
+      // 超时兜底：开场叙事必须有内容，否则玩家无法开始游戏
+      if (!fullText.trim()) {
+        const fallback = '马车在颠簸中缓缓前行，车轮碾过砾石的声音将你从昏沉中唤醒。你眨了眨眼，试图记起自己为何在这里——记忆如同被雾气包裹，朦胧不清。'
+        console.warn(`[opening] 空响应，发送兜底文本 (timedOut=${openingTimedOut})`)
+        yield { type: 'dm_text_delta', text: fallback }
+        fullText = fallback
+      }
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }
@@ -3325,13 +3375,20 @@ export class GameEngine {
     }
     yield { type: 'dm_end', combat: false, pendingMonster: false, actions: actions ? classifyActions(actions) : null }
 
-    // 开场 NPC 解锁（只有同区域的 NPC 才解锁——车夫提到格雷格不算见面）
+    // 开场 NPC 解锁（只有"真的在同一房间"才算见面）
+    //   - 同 location：排除车夫提到外地 NPC
+    //   - 同 subLocation：排除在酒馆听人提到公会的艾琳娜（她虽在同镇但不同房间）
+    //   - subLocation 为空时（如荒野过场）放宽，只按 location 判断
     const openChapterNum = parseInt((session.chapter?.currentChapter ?? 'ch1').replace(/\D/g, ''), 10) || 1
+    const openPlayerSub = getPlayerSubLocation(session)
     for (const npc of session.npcs) {
-      if (fullText.includes(npc.name) && npc.location === session.worldState.currentLocation) {
-        const notice = this.dossier.unlock(npc.name, 0, openChapterNum)
-        if (notice) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
-      }
+      if (!fullText.includes(npc.name)) continue
+      if (npc.location !== session.worldState.currentLocation) continue
+      const npcSub = getNPCSubLocation(npc)
+      const sameSpot = !npcSub || !openPlayerSub || npcSub === openPlayerSub
+      if (!sameSpot) continue
+      const notice = this.dossier.unlock(npc.name, 0, openChapterNum)
+      if (notice) yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
     }
 
     session.dmMessages = getDMMessages()
