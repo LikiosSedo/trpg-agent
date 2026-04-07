@@ -25,10 +25,14 @@ to give each shop in Dawnbreak Town its own distinct atmosphere.
 
 ### `apothecary.mp3` — Greenleaf Apothecary
 
-- **Title**: Mystical Theme
-- **Author**: Alexandr Zhelanov
+- **Title**: Woodland Fantasy
+- **Author**: Matthew Pablo
 - **License**: CC-BY 3.0 (attribution required)
-- **Source**: <https://opengameart.org/content/mystical-theme>
+- **Source**: <https://opengameart.org/content/woodland-fantasy>
+- **Note**: Replaced the earlier "Mystical Theme" by Alexandr Zhelanov, which felt
+  too eerie/suspenseful for a cozy herbal shop. Woodland Fantasy is a warm
+  acoustic ballad (real violin + flute + guitar) better suited to a quiet
+  herbalist interior.
 
 ### `inn.mp3` — Dawn's Rest Inn
 

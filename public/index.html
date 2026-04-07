@@ -666,6 +666,48 @@
     .scene-detail-overlay.discovery .sd-go {
       display: none;
     }
+    /* ─── BGM 切换提示 ─── */
+    /* 每次背景音乐切换时左下角短暂浮现，3 秒后淡出。点击可固定显示。 */
+    #bgm-toast {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 250;
+      max-width: 70vw;
+      padding: 6px 12px;
+      background: rgba(15, 10, 25, 0.85);
+      border: 1px solid rgba(184, 134, 11, 0.45);
+      border-radius: 14px;
+      color: #d6c89c;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      pointer-events: auto;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      user-select: none;
+    }
+    #bgm-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #bgm-toast.pinned {
+      border-color: #d4a017;
+      color: #e6c866;
+    }
+    #bgm-toast .bgm-icon {
+      color: #b8860b;
+      margin-right: 4px;
+    }
+    #bgm-toast .bgm-id {
+      color: #667;
+      font-size: 10px;
+      margin-left: 6px;
+      font-family: -apple-system, monospace;
+    }
     /* ─── 战利品/物品列表（discovery 模式下可选展示） ─── */
     .sd-loot {
       display: none;
@@ -1283,7 +1325,11 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin-bottom: 20px;
+      margin: 0 auto 20px;
+      max-width: 320px;  /* 限宽：每张卡片 ≈ 155×155 头像 + 下方文字 */
+    }
+    @media (max-width: 360px) {
+      .class-grid { max-width: 280px; }
     }
 
     .class-btn {
@@ -1328,25 +1374,25 @@
     }
 
     .class-btn .pc-info {
-      padding: 8px 10px 10px;
+      padding: 6px 8px 8px;
     }
 
     .class-btn .name {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: bold;
       color: #d4a017;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
     }
 
     .class-btn .desc {
-      font-size: 11px;
+      font-size: 10px;
       color: #888;
-      margin-top: 3px;
-      line-height: 1.3;
+      margin-top: 2px;
+      line-height: 1.25;
     }
 
     .class-btn .persona {
-      font-size: 10px;
+      font-size: 9px;
       color: #6a8aa0;
       margin-top: 2px;
       font-style: italic;
@@ -3038,6 +3084,9 @@
         <span id="hud-location" style="color:#888"><i class="ra ra-compass"></i> --</span>
       </div>
     </div>
+    <!-- BGM 切换浮动提示（点击切换"短暂显示"/"固定显示"） -->
+    <div id="bgm-toast" onclick="toggleBgmToastPin()"><span class="bgm-icon">♪</span><span id="bgm-toast-text">--</span><span class="bgm-id" id="bgm-toast-id"></span></div>
+
     <!-- 常驻主线任务提示条 -->
     <div id="quest-hint-bar">
       <span class="quest-hint-chapter" id="quest-hint-chapter"></span>
@@ -5786,6 +5835,68 @@
     let pendingBgm = ''
     let pendingAmbient = ''
 
+    // BGM id → 中文 label（与 src/audio-config.ts BGM_TRACKS 同步）
+    const BGM_LABELS = {
+      'town-day': '小镇白日',
+      'town-night': '小镇夜晚',
+      'tavern': '酒馆温暖',
+      'forest': '森林探索',
+      'mines': '矿道深沉',
+      'wasteland': '荒原苍凉',
+      'blacksmith': '铁砧铺',
+      'guild': '银鳞商会',
+      'apothecary': '草药堂',
+      'inn': '破晓旅店',
+      'battle': '战斗',
+      'boss-battle': 'BOSS战',
+      'tension': '紧张悬疑',
+      'sad': '阵亡哀乐',
+      'sorrow': '沉痛悲怆',
+      'revelation': '史诗揭示',
+      'reflection': '往事回望',
+      'triumph': '凯旋',
+      'mystery': '神秘',
+      'danger': '危险逼近',
+      'peaceful': '宁静',
+    }
+
+    // BGM 浮动提示：3 秒后淡出。点击元素可"固定显示"切换。
+    let bgmToastTimer = null
+    let bgmToastPinned = false
+    function showBgmToast(bgmId) {
+      const el = document.getElementById('bgm-toast')
+      const txt = document.getElementById('bgm-toast-text')
+      const idEl = document.getElementById('bgm-toast-id')
+      if (!el || !txt) return
+      const label = BGM_LABELS[bgmId] || bgmId || '(未知)'
+      txt.textContent = label
+      if (idEl) idEl.textContent = bgmId ? `[${bgmId}]` : ''
+      el.classList.add('show')
+      if (bgmToastTimer) clearTimeout(bgmToastTimer)
+      // 固定显示模式不自动淡出
+      if (!bgmToastPinned) {
+        bgmToastTimer = setTimeout(() => {
+          el.classList.remove('show')
+          bgmToastTimer = null
+        }, 3500)
+      }
+    }
+    function toggleBgmToastPin() {
+      bgmToastPinned = !bgmToastPinned
+      const el = document.getElementById('bgm-toast')
+      if (!el) return
+      el.classList.toggle('pinned', bgmToastPinned)
+      if (bgmToastPinned) {
+        if (bgmToastTimer) { clearTimeout(bgmToastTimer); bgmToastTimer = null }
+        el.classList.add('show')  // 固定时确保可见
+      } else {
+        // 取消固定后立即开始 3 秒淡出
+        bgmToastTimer = setTimeout(() => { el.classList.remove('show'); bgmToastTimer = null }, 3500)
+      }
+    }
+    // 暴露给 console：随时输入 __bgm() 查看当前播放
+    window.__bgm = () => ({ bgm: currentBgm, label: BGM_LABELS[currentBgm] || currentBgm, ambient: currentAmbient })
+
     function unlockAudio() {
       if (audioUnlocked) return
       bgmAudio = new Audio()
@@ -5803,6 +5914,12 @@
       }
     }
 
+    // 跟踪上一次 play() 的 Promise，用于排查"双重播放"bug
+    // （Chrome/Safari 在 src 替换时若上一次 play promise 还 pending，
+    //  abort 不彻底，旧 buffer 偶尔会与新 buffer 短暂同响）
+    let bgmPlayPromise = null
+    let ambientPlayPromise = null
+
     function switchAudio(bgm, ambient) {
       // 未解锁时缓存，等用户点击后播放
       if (!audioUnlocked) {
@@ -5810,22 +5927,77 @@
         if (ambient !== undefined) pendingAmbient = ambient
         return
       }
+
+      // ── BGM 切换 ──
       if (bgm && bgm !== currentBgm) {
+        const prev = currentBgm
         currentBgm = bgm
+        console.log(`[bgm] switch: ${prev || '(none)'} → ${bgm}`)
+        // 1) 显式停止旧播放，避免 src 替换时旧 buffer 短暂残留
+        try { bgmAudio.pause() } catch (e) { }
+        try { bgmAudio.currentTime = 0 } catch (e) { }
+        // 2) 换 src 并强制重新加载（不依赖浏览器自动 abort 旧加载）
         bgmAudio.src = AUDIO_BASE + bgm + '.mp3'
-        bgmAudio.play().catch(() => { })
+        try { bgmAudio.load() } catch (e) { }
+        // 3) 异步 play —— 上一次 play promise 若还 pending 会被自然 abort
+        bgmPlayPromise = bgmAudio.play()
+        if (bgmPlayPromise && bgmPlayPromise.catch) {
+          bgmPlayPromise.catch((err) => {
+            // AbortError 是快速切换时的预期行为，不报警
+            if (err && err.name !== 'AbortError') console.warn('[bgm] play failed:', err.name, err.message)
+          })
+        }
+        showBgmToast(bgm)
       }
+
+      // ── Ambient 切换 ──
       if (ambient !== undefined && ambient !== currentAmbient) {
+        const prevAmb = currentAmbient
         currentAmbient = ambient
+        console.log(`[ambient] switch: ${prevAmb || '(none)'} → ${ambient || '(silence)'}`)
+        try { ambientAudio.pause() } catch (e) { }
+        try { ambientAudio.currentTime = 0 } catch (e) { }
         if (!ambient || ambient === 'silence') {
-          ambientAudio.pause()
-          ambientAudio.src = ''
+          ambientAudio.removeAttribute('src')
+          try { ambientAudio.load() } catch (e) { }
         } else {
           ambientAudio.src = AUDIO_BASE + 'amb-' + ambient + '.mp3'
-          ambientAudio.play().catch(() => { })
+          try { ambientAudio.load() } catch (e) { }
+          ambientPlayPromise = ambientAudio.play()
+          if (ambientPlayPromise && ambientPlayPromise.catch) {
+            ambientPlayPromise.catch((err) => {
+              if (err && err.name !== 'AbortError') console.warn('[ambient] play failed:', err.name, err.message)
+            })
+          }
         }
       }
     }
+
+    // 调试入口：随时输入 __audioState() 查看实际 audio element 状态
+    // 用于排查"听到两首 BGM"这种 bug —— 看 bgm.paused/src/currentTime 是否
+    // 与 currentBgm 一致；如果发现 paused=false 但 src 里是别的曲目，就是
+    // race condition，请把输出贴给开发者。
+    window.__audioState = () => ({
+      bgm: bgmAudio ? {
+        currentBgmId: currentBgm,
+        src: bgmAudio.src,
+        paused: bgmAudio.paused,
+        currentTime: bgmAudio.currentTime,
+        duration: bgmAudio.duration,
+        volume: bgmAudio.volume,
+        readyState: bgmAudio.readyState,
+      } : null,
+      ambient: ambientAudio ? {
+        currentAmbientId: currentAmbient,
+        src: ambientAudio.src,
+        paused: ambientAudio.paused,
+        readyState: ambientAudio.readyState,
+      } : null,
+      unlocked: audioUnlocked,
+      // 全局扫描:页面里所有 <audio> element（不只是我们持有引用的）
+      // 如果数量 > 2 + SFX_POOL_SIZE = 6，说明有"野生 audio"被某处创建了
+      allAudioElementsCount: document.querySelectorAll('audio').length,
+    })
 
     // 用户首次交互解锁音频（iOS/Chrome 要求）
     document.addEventListener('click', unlockAudio, { once: true })

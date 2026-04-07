@@ -19,7 +19,8 @@
  * - 室内子地点轨（铁砧铺/银鳞商会/草药堂/破晓旅店）：本次新增
  *   - blacksmith.mp3 — Joth "Medieval: Harvest Season" (CC0)
  *   - guild.mp3      — RandomMind "Fame Town" (CC-BY，需署名)
- *   - apothecary.mp3 — Alexandr Zhelanov "Mystical Theme" (CC-BY，需署名)
+ *   - apothecary.mp3 — Matthew Pablo "Woodland Fantasy" (CC-BY，需署名)
+ *                       温暖小提琴+长笛+原声吉他民谣，替换原 Mystical Theme
  *   - inn.mp3        — cynicmusic "Small Sleepy Town (Major)" (CC-BY，需署名)
  */
 export const BGM_TRACKS: Record<string, { file: string; label: string }> = {

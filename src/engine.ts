@@ -2185,9 +2185,18 @@ export class GameEngine {
       session.worldState.timeOfDay,
       !!session.combat?.active,
     )
+    const finalBgm = ambianceOverride?.bgm ?? autoAudio.bgm
+    console.log(
+      `[audio] BGM=${finalBgm} ambient=${autoAudio.ambient}` +
+      ` (loc=${session.worldState.currentLocation}` +
+      `${session.worldState.currentSubLocation ? '/' + session.worldState.currentSubLocation : ''}` +
+      ` time=${session.worldState.timeOfDay}` +
+      `${session.combat?.active ? ' combat' : ''}` +
+      `${ambianceOverride ? ' [DM-override]' : ''})`
+    )
     yield {
       type: 'audio',
-      bgm: ambianceOverride?.bgm ?? autoAudio.bgm,
+      bgm: finalBgm,
       ambient: autoAudio.ambient,
     }
 
