@@ -32,7 +32,7 @@ function loadConfig() {
     const config: Record<string, unknown> = {
       apiKey: process.env.TRPG_API_KEY,
       baseUrl: process.env.TRPG_BASE_URL,
-      model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
+      model: process.env.TRPG_MODEL ?? 'kimi-for-coding',
       type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
     }
     // Kimi coding API 需要伪装成 coding agent + 禁用 stream_options

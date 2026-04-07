@@ -146,7 +146,7 @@ function loadConfig() {
     return {
       apiKey: process.env.TRPG_API_KEY,
       baseUrl: process.env.TRPG_BASE_URL,
-      model: process.env.TRPG_MODEL ?? 'moonshotai/Kimi-K2.5',
+      model: process.env.TRPG_MODEL ?? 'kimi-for-coding',
       type: process.env.TRPG_PROVIDER_TYPE ?? 'openai',
       headers: process.env.TRPG_HEADERS ? JSON.parse(process.env.TRPG_HEADERS) : undefined,
       streamUsage: process.env.TRPG_STREAM_USAGE === 'false' ? false : undefined,

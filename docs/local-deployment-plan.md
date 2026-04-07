@@ -259,9 +259,9 @@ Rules Agent  → Qwen3-4B 或 Qwen3-8B（意图分类，极快响应）
 你的 `dm-agent.ts` 已经是 OpenAI 兼容 API 调用，迁移到本地只需改环境变量：
 
 ```bash
-# 从云端 API
-TRPG_BASE_URL=https://your-llm-endpoint/v1
-TRPG_MODEL=moonshotai/Kimi-K2.5
+# 从云端 API（项目当前默认 = Kimi coding API）
+TRPG_BASE_URL=https://api.kimi.com/coding/v1
+TRPG_MODEL=kimi-for-coding
 
 # 改为本地 vLLM
 TRPG_BASE_URL=http://localhost:8000/v1
