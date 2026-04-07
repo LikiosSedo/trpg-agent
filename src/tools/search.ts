@@ -135,9 +135,8 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       )
       const hasWatcher = activeNpcs.length > 0
 
-      // 夜间偷窃更容易（光线差、店主警觉性低）
+      // 夜间影响：潜行更容易（店主看不清），但搜索找物品更难（自己看不清）
       const isNight = session.worldState.timeOfDay === 'night'
-      const nightBonus = isNight ? -4 : 0
 
       if (hasUnconsciousNpc) dc = 5  // 战后搜刮，东西就在眼前
       // 建筑内搜索（商店、旅店、公会）
@@ -146,7 +145,9 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       } else if (hasWatcher) {
         dc += 3  // 野外/矿道有 NPC 同行时略微提高
       }
-      dc = Math.max(5, dc + nightBonus)  // 夜间加成（但 DC 下限 5）
+      // 夜间修正：有 watcher 时 -4（潜行容易），无 watcher 时 +2（看不清）
+      const nightMod = isNight ? (hasWatcher ? -4 : +2) : 0
+      dc = Math.max(5, dc + nightMod)
 
       const result = skillCheck(mod, dc)
       const checkLabel = hasWatcher ? '潜行检定(在他人注视下寻找物品)' : '察觉检定(搜索区域)'
