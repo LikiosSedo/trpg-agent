@@ -4,3 +4,17 @@ dist/
 *.json.bak
 tmp.env
 *.env
+
+# ─── 资源（由 GitHub Release 分发，scripts/fetch-assets.mjs 下载）───
+# 二进制资源不进 git；只在仓库里保留文档（CREDITS.md / *.md prompt）
+public/audio/*.mp3
+public/audio/*.ogg
+public/audio/*.wav
+public/audio/sfx/**/*.mp3
+public/audio/sfx/**/*.ogg
+public/audio/sfx/**/*.wav
+public/portraits/*.png
+public/portraits/scenes/*.png
+
+# fetch-assets.mjs 的临时文件
+.fetch-*.tar.gz

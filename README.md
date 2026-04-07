@@ -26,6 +26,10 @@ npm run start      # 备选:终端 CLI 模式
 npm run play       # 彩蛋:酒馆骰子小游戏(单独的 demo)
 ```
 
+> `npm install` 会自动通过 `postinstall` 触发 `scripts/fetch-assets.mjs`,
+> 从 GitHub Release 下载约 200 MB 的 BGM/立绘资源到 `public/audio/` 和
+> `public/portraits/`。详见下方 [资源](#资源bgm--美术) 一节。
+
 ## 配置
 
 LLM 凭据有两种配置方式,二选一即可。代码会**优先读取环境变量**,
@@ -92,6 +96,63 @@ DM Agent 通过 open-claude-cli 调用,要求模型支持 **tool use / function 
 
 不支持 tool use 的模型(早期 Llama2、纯 chat completion 模型)无法正常运行 DM。
 
+## 资源(BGM / 美术)
+
+为了让 git 仓库保持轻量,音频(~135 MB)和美术立绘(~57 MB)**不直接提交进 git**,
+而是通过 [GitHub Releases](https://github.com/LikiosSedo/trpg-agent/releases) 分发。
+
+### 自动获取(默认)
+
+`npm install` 会触发 `scripts/fetch-assets.mjs`,它会:
+
+1. 读 [`assets-manifest.json`](assets-manifest.json) 的当前资源版本
+2. 从 GitHub Release 流式下载 tarball
+3. 校验 sha256
+4. 用系统 `tar` 解压到 `public/audio/` 和 `public/portraits/`
+
+下载约 30-60 秒,看网速。失败不会阻塞 `npm install`,只打 warning。
+
+### 手动管理
+
+```bash
+npm run fetch-assets             # 已存在则跳过
+npm run fetch-assets -- --force  # 强制重新下载所有 pack
+SKIP_ASSETS=1 npm install        # 跳过资源下载(只关心代码时)
+```
+
+### 资源版本管理
+
+每次资源更新会发布一个新的 `assets-vN` Release tag,manifest 同步更新版本号
+和 sha256。资源版本是不可变的:`assets-v1` 永远是同一份内容。
+
+打新版本的流程(只有 maintainer 需要):
+
+```bash
+# 1. 在 public/audio/ public/portraits/ 改好资源
+# 2. 打新 tarball
+tar czf /tmp/audio-pack-v2.tar.gz \
+  --exclude='public/audio/*.md' --exclude='public/audio/sfx/*.md' \
+  public/audio/
+tar czf /tmp/portraits-pack-v2.tar.gz \
+  --exclude='public/portraits/*.md' \
+  public/portraits/
+
+# 3. 计算 sha256
+shasum -a 256 /tmp/audio-pack-v2.tar.gz /tmp/portraits-pack-v2.tar.gz
+
+# 4. 创建新 release
+gh release create assets-v2 \
+  /tmp/audio-pack-v2.tar.gz /tmp/portraits-pack-v2.tar.gz \
+  --title "Assets v2" --notes "..."
+
+# 5. 更新 assets-manifest.json 里的 url + sha256 + version,提交
+```
+
+### CREDITS
+
+资源里只有 `*.md` 文档(`CREDITS.md`、prompt 文档等)留在 git 仓库里,
+方便 review 和归属追踪。完整的 BGM 出处见 [`public/audio/CREDITS.md`](public/audio/CREDITS.md)。
+
 ## 开发命令
 
 ```bash
@@ -155,6 +216,8 @@ CLAUDE.md                    # 项目开发规范(给 AI 协作者读)
 - `dist/` — 构建产物(项目用 `tsx` 直接跑 ts 源码,实际不需要)
 - `*.env`, `tmp.env` — 本地环境变量
 - `~/.occ/config.json` — LLM 凭据(在 home 目录,根本不在 repo 里)
+- `public/audio/*.{mp3,ogg,wav}` `public/portraits/*.png` — 资源,通过
+  GitHub Release 分发(见 [资源](#资源bgm--美术) 一节)
 
 仓库里**没有任何 API key 或敏感凭据**。
 

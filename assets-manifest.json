@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "schemaVersion": "trpg-agent-assets/v1",
+  "version": "v1",
+  "release": "assets-v1",
+  "description": "Trpg-agent 资源清单。版本号 + sha256 决定 fetch-assets.mjs 下载哪一份。每次发新资源 release 时同步更新此文件并提交。",
+  "packs": [
+    {
+      "name": "audio",
+      "url": "https://github.com/LikiosSedo/trpg-agent/releases/download/assets-v1/audio-pack-v1.tar.gz",
+      "sha256": "a845761ce8542fc11b4043298cd4f1ea1e31dd997a12af6692798e1a8f8796e1",
+      "size": 135556656,
+      "verifyPath": "public/audio/town-day.mp3"
+    },
+    {
+      "name": "portraits",
+      "url": "https://github.com/LikiosSedo/trpg-agent/releases/download/assets-v1/portraits-pack-v1.tar.gz",
+      "sha256": "1993bd794f87a16a32ee2b0ee2da2677c93545bfe7fef684331593d765c7439f",
+      "size": 56969291,
+      "verifyPath": "public/portraits/elena-silverleaf.png"
+    }
+  ]
+}
