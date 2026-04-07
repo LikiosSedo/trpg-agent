@@ -2234,13 +2234,12 @@ export class GameEngine {
       pendingCombatInterrupt = null
     }
 
-    yield {
-      type: 'dm_end',
-      combat: !!session.combat?.active,
-      pendingMonster: !!session.combat?.pendingMonsterTurn,
-      actions: actions ? classifyActions(actions) : null,
-      hasPendingTrade,
-    }
+    // 注意：dm_end 已经从此处后移到所有副作用 yield 完成之后（见 sync 之前）
+    // 这样可以避免 input 提前解锁——例如：DM 叙事刚结束 → 解锁 → 后台触发随机
+    // 遭遇 → combatDMNarrative 又开始流式叙事，用户感知"输入框解锁后还在出文字"。
+    // actions / hasPendingTrade 在此预先固化，后续不再修改。
+    const dmEndActions = actions ? classifyActions(actions) : null
+    const dmEndHasPendingTrade = hasPendingTrade
 
     // 剧情保底遭遇：关键探索节点完成后，下次移动 100% 触发战斗
     // 双保险：如果玩家不移动，8 轮后也强制触发（防止卡住）
@@ -2430,6 +2429,19 @@ export class GameEngine {
 
     // DM 消息持久化
     session.dmMessages = getDMMessages()
+
+    // ─── dm_end 在此延迟发出（原本在主叙事流刚结束时就发） ───
+    // 此时所有副作用已完成：随机/剧情遭遇、combatDMNarrative、怪物回合、
+    // npc_unlock 卡片、quest_progress 等都已 yield。combat 字段反映最终状态，
+    // 前端读到 combat:true 时不会解锁 input；combat:false 时所有视觉元素已落地，
+    // 此刻解锁 input 是安全的。
+    yield {
+      type: 'dm_end',
+      combat: !!session.combat?.active,
+      pendingMonster: !!session.combat?.pendingMonsterTurn,
+      actions: dmEndActions,
+      hasPendingTrade: dmEndHasPendingTrade,
+    }
 
     // 同步
     yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }

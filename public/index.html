@@ -605,56 +605,44 @@
       line-height: 1.5;
     }
 
-    /* ─── POI 解锁卡片 ─── */
-    .poi-unlock-card {
-      margin: 12px 0;
-      border: 1px solid rgba(184, 134, 11, 0.4);
-      border-radius: 8px;
-      overflow: hidden;
-      background: linear-gradient(135deg, #0f1a2e 0%, #1a0f3d 100%);
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-    .poi-unlock-card.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .poi-unlock-img {
-      width: 100%;
-      max-height: 180px;
-      overflow: hidden;
-    }
-    .poi-unlock-img img {
-      width: 100%;
-      display: block;
-      object-fit: cover;
-    }
-    .poi-unlock-body {
-      padding: 12px 16px;
-      text-align: center;
-    }
-    .poi-unlock-badge {
-      font-size: 11px;
-      color: #b8860b;
-      letter-spacing: 2px;
-      margin-bottom: 6px;
-    }
-    .poi-unlock-name {
-      font-size: 18px;
-      font-weight: 700;
+    /* ─── POI 发现模式（复用 scene-detail-overlay，非阻塞） ─── */
+    .sd-discovery-badge {
+      display: none;
       color: #e6b800;
-      margin-bottom: 2px;
-    }
-    .poi-unlock-area {
-      font-size: 12px;
-      color: #667;
-      margin-bottom: 8px;
-    }
-    .poi-unlock-desc {
       font-size: 13px;
-      color: #999;
-      line-height: 1.6;
+      letter-spacing: 4px;
+      margin-bottom: 6px;
+      text-shadow: 0 0 12px rgba(230, 184, 0, 0.6);
+      animation: discoveryBadgeGlow 2.4s ease-in-out infinite;
+    }
+    .scene-detail-overlay.discovery .sd-discovery-badge {
+      display: block;
+    }
+    @keyframes discoveryBadgeGlow {
+      0%, 100% { text-shadow: 0 0 8px rgba(230, 184, 0, 0.4); }
+      50%      { text-shadow: 0 0 18px rgba(230, 184, 0, 0.9); }
+    }
+    /* 发现模式下：背景更轻、内容做仪式感入场 */
+    .scene-detail-overlay.discovery .sd-bg {
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .scene-detail-overlay.discovery .sd-content {
+      animation: discoveryEntrance 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+    .scene-detail-overlay.discovery .sd-content img {
+      box-shadow: 0 0 40px rgba(230, 184, 0, 0.35), 0 0 80px rgba(230, 184, 0, 0.15);
+      border-color: #b8860b;
+    }
+    /* 发现模式下隐藏 "前往" 按钮（玩家此刻已经在这里） */
+    .scene-detail-overlay.discovery .sd-go {
+      display: none;
+    }
+    @keyframes discoveryEntrance {
+      0%   { opacity: 0; transform: scale(0.86) translateY(20px); }
+      60%  { opacity: 1; }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
     }
 
     .msg.reconnect {
@@ -3010,6 +2998,7 @@
   <div class="scene-detail-overlay" id="scene-detail-overlay">
     <div class="sd-close-btn" onclick="closeSceneDetail()">✕ 关闭</div>
     <div class="sd-content" onclick="event.stopPropagation()">
+      <div class="sd-discovery-badge" id="sd-discovery-badge">✦ 新地点揭晓 ✦</div>
       <img id="sd-img" src="" alt="">
       <div class="sd-title" id="sd-title"></div>
       <div class="sd-desc" id="sd-desc"></div>
@@ -3644,7 +3633,9 @@
       overlay.classList.add('open')
     }
     function closeSceneDetail() {
-      document.getElementById('scene-detail-overlay').classList.remove('open')
+      const overlay = document.getElementById('scene-detail-overlay')
+      overlay.classList.remove('open')
+      overlay.classList.remove('discovery')
     }
 
     // ─── POI 场景详情（复用 scene-detail-overlay） ───
@@ -4615,10 +4606,10 @@
           showNPCCard(msg)
           break
 
-        // ─── POI 解锁卡片 ───
+        // ─── POI 发现弹窗（复用地图详情卡，非阻塞） ───
         case 'poi_unlock':
-          playSfx('ui_send', 0.3)
-          showPoiUnlock(msg)
+          playSfx('ui_send', 0.5)
+          showPoiDiscovery(msg)
           break
 
         // ─── 物品获取通知 ───
@@ -5239,25 +5230,24 @@
       smartScrollToBottom()
     }
 
-    // ─── POI 解锁卡片（首次到达子地点） ───
-    function showPoiUnlock(data) {
-      const img = POI_SCENE_IMAGES[data.poiId] || MAP_SCENE_IMAGES[data.areaId] || ''
-      const container = document.getElementById('messages')
+    // ─── POI 发现弹窗（首次发现子地点，复用 scene-detail-overlay） ───
+    // 异步、非阻塞：游戏流程继续（DM 仍在说话），玩家可随时点掉
+    function showPoiDiscovery(data) {
+      const overlay = document.getElementById('scene-detail-overlay')
+      const img = document.getElementById('sd-img')
+      const title = document.getElementById('sd-title')
+      const desc = document.getElementById('sd-desc')
 
-      const card = document.createElement('div')
-      card.className = 'poi-unlock-card'
-      card.innerHTML =
-        (img ? '<div class="poi-unlock-img"><img src="' + esc(img) + '"></div>' : '') +
-        '<div class="poi-unlock-body">' +
-          '<div class="poi-unlock-badge">— 发现新地点 —</div>' +
-          '<div class="poi-unlock-name">' + esc(data.poiName) + '</div>' +
-          '<div class="poi-unlock-area">' + esc(data.areaName) + '</div>' +
-          '<div class="poi-unlock-desc">' + esc(data.description) + '</div>' +
-        '</div>'
+      const poiImg = POI_SCENE_IMAGES[data.poiId] || MAP_SCENE_IMAGES[data.areaId] || ''
+      if (poiImg) img.src = poiImg
+      img.alt = data.poiName || ''
 
-      container.appendChild(card)
-      requestAnimationFrame(() => card.classList.add('show'))
-      smartScrollToBottom()
+      const areaName = data.areaName || MAP_AREA_ZH[data.areaId] || ''
+      title.textContent = (data.poiName || '') + (areaName ? ` · ${areaName}` : '')
+      desc.textContent = data.description || ''
+
+      overlay.classList.add('open')
+      overlay.classList.add('discovery')
     }
 
     // ─── NPC 角色卡弹窗 ───
