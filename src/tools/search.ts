@@ -123,10 +123,33 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
         n.location === locId &&
         (n.subLocation ?? n.homeBase) === subLoc
       )
+      // 有"活跃"的 NPC 在场 → 相当于潜行/扒窃，DC 大幅提高
+      // 不区分"搜索"和"偷窃"：有人看着就难，没人看着就简单
+      // 活跃 = 意识清醒（重伤、昏迷、康复中都不算"在看"）
+      const activeNpcs = session.npcs.filter(n =>
+        n.condition !== 'unconscious' &&
+        n.condition !== 'wounded' &&
+        n.condition !== 'recovering' &&
+        n.location === locId &&
+        (n.subLocation ?? n.homeBase) === subLoc
+      )
+      const hasWatcher = activeNpcs.length > 0
+
+      // 夜间偷窃更容易（光线差、店主警觉性低）
+      const isNight = session.worldState.timeOfDay === 'night'
+      const nightBonus = isNight ? -4 : 0
+
       if (hasUnconsciousNpc) dc = 5  // 战后搜刮，东西就在眼前
-      // 建筑内搜索（商店、旅店、公会）→ 容易
-      else if (['greenleaf-apothecary', 'sturdy-anvil', 'dawns-rest-inn', 'silver-scale-guild', 'mayor-office'].includes(subLoc)) dc = 8
+      // 建筑内搜索（商店、旅店、公会）
+      else if (['greenleaf-apothecary', 'sturdy-anvil', 'dawns-rest-inn', 'silver-scale-guild', 'mayor-office'].includes(subLoc)) {
+        dc = hasWatcher ? 18 : 8  // 店主看着 = 潜行DC 18；没人 = DC 8
+      } else if (hasWatcher) {
+        dc += 3  // 野外/矿道有 NPC 同行时略微提高
+      }
+      dc = Math.max(5, dc + nightBonus)  // 夜间加成（但 DC 下限 5）
+
       const result = skillCheck(mod, dc)
+      const checkLabel = hasWatcher ? '潜行检定(在他人注视下寻找物品)' : '察觉检定(搜索区域)'
 
       // Discover hidden POIs on success
       const hiddenPois = loc?.pointsOfInterest.filter(p => !p.discovered) ?? []
@@ -138,10 +161,14 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       }
 
       const lightNote = lightBonus > 0 ? `(含火把+${lightBonus}) ` : ''
-      const checkLine = `察觉检定(搜索区域)：d20=${result.roll}, 修正+${mod}${lightNote}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`
+      const checkLine = `${checkLabel}：d20=${result.roll}, 修正+${mod}${lightNote}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`
 
       if (!result.success) {
-        return { output: checkLine }
+        // 当着 NPC 的面被发现（潜行失败）→ 标记给 DM 处理反应
+        const failedWithWatcher = hasWatcher
+          ? `\n[被发现] 玩家试图在${activeNpcs.map(n => n.name).join('、')}面前拿取物品被发现。请根据 NPC 性格叙事反应（警告、驱逐、报警、甚至攻击）。`
+          : ''
+        return { output: checkLine + failedWithWatcher }
       }
 
       // 成功：查找产出表
