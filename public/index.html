@@ -5530,10 +5530,13 @@
         return
       }
       npcCardOpen = true
-      renderNPCCard(data)
+      renderNPCCardModal(data)
     }
 
-    function renderNPCCard(data) {
+    // 注意：函数名必须是 renderNPCCardModal，不能用 renderNPCCard
+    // —— line 4217 已有同名函数 renderNPCCard(npc, npcLocs, isHere) 用于人物面板列表项渲染，
+    //    JavaScript 函数声明 hoisting 会让后定义的覆盖前定义的，导致面板崩溃。
+    function renderNPCCardModal(data) {
       const overlay = document.getElementById('npc-card-overlay')
       const portraitEl = document.getElementById('npc-card-portrait')
       const nameEl = document.getElementById('npc-card-name')
@@ -5575,7 +5578,7 @@
           if (!next) return
           npcCardOpen = true
           playSfx('npc_card', 0.35)
-          renderNPCCard(next)
+          renderNPCCardModal(next)
         }, 350)
       }
     }
