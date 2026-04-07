@@ -4915,11 +4915,17 @@
               for (const m of (snap.combat.monsters || [])) { if (m.portrait) combatMonsterPortraits[m.id] = m.portrait }
               updateCombatHUD()
             } else {
-              // 非战斗 → 恢复上一轮的选项按钮
-              try {
-                const savedActions = JSON.parse(localStorage.getItem('trpg_last_actions') || 'null')
-                if (savedActions) showSceneActions(savedActions)
-              } catch { }
+              // 非战斗 → 优先用服务端 snapshot 提供的 fresh fallback actions
+              // （避免 localStorage 缓存被前一章/前一局的旧数据污染）。
+              // 服务端没给（兼容旧客户端/路径）才退到 localStorage 兜底。
+              if (snap.actions) {
+                showSceneActions(snap.actions)
+              } else {
+                try {
+                  const savedActions = JSON.parse(localStorage.getItem('trpg_last_actions') || 'null')
+                  if (savedActions) showSceneActions(savedActions)
+                } catch { }
+              }
               // HUD 兜底
               const s = getSavedSession()
               if (s) updateHUD(s)

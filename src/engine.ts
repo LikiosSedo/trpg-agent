@@ -3420,6 +3420,9 @@ export class GameEngine {
       session,
       combat: null as any,
       questHint: getQuestHint(session),
+      // resume 时附带当前章节的 fresh fallback actions，避免前端 fallback 到陈旧的
+      // localStorage 缓存（可能来自前一章甚至前一局）。战斗中由 combat 字段接管 UI。
+      actions: session.combat?.active ? null : buildFallbackActions(session),
     }
 
     // 如果在战斗中，发送战斗状态供前端重建 UI
