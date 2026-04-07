@@ -37,6 +37,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const MANIFEST_PATH = join(ROOT, 'assets-manifest.json')
+const FILELIST_PATH = join(ROOT, 'assets-filelist.json')
 
 // ─── pack 配置（与 fetch-assets 解压结构对称）──────────
 //
@@ -274,6 +275,7 @@ for (const a of remoteAssets) urlByName.set(a.name, a.url)
 
 const newManifest = { ...manifest, version: newVersion, release: newRelease }
 
+// 写 manifest（不含 fileList，保持 manifest 小巧）
 newManifest.packs = manifest.packs.map((oldPack) => {
   const built = builtPacks.find((b) => b.name === oldPack.name)
   if (!built) {
@@ -283,17 +285,30 @@ newManifest.packs = manifest.packs.map((oldPack) => {
   const tarFileName = `${oldPack.name}-pack-${newVersion}.tar.gz`
   const url = urlByName.get(tarFileName)
   if (!url) die(`找不到上传后的 ${tarFileName} URL，release 可能损坏`)
+  // 移除任何旧版残留的 fileList 字段（前一版方案曾把 fileList 写在 manifest 里）
+  const { fileList: _drop, ...rest } = oldPack
   return {
-    ...oldPack,        // 保留 verifyPath 等字段
+    ...rest,           // 保留 verifyPath 等字段，丢掉 fileList
     url,
     sha256: built.sha256,
     size: built.size,
-    fileList: built.fileList,
   }
 })
 
 await writeFile(MANIFEST_PATH, JSON.stringify(newManifest, null, 2) + '\n')
-log(`✓ assets-manifest.json 已更新`)
+log(`✓ assets-manifest.json 已更新（不含 fileList）`)
+
+// 写 filelist 单独文件（让 git diff manifest 时不被 1600 行 fileList 淹没）
+const fileListData = {
+  version: newVersion,
+  description: '资源文件清单 — 由 publish-assets / verify-assets 维护。verify-assets 用它做 path+size 对比。manifest 故意不内嵌此清单，以保持 git diff 干净。',
+  packs: builtPacks.map((b) => ({
+    name: b.name,
+    fileList: b.fileList,
+  })),
+}
+await writeFile(FILELIST_PATH, JSON.stringify(fileListData, null, 2) + '\n')
+log(`✓ assets-filelist.json 已更新（${builtPacks.reduce((n, b) => n + b.fileList.length, 0)} 个文件）`)
 
 // ─── 清理临时文件 ──────────────────────────────────────
 

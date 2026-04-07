@@ -1,0 +1,1632 @@
+{
+  "version": "v1",
+  "description": "资源文件清单 — 由 publish-assets / verify-assets 维护。verify-assets 用它做 path+size 对比。manifest 故意不内嵌此清单，以保持 git diff 干净。",
+  "packs": [
+    {
+      "name": "audio",
+      "fileList": [
+        {
+          "path": "public/audio/amb-birds.mp3",
+          "size": 3202447
+        },
+        {
+          "path": "public/audio/amb-crickets.mp3",
+          "size": 3343717
+        },
+        {
+          "path": "public/audio/amb-crowd.mp3",
+          "size": 3305265
+        },
+        {
+          "path": "public/audio/amb-drip.mp3",
+          "size": 3140589
+        },
+        {
+          "path": "public/audio/amb-fire.mp3",
+          "size": 4920259
+        },
+        {
+          "path": "public/audio/amb-rain.mp3",
+          "size": 3231831
+        },
+        {
+          "path": "public/audio/amb-thunder.mp3",
+          "size": 6197797
+        },
+        {
+          "path": "public/audio/amb-wind.mp3",
+          "size": 3652126
+        },
+        {
+          "path": "public/audio/apothecary.mp3",
+          "size": 6012254
+        },
+        {
+          "path": "public/audio/battle.mp3",
+          "size": 6859825
+        },
+        {
+          "path": "public/audio/blacksmith.mp3",
+          "size": 8568245
+        },
+        {
+          "path": "public/audio/boss-battle.mp3",
+          "size": 3878705
+        },
+        {
+          "path": "public/audio/danger.mp3",
+          "size": 9436800
+        },
+        {
+          "path": "public/audio/forest.mp3",
+          "size": 1942315
+        },
+        {
+          "path": "public/audio/guild.mp3",
+          "size": 3665419
+        },
+        {
+          "path": "public/audio/inn.mp3",
+          "size": 1601898
+        },
+        {
+          "path": "public/audio/mines.mp3",
+          "size": 3714156
+        },
+        {
+          "path": "public/audio/mystery.mp3",
+          "size": 3329580
+        },
+        {
+          "path": "public/audio/peaceful.mp3",
+          "size": 5206482
+        },
+        {
+          "path": "public/audio/reflection.mp3",
+          "size": 3356745
+        },
+        {
+          "path": "public/audio/revelation.mp3",
+          "size": 3949984
+        },
+        {
+          "path": "public/audio/sad.mp3",
+          "size": 432467
+        },
+        {
+          "path": "public/audio/sfx/blade_01.ogg",
+          "size": 15142
+        },
+        {
+          "path": "public/audio/sfx/blade_02.ogg",
+          "size": 17776
+        },
+        {
+          "path": "public/audio/sfx/blade_03.ogg",
+          "size": 15184
+        },
+        {
+          "path": "public/audio/sfx/book_01.ogg",
+          "size": 34237
+        },
+        {
+          "path": "public/audio/sfx/book_02.ogg",
+          "size": 36858
+        },
+        {
+          "path": "public/audio/sfx/book_03.ogg",
+          "size": 60390
+        },
+        {
+          "path": "public/audio/sfx/book_04.ogg",
+          "size": 44092
+        },
+        {
+          "path": "public/audio/sfx/chain_01.ogg",
+          "size": 23007
+        },
+        {
+          "path": "public/audio/sfx/chain_02.ogg",
+          "size": 18783
+        },
+        {
+          "path": "public/audio/sfx/chain_03.ogg",
+          "size": 36494
+        },
+        {
+          "path": "public/audio/sfx/creature_die_01.ogg",
+          "size": 15883
+        },
+        {
+          "path": "public/audio/sfx/creature_hurt_01.ogg",
+          "size": 17185
+        },
+        {
+          "path": "public/audio/sfx/creature_hurt_02.ogg",
+          "size": 20959
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_01.ogg",
+          "size": 16406
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_02.ogg",
+          "size": 7729
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_03.ogg",
+          "size": 29846
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_04.ogg",
+          "size": 24456
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_05.ogg",
+          "size": 15804
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_06.ogg",
+          "size": 23008
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_07.ogg",
+          "size": 15789
+        },
+        {
+          "path": "public/audio/sfx/creature_misc_08.ogg",
+          "size": 16889
+        },
+        {
+          "path": "public/audio/sfx/creature_monster_01.ogg",
+          "size": 12446
+        },
+        {
+          "path": "public/audio/sfx/creature_monster_02.ogg",
+          "size": 16920
+        },
+        {
+          "path": "public/audio/sfx/creature_monster_03.ogg",
+          "size": 21818
+        },
+        {
+          "path": "public/audio/sfx/creature_monster_04.ogg",
+          "size": 19153
+        },
+        {
+          "path": "public/audio/sfx/creature_roar_01.ogg",
+          "size": 15061
+        },
+        {
+          "path": "public/audio/sfx/creature_roar_02.ogg",
+          "size": 22480
+        },
+        {
+          "path": "public/audio/sfx/creature_roar_03.ogg",
+          "size": 23375
+        },
+        {
+          "path": "public/audio/sfx/creature_slime_01.ogg",
+          "size": 35353
+        },
+        {
+          "path": "public/audio/sfx/creature_slime_02.ogg",
+          "size": 35232
+        },
+        {
+          "path": "public/audio/sfx/creature_slime_03.ogg",
+          "size": 27560
+        },
+        {
+          "path": "public/audio/sfx/creature_slime_04.ogg",
+          "size": 35702
+        },
+        {
+          "path": "public/audio/sfx/electric_hit_01.wav",
+          "size": 74190
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Fantasy SFX Pack Vol 1 - Asset List.pdf",
+          "size": 31076
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Loop_Fantasy Pack Vol 1_Dark Necromancy Chant_01.wav",
+          "size": 1059090
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Loop_Fantasy SFX Pack Vol 1_Electric Spell_Hold.wav",
+          "size": 159450
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Loop_Fantasy SFX Pack Vol 1_Fireball_Hold.wav",
+          "size": 177090
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Loop_Fantasy SFX Pack Vol 1_Ice Spell_Hold.wav",
+          "size": 121230
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Seq_Fantasy SFX Pack Vol 1_Mana Drain_End.wav",
+          "size": 182970
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Seq_Fantasy SFX Pack Vol 1_Mana Drain_Mid_LOOP.wav",
+          "size": 177090
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Seq_Fantasy SFX Pack Vol 1_Mana Drain_Start.wav",
+          "size": 127110
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Draw_01.wav",
+          "size": 83010
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Draw_02.wav",
+          "size": 88890
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Hit_01.wav",
+          "size": 15390
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Hit_02.wav",
+          "size": 33030
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Shoot_01.wav",
+          "size": 30090
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Bow_Arrow_Shoot_02.wav",
+          "size": 30090
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Hit_Metal_01.wav",
+          "size": 27150
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Hit_Metal_02.wav",
+          "size": 24210
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Hit_Metal_03.wav",
+          "size": 24210
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Swing_01.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Swing_02.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Dagger_Swing_03.wav",
+          "size": 33030
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Buildup.wav",
+          "size": 127110
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_01.wav",
+          "size": 74190
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_02.wav",
+          "size": 77130
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_03.wav",
+          "size": 77130
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Launch_01.wav",
+          "size": 94770
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Launch_02.wav",
+          "size": 94770
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Electric Spell_Launch_03.wav",
+          "size": 94770
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Impact_01.wav",
+          "size": 109470
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Impact_02.wav",
+          "size": 109470
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Impact_03.wav",
+          "size": 109470
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Launch_01.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Launch_02.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball Launch_03.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Fireball_Buildup.wav",
+          "size": 106530
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Healing Chime_01.wav",
+          "size": 415230
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Healing Chime_02.wav",
+          "size": 415230
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Hit_Metal_01.wav",
+          "size": 59490
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Hit_Metal_02.wav",
+          "size": 62430
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Hit_Metal_03.wav",
+          "size": 62430
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_01.wav",
+          "size": 56550
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_02.wav",
+          "size": 53610
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_03.wav",
+          "size": 53610
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard  Projectile_Impact_01.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard  Projectile_Impact_02.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard  Projectile_Impact_03.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard Projectile_Launch_01.wav",
+          "size": 191790
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard Projectile_Launch_02.wav",
+          "size": 191790
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Shard Projectile_Launch_03.wav",
+          "size": 191790
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Ice Spell_Buildup.wav",
+          "size": 106530
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Magic Shield_Activation_01.wav",
+          "size": 474030
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Magic Shield_Activation_02.wav",
+          "size": 474030
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Hit_Metal_01.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Hit_Metal_02.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Hit_Metal_03.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Swing_01.wav",
+          "size": 41850
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Swing_02.wav",
+          "size": 41850
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Sword_Swing_03.wav",
+          "size": 41850
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Teleport_In.wav",
+          "size": 144750
+        },
+        {
+          "path": "public/audio/sfx/fantasy-pack/Fantasy SFX Pack Vol 1/Single_Fantasy SFX Pack Vol 1_Teleport_Out.wav",
+          "size": 144750
+        },
+        {
+          "path": "public/audio/sfx/healing_01.wav",
+          "size": 415230
+        },
+        {
+          "path": "public/audio/sfx/healing_02.wav",
+          "size": 415230
+        },
+        {
+          "path": "public/audio/sfx/heavy_hit_01.wav",
+          "size": 59490
+        },
+        {
+          "path": "public/audio/sfx/heavy_hit_02.wav",
+          "size": 62430
+        },
+        {
+          "path": "public/audio/sfx/heavy_hit_03.wav",
+          "size": 62430
+        },
+        {
+          "path": "public/audio/sfx/heavy_sword_swing_01.wav",
+          "size": 56550
+        },
+        {
+          "path": "public/audio/sfx/item_coins_01.ogg",
+          "size": 18985
+        },
+        {
+          "path": "public/audio/sfx/item_coins_02.ogg",
+          "size": 31942
+        },
+        {
+          "path": "public/audio/sfx/item_coins_03.ogg",
+          "size": 24878
+        },
+        {
+          "path": "public/audio/sfx/item_coins_04.ogg",
+          "size": 70846
+        },
+        {
+          "path": "public/audio/sfx/item_gem_01.ogg",
+          "size": 14690
+        },
+        {
+          "path": "public/audio/sfx/item_gem_02.ogg",
+          "size": 9058
+        },
+        {
+          "path": "public/audio/sfx/item_gem_03.ogg",
+          "size": 11885
+        },
+        {
+          "path": "public/audio/sfx/item_gem_04.ogg",
+          "size": 28423
+        },
+        {
+          "path": "public/audio/sfx/item_misc_01.ogg",
+          "size": 22242
+        },
+        {
+          "path": "public/audio/sfx/item_misc_02.ogg",
+          "size": 22460
+        },
+        {
+          "path": "public/audio/sfx/item_misc_03.ogg",
+          "size": 19638
+        },
+        {
+          "path": "public/audio/sfx/item_misc_04.ogg",
+          "size": 13457
+        },
+        {
+          "path": "public/audio/sfx/item_misc_05.ogg",
+          "size": 15531
+        },
+        {
+          "path": "public/audio/sfx/item_misc_06.ogg",
+          "size": 29391
+        },
+        {
+          "path": "public/audio/sfx/item_stone_01.ogg",
+          "size": 34170
+        },
+        {
+          "path": "public/audio/sfx/item_stone_02.ogg",
+          "size": 15303
+        },
+        {
+          "path": "public/audio/sfx/item_stone_03.ogg",
+          "size": 24923
+        },
+        {
+          "path": "public/audio/sfx/item_stone_04.ogg",
+          "size": 17029
+        },
+        {
+          "path": "public/audio/sfx/item_wood_01.ogg",
+          "size": 22789
+        },
+        {
+          "path": "public/audio/sfx/item_wood_02.ogg",
+          "size": 13988
+        },
+        {
+          "path": "public/audio/sfx/item_wood_03.ogg",
+          "size": 18291
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_carpet_000.ogg",
+          "size": 6353
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_carpet_001.ogg",
+          "size": 6411
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_carpet_002.ogg",
+          "size": 6411
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_carpet_003.ogg",
+          "size": 6301
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_carpet_004.ogg",
+          "size": 6301
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_concrete_000.ogg",
+          "size": 5808
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_concrete_001.ogg",
+          "size": 6308
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_concrete_002.ogg",
+          "size": 6255
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_concrete_003.ogg",
+          "size": 5805
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_concrete_004.ogg",
+          "size": 5912
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_grass_000.ogg",
+          "size": 8290
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_grass_001.ogg",
+          "size": 8313
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_grass_002.ogg",
+          "size": 8278
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_grass_003.ogg",
+          "size": 8129
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_grass_004.ogg",
+          "size": 7800
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_snow_000.ogg",
+          "size": 7880
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_snow_001.ogg",
+          "size": 7794
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_snow_002.ogg",
+          "size": 7694
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_snow_003.ogg",
+          "size": 7860
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_snow_004.ogg",
+          "size": 7630
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_wood_000.ogg",
+          "size": 5949
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_wood_001.ogg",
+          "size": 5929
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_wood_002.ogg",
+          "size": 5895
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_wood_003.ogg",
+          "size": 6207
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/footstep_wood_004.ogg",
+          "size": 5799
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactBell_heavy_000.ogg",
+          "size": 13915
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactBell_heavy_001.ogg",
+          "size": 15577
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactBell_heavy_002.ogg",
+          "size": 9252
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactBell_heavy_003.ogg",
+          "size": 9429
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactBell_heavy_004.ogg",
+          "size": 6529
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGeneric_light_000.ogg",
+          "size": 5827
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGeneric_light_001.ogg",
+          "size": 5636
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGeneric_light_002.ogg",
+          "size": 5795
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGeneric_light_003.ogg",
+          "size": 5792
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGeneric_light_004.ogg",
+          "size": 5747
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_heavy_000.ogg",
+          "size": 7403
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_heavy_001.ogg",
+          "size": 8946
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_heavy_002.ogg",
+          "size": 7661
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_heavy_003.ogg",
+          "size": 6956
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_heavy_004.ogg",
+          "size": 8300
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_light_000.ogg",
+          "size": 6526
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_light_001.ogg",
+          "size": 6544
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_light_002.ogg",
+          "size": 6562
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_light_003.ogg",
+          "size": 6618
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_light_004.ogg",
+          "size": 6641
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_medium_000.ogg",
+          "size": 8400
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_medium_001.ogg",
+          "size": 8605
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_medium_002.ogg",
+          "size": 8341
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_medium_003.ogg",
+          "size": 8596
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactGlass_medium_004.ogg",
+          "size": 8397
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_heavy_000.ogg",
+          "size": 6110
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_heavy_001.ogg",
+          "size": 7279
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_heavy_002.ogg",
+          "size": 5634
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_heavy_003.ogg",
+          "size": 6209
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_heavy_004.ogg",
+          "size": 5788
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_light_000.ogg",
+          "size": 7651
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_light_001.ogg",
+          "size": 6967
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_light_002.ogg",
+          "size": 6804
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_light_003.ogg",
+          "size": 9023
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_light_004.ogg",
+          "size": 6675
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_medium_000.ogg",
+          "size": 7117
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_medium_001.ogg",
+          "size": 6151
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_medium_002.ogg",
+          "size": 5857
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_medium_003.ogg",
+          "size": 6964
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMetal_medium_004.ogg",
+          "size": 5744
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMining_000.ogg",
+          "size": 12035
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMining_001.ogg",
+          "size": 11481
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMining_002.ogg",
+          "size": 11235
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMining_003.ogg",
+          "size": 12160
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactMining_004.ogg",
+          "size": 11668
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlank_medium_000.ogg",
+          "size": 12016
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlank_medium_001.ogg",
+          "size": 12082
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlank_medium_002.ogg",
+          "size": 12313
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlank_medium_003.ogg",
+          "size": 12138
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlank_medium_004.ogg",
+          "size": 12084
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_heavy_000.ogg",
+          "size": 10032
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_heavy_001.ogg",
+          "size": 8713
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_heavy_002.ogg",
+          "size": 10188
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_heavy_003.ogg",
+          "size": 8490
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_heavy_004.ogg",
+          "size": 11092
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_light_000.ogg",
+          "size": 10474
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_light_001.ogg",
+          "size": 11730
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_light_002.ogg",
+          "size": 9932
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_light_003.ogg",
+          "size": 10626
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_light_004.ogg",
+          "size": 11928
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_medium_000.ogg",
+          "size": 10921
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_medium_001.ogg",
+          "size": 11491
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_medium_002.ogg",
+          "size": 10250
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_medium_003.ogg",
+          "size": 11616
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPlate_medium_004.ogg",
+          "size": 10803
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_heavy_000.ogg",
+          "size": 11617
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_heavy_001.ogg",
+          "size": 10861
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_heavy_002.ogg",
+          "size": 9025
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_heavy_003.ogg",
+          "size": 10029
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_heavy_004.ogg",
+          "size": 10452
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_medium_000.ogg",
+          "size": 8800
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_medium_001.ogg",
+          "size": 8701
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_medium_002.ogg",
+          "size": 10399
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_medium_003.ogg",
+          "size": 9509
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactPunch_medium_004.ogg",
+          "size": 10032
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_heavy_000.ogg",
+          "size": 6570
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_heavy_001.ogg",
+          "size": 6689
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_heavy_002.ogg",
+          "size": 6749
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_heavy_003.ogg",
+          "size": 6665
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_heavy_004.ogg",
+          "size": 6478
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_medium_000.ogg",
+          "size": 5351
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_medium_001.ogg",
+          "size": 5506
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_medium_002.ogg",
+          "size": 5358
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_medium_003.ogg",
+          "size": 5392
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactSoft_medium_004.ogg",
+          "size": 5438
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactTin_medium_000.ogg",
+          "size": 6509
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactTin_medium_001.ogg",
+          "size": 6603
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactTin_medium_002.ogg",
+          "size": 6156
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactTin_medium_003.ogg",
+          "size": 6541
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactTin_medium_004.ogg",
+          "size": 6362
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_heavy_000.ogg",
+          "size": 6233
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_heavy_001.ogg",
+          "size": 6239
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_heavy_002.ogg",
+          "size": 6146
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_heavy_003.ogg",
+          "size": 6181
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_heavy_004.ogg",
+          "size": 6253
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_light_000.ogg",
+          "size": 6343
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_light_001.ogg",
+          "size": 6373
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_light_002.ogg",
+          "size": 6366
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_light_003.ogg",
+          "size": 6381
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_light_004.ogg",
+          "size": 6395
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_medium_000.ogg",
+          "size": 6575
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_medium_001.ogg",
+          "size": 6555
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_medium_002.ogg",
+          "size": 6607
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_medium_003.ogg",
+          "size": 6598
+        },
+        {
+          "path": "public/audio/sfx/kenney-impact/impactWood_medium_004.ogg",
+          "size": 6481
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/beltHandle1.ogg",
+          "size": 10820
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/beltHandle2.ogg",
+          "size": 15410
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookClose.ogg",
+          "size": 9292
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookFlip1.ogg",
+          "size": 18248
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookFlip2.ogg",
+          "size": 12393
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookFlip3.ogg",
+          "size": 9077
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookOpen.ogg",
+          "size": 8273
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookPlace1.ogg",
+          "size": 9901
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookPlace2.ogg",
+          "size": 11185
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/bookPlace3.ogg",
+          "size": 9570
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/chop.ogg",
+          "size": 9370
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/cloth1.ogg",
+          "size": 16508
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/cloth2.ogg",
+          "size": 11787
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/cloth3.ogg",
+          "size": 12432
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/cloth4.ogg",
+          "size": 11043
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/clothBelt.ogg",
+          "size": 21491
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/clothBelt2.ogg",
+          "size": 20013
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/creak1.ogg",
+          "size": 15761
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/creak2.ogg",
+          "size": 19012
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/creak3.ogg",
+          "size": 10408
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorClose_1.ogg",
+          "size": 18564
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorClose_2.ogg",
+          "size": 17598
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorClose_3.ogg",
+          "size": 20889
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorClose_4.ogg",
+          "size": 16902
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorOpen_1.ogg",
+          "size": 22848
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/doorOpen_2.ogg",
+          "size": 30280
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/drawKnife1.ogg",
+          "size": 11134
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/drawKnife2.ogg",
+          "size": 12395
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/drawKnife3.ogg",
+          "size": 12726
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/dropLeather.ogg",
+          "size": 11695
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep00.ogg",
+          "size": 9475
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep01.ogg",
+          "size": 9900
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep02.ogg",
+          "size": 9528
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep03.ogg",
+          "size": 10559
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep04.ogg",
+          "size": 11303
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep05.ogg",
+          "size": 10288
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep06.ogg",
+          "size": 9885
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep07.ogg",
+          "size": 10264
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep08.ogg",
+          "size": 9242
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/footstep09.ogg",
+          "size": 9356
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/handleCoins.ogg",
+          "size": 25394
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/handleCoins2.ogg",
+          "size": 13094
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/handleSmallLeather.ogg",
+          "size": 10492
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/handleSmallLeather2.ogg",
+          "size": 10028
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/knifeSlice.ogg",
+          "size": 15532
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/knifeSlice2.ogg",
+          "size": 15099
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/metalClick.ogg",
+          "size": 13615
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/metalLatch.ogg",
+          "size": 10208
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/metalPot1.ogg",
+          "size": 31619
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/metalPot2.ogg",
+          "size": 22471
+        },
+        {
+          "path": "public/audio/sfx/kenney-rpg/metalPot3.ogg",
+          "size": 23142
+        },
+        {
+          "path": "public/audio/sfx/lock_01.ogg",
+          "size": 17452
+        },
+        {
+          "path": "public/audio/sfx/lock_02.ogg",
+          "size": 15553
+        },
+        {
+          "path": "public/audio/sfx/lock_03.ogg",
+          "size": 18168
+        },
+        {
+          "path": "public/audio/sfx/metal_01.ogg",
+          "size": 25403
+        },
+        {
+          "path": "public/audio/sfx/metal_02.ogg",
+          "size": 26586
+        },
+        {
+          "path": "public/audio/sfx/metal_03.ogg",
+          "size": 18753
+        },
+        {
+          "path": "public/audio/sfx/misc_01.ogg",
+          "size": 12521
+        },
+        {
+          "path": "public/audio/sfx/misc_02.ogg",
+          "size": 19851
+        },
+        {
+          "path": "public/audio/sfx/misc_03.ogg",
+          "size": 12875
+        },
+        {
+          "path": "public/audio/sfx/shield_01.wav",
+          "size": 474030
+        },
+        {
+          "path": "public/audio/sfx/shield_02.wav",
+          "size": 474030
+        },
+        {
+          "path": "public/audio/sfx/spell_01.ogg",
+          "size": 29121
+        },
+        {
+          "path": "public/audio/sfx/spell_02.ogg",
+          "size": 25118
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_01.ogg",
+          "size": 39482
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_02.ogg",
+          "size": 33115
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_03.ogg",
+          "size": 71801
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_04.ogg",
+          "size": 59036
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_05.ogg",
+          "size": 54658
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_06.ogg",
+          "size": 53074
+        },
+        {
+          "path": "public/audio/sfx/spell_fire_07.ogg",
+          "size": 24862
+        },
+        {
+          "path": "public/audio/sfx/spell_impact_01.wav",
+          "size": 109470
+        },
+        {
+          "path": "public/audio/sfx/spell_launch_01.wav",
+          "size": 138870
+        },
+        {
+          "path": "public/audio/sfx/stones_01.ogg",
+          "size": 27110
+        },
+        {
+          "path": "public/audio/sfx/stones_02.ogg",
+          "size": 35982
+        },
+        {
+          "path": "public/audio/sfx/stones_03.ogg",
+          "size": 41046
+        },
+        {
+          "path": "public/audio/sfx/stones_04.ogg",
+          "size": 20176
+        },
+        {
+          "path": "public/audio/sfx/sword_hit_01.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/sword_hit_02.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/sword_hit_03.wav",
+          "size": 21270
+        },
+        {
+          "path": "public/audio/sfx/sword_swing_01.wav",
+          "size": 41850
+        },
+        {
+          "path": "public/audio/sfx/sword_swing_02.wav",
+          "size": 41850
+        },
+        {
+          "path": "public/audio/sfx/sword_unsheathe_01.wav",
+          "size": 287168
+        },
+        {
+          "path": "public/audio/sfx/teleport_in.wav",
+          "size": 144750
+        },
+        {
+          "path": "public/audio/sfx/teleport_out.wav",
+          "size": 144750
+        },
+        {
+          "path": "public/audio/sfx/wood_01.ogg",
+          "size": 13512
+        },
+        {
+          "path": "public/audio/sfx/wood_02.ogg",
+          "size": 10311
+        },
+        {
+          "path": "public/audio/sfx/wood_03.ogg",
+          "size": 14089
+        },
+        {
+          "path": "public/audio/sfx/wood_04.ogg",
+          "size": 20667
+        },
+        {
+          "path": "public/audio/sfx/wood_05.ogg",
+          "size": 14208
+        },
+        {
+          "path": "public/audio/sorrow.mp3",
+          "size": 7615062
+        },
+        {
+          "path": "public/audio/tavern.mp3",
+          "size": 2535801
+        },
+        {
+          "path": "public/audio/tension.mp3",
+          "size": 9052021
+        },
+        {
+          "path": "public/audio/town-day.mp3",
+          "size": 1316581
+        },
+        {
+          "path": "public/audio/town-night.mp3",
+          "size": 3810344
+        },
+        {
+          "path": "public/audio/triumph.mp3",
+          "size": 3837827
+        },
+        {
+          "path": "public/audio/wasteland.mp3",
+          "size": 6965706
+        }
+      ]
+    },
+    {
+      "name": "portraits",
+      "fileList": [
+        {
+          "path": "public/portraits/chen-ma.png",
+          "size": 730824
+        },
+        {
+          "path": "public/portraits/elena-silverleaf.png",
+          "size": 956014
+        },
+        {
+          "path": "public/portraits/greg-ironfist.png",
+          "size": 702146
+        },
+        {
+          "path": "public/portraits/grom.png",
+          "size": 806544
+        },
+        {
+          "path": "public/portraits/han-meng.png",
+          "size": 784675
+        },
+        {
+          "path": "public/portraits/kahn-the-traveler.png",
+          "size": 677221
+        },
+        {
+          "path": "public/portraits/monster-eclipsed-beast.png",
+          "size": 766716
+        },
+        {
+          "path": "public/portraits/monster-ghoul.png",
+          "size": 861458
+        },
+        {
+          "path": "public/portraits/monster-mimic.png",
+          "size": 823259
+        },
+        {
+          "path": "public/portraits/monster-shadow.png",
+          "size": 668870
+        },
+        {
+          "path": "public/portraits/pc-cleric.png",
+          "size": 1297732
+        },
+        {
+          "path": "public/portraits/pc-fighter.png",
+          "size": 1379255
+        },
+        {
+          "path": "public/portraits/pc-mage.png",
+          "size": 1430897
+        },
+        {
+          "path": "public/portraits/pc-ranger.png",
+          "size": 1621976
+        },
+        {
+          "path": "public/portraits/scenes/map-world-parchment.png",
+          "size": 4010172
+        },
+        {
+          "path": "public/portraits/scenes/poi-adventurer-guild.png",
+          "size": 2004437
+        },
+        {
+          "path": "public/portraits/scenes/poi-dawn-stele.png",
+          "size": 2890216
+        },
+        {
+          "path": "public/portraits/scenes/poi-greenleaf-apothecary.png",
+          "size": 1742295
+        },
+        {
+          "path": "public/portraits/scenes/poi-hunter-stone-house.png",
+          "size": 2264024
+        },
+        {
+          "path": "public/portraits/scenes/poi-mayor-office.png",
+          "size": 1932789
+        },
+        {
+          "path": "public/portraits/scenes/poi-moon-pool.png",
+          "size": 2138120
+        },
+        {
+          "path": "public/portraits/scenes/poi-old-lumber-camp.png",
+          "size": 2419151
+        },
+        {
+          "path": "public/portraits/scenes/poi-shattered-shield-tavern.png",
+          "size": 1888402
+        },
+        {
+          "path": "public/portraits/scenes/poi-silver-scale-guild.png",
+          "size": 2774698
+        },
+        {
+          "path": "public/portraits/scenes/poi-sturdy-anvil.png",
+          "size": 2173330
+        },
+        {
+          "path": "public/portraits/scenes/poi-town-square.png",
+          "size": 2305094
+        },
+        {
+          "path": "public/portraits/scenes/scene-dawnbreak-town.png",
+          "size": 2564711
+        },
+        {
+          "path": "public/portraits/scenes/scene-forest-entrance.png",
+          "size": 2264468
+        },
+        {
+          "path": "public/portraits/scenes/scene-greyspine-mines.png",
+          "size": 2057855
+        },
+        {
+          "path": "public/portraits/scenes/scene-shatterstone-wastes.png",
+          "size": 2572536
+        },
+        {
+          "path": "public/portraits/scenes/scene-twilight-woods.png",
+          "size": 2274135
+        },
+        {
+          "path": "public/portraits/scenes/title-bg-alt.png",
+          "size": 1330373
+        },
+        {
+          "path": "public/portraits/scenes/title-bg.png",
+          "size": 1060960
+        },
+        {
+          "path": "public/portraits/victor-blackstone.png",
+          "size": 838513
+        },
+        {
+          "path": "public/portraits/xiao-li.png",
+          "size": 773389
+        },
+        {
+          "path": "public/portraits/ye-lv.png",
+          "size": 773564
+        }
+      ]
+    }
+  ]
+}

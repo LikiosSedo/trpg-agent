@@ -203,6 +203,11 @@ npm run publish-assets -- --skip-clean-check
 与 manifest 一致(逐文件 path + size 对比,**不算 sha 因为 tar 打包带 mtime
 不确定**)。
 
+文件清单存在独立的 [`assets-filelist.json`](assets-filelist.json) 里
+(~48 KB,404 个文件 entry),**故意不内嵌进 `assets-manifest.json`**,
+让 `git diff assets-manifest.json` 时干净易读 —— 主 manifest 只有 23 行
+元数据,filelist 只在 verify-assets / publish-assets 真正用到。
+
 ```bash
 npm run verify-assets             # 校验,问题时 exit 1
 npm run verify-assets -- --quiet  # 静默模式(供 hook 用)

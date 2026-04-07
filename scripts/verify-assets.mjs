@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const MANIFEST_PATH = join(ROOT, 'assets-manifest.json')
+const FILELIST_PATH = join(ROOT, 'assets-filelist.json')
 
 const argv = new Set(process.argv.slice(2))
 const REBUILD = argv.has('--rebuild')
@@ -53,6 +54,19 @@ try {
   process.exit(2)
 }
 
+// 读外置 fileList（assets-filelist.json）。manifest 故意不内嵌它，
+// 以保持 git diff manifest 时干净。fileList 不存在时进入降级模式。
+let fileListByPack = new Map()  // packName → [{path, size}]
+let fileListMissing = false
+try {
+  const filelistData = JSON.parse(await readFile(FILELIST_PATH, 'utf-8'))
+  for (const p of filelistData.packs ?? []) {
+    if (Array.isArray(p.fileList)) fileListByPack.set(p.name, p.fileList)
+  }
+} catch {
+  fileListMissing = true
+}
+
 // 扫描每个 pack 的实际文件
 const scanResults = new Map()
 for (const cfg of PACKS_CONFIG) {
@@ -60,22 +74,40 @@ for (const cfg of PACKS_CONFIG) {
   scanResults.set(cfg.name, files)
 }
 
-// ─── --rebuild 模式：把扫描结果写回 manifest ────────
+// ─── --rebuild 模式：把扫描结果写回 assets-filelist.json ────
 if (REBUILD) {
+  // 同时清理 manifest 里残留的 fileList 字段（前一版方案曾内嵌）
+  let manifestChanged = false
   const newManifest = { ...manifest }
   newManifest.packs = manifest.packs.map((pack) => {
-    const scanned = scanResults.get(pack.name)
-    if (!scanned) {
-      warn(`${pack.name}: PACKS_CONFIG 没定义此 pack，保持原样`)
-      return pack
+    if ('fileList' in pack) {
+      manifestChanged = true
+      const { fileList: _drop, ...rest } = pack
+      return rest
     }
-    return { ...pack, fileList: scanned }
+    return pack
   })
-  await writeFile(MANIFEST_PATH, JSON.stringify(newManifest, null, 2) + '\n')
-  log(`✓ 已重写 manifest fileList`)
-  log('请 review git diff 后 commit:')
-  log('    git diff assets-manifest.json')
-  log('    git commit -am "assets: backfill manifest fileList"')
+  if (manifestChanged) {
+    await writeFile(MANIFEST_PATH, JSON.stringify(newManifest, null, 2) + '\n')
+    log(`✓ 清理 manifest 里残留的 fileList 字段`)
+  }
+
+  // 写新 fileList 到独立文件
+  const totalFiles = [...scanResults.values()].reduce((n, arr) => n + arr.length, 0)
+  const filelistData = {
+    version: manifest.version,
+    description: '资源文件清单 — 由 publish-assets / verify-assets 维护。verify-assets 用它做 path+size 对比。manifest 故意不内嵌此清单，以保持 git diff 干净。',
+    packs: PACKS_CONFIG.map((cfg) => ({
+      name: cfg.name,
+      fileList: scanResults.get(cfg.name) ?? [],
+    })),
+  }
+  await writeFile(FILELIST_PATH, JSON.stringify(filelistData, null, 2) + '\n')
+  log(`✓ 已重写 assets-filelist.json (${totalFiles} 个文件)`)
+  log('请 review 后 commit:')
+  log('    git diff assets-manifest.json assets-filelist.json')
+  log('    git add assets-manifest.json assets-filelist.json')
+  log('    git commit -m "assets: backfill filelist"')
   process.exit(0)
 }
 
@@ -102,9 +134,12 @@ for (const pack of manifest.packs) {
     }
   }
 
-  // 2) fileList 详细对比（manifest 里有时）
-  if (Array.isArray(pack.fileList) && pack.fileList.length > 0) {
-    const expected = new Map(pack.fileList.map((f) => [f.path, f.size]))
+  // 2) fileList 详细对比 — 优先用外置 assets-filelist.json,
+  //    兼容旧版内嵌在 manifest 的 pack.fileList
+  const externalFileList = fileListByPack.get(pack.name)
+  const expectedList = externalFileList ?? pack.fileList
+  if (Array.isArray(expectedList) && expectedList.length > 0) {
+    const expected = new Map(expectedList.map((f) => [f.path, f.size]))
     const actual = new Map(scanned.map((f) => [f.path, f.size]))
 
     const missing = []
@@ -148,16 +183,16 @@ for (const pack of manifest.packs) {
       }
     }
   } else {
-    // manifest 里没 fileList，降级模式
-    log(`${pack.name}: ✓ verifyPath 存在 (manifest 没有 fileList，跳过详细对比)`)
+    // 没有 fileList（filelist 文件缺失 + manifest 里也没有），降级模式
+    log(`${pack.name}: ✓ verifyPath 存在 (没有 fileList，跳过详细对比)`)
     missingFileListWarning = true
   }
 }
 
 if (missingFileListWarning) {
   log('')
-  log('提示: 当前 manifest 没有 fileList，详细校验已跳过。')
-  log(`    跑 \`node scripts/verify-assets.mjs --rebuild\` 把当前工作区状态写入 manifest，`)
+  log('提示: 当前没有 assets-filelist.json，详细校验已跳过。')
+  log(`    跑 \`node scripts/verify-assets.mjs --rebuild\` 生成 fileList，`)
   log('    然后 commit。下次 verify 就能做完整对比。')
 }
 
