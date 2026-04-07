@@ -10,15 +10,31 @@
 
 // ─── 音频 ID 注册表 ──────────────────────────
 
-/** BGM 轨道（循环） */
+/**
+ * BGM 轨道（循环）
+ *
+ * 来源（attribution）：
+ * - 小镇/酒馆/森林等基础轨：commit e8d5140 引入，OpenGameArt CC0
+ *   作者：RandomMind / cynicmusic / CleytonRX / Joth
+ * - 室内子地点轨（铁砧铺/银鳞商会/草药堂/破晓旅店）：本次新增
+ *   - blacksmith.mp3 — Joth "Medieval: Harvest Season" (CC0)
+ *   - guild.mp3      — RandomMind "Fame Town" (CC-BY，需署名)
+ *   - apothecary.mp3 — Alexandr Zhelanov "Mystical Theme" (CC-BY，需署名)
+ *   - inn.mp3        — cynicmusic "Small Sleepy Town (Major)" (CC-BY，需署名)
+ */
 export const BGM_TRACKS: Record<string, { file: string; label: string }> = {
-  // 位置 BGM
+  // 位置 BGM（区域级）
   'town-day':      { file: 'town-day.mp3',      label: '小镇白日' },
   'town-night':    { file: 'town-night.mp3',     label: '小镇夜晚' },
   'tavern':        { file: 'tavern.mp3',         label: '酒馆温暖' },
   'forest':        { file: 'forest.mp3',         label: '森林探索' },
   'mines':         { file: 'mines.mp3',          label: '矿道深沉' },
   'wasteland':     { file: 'wasteland.mp3',      label: '荒原苍凉' },
+  // 室内子地点 BGM（破晓镇内部各家店铺）
+  'blacksmith':    { file: 'blacksmith.mp3',     label: '铁砧铺' },
+  'guild':         { file: 'guild.mp3',          label: '银鳞商会' },
+  'apothecary':    { file: 'apothecary.mp3',     label: '草药堂' },
+  'inn':           { file: 'inn.mp3',            label: '破晓旅店' },
   // 战斗 BGM
   'battle':        { file: 'battle.mp3',         label: '战斗' },
   'boss-battle':   { file: 'boss-battle.mp3',    label: 'BOSS战' },
@@ -66,9 +82,21 @@ export function resolveAudio(
     return { bgm: 'battle', ambient: 'silence' }
   }
 
-  // 子地点特殊覆盖
+  // 子地点特殊覆盖（破晓镇室内场景，每家店铺独立 BGM）
   if (subLocation === 'shattered-shield-tavern') {
     return { bgm: 'tavern', ambient: 'fire' }
+  }
+  if (subLocation === 'sturdy-anvil') {
+    return { bgm: 'blacksmith', ambient: 'fire' }  // 锻炉炉火
+  }
+  if (subLocation === 'silver-scale-guild') {
+    return { bgm: 'guild', ambient: 'crowd' }  // 公会大厅人声
+  }
+  if (subLocation === 'greenleaf-apothecary') {
+    return { bgm: 'apothecary', ambient: 'silence' }  // 草药堂保持安静
+  }
+  if (subLocation === 'dawns-rest-inn') {
+    return { bgm: 'inn', ambient: 'fire' }  // 旅店壁炉
   }
 
   // 位置 × 时间
