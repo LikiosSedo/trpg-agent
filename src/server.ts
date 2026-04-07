@@ -260,8 +260,10 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('dm_thinking', { text: ev.text }); break
         case 'auto_save':
           break // silent
+        case 'death_pending':
+          send('death_pending', {}); break
         case 'death':
-          send('death', { text: '💀 你倒下了……意识逐渐远去。' })
+          send('death', { epilogue: (ev as any).epilogue })
           gameStarted = false
           break
         case 'sync':
