@@ -156,22 +156,22 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 ```
 Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
 
-Character: A young human adventurer, level 5 fighter. Lean and battle-hardened, with an aura of quiet intensity. The kind of person who lets their blade speak.
+Character: A young human adventurer, level 5 fighter. Brave, loyal, and warm-hearted — the kind of person who stands between friends and danger without hesitation. A shield-brother first, a warrior second.
 
 Visual details:
-- Short, slightly messy silver-white hair — windswept and practical, a few strands falling across the forehead
-- Striking crimson-red eyes with a sharp, focused gaze — like embers smoldering in shadow
-- Angular jawline, youthful face (early 20s) marked with a thin scar along the left cheek
-- Athletic, broad-shouldered build clad in worn dark leather armor with steel pauldron on the leading shoulder
-- A longsword strapped across the back, its pommel wrapped in frayed dark cloth — the blade has faint eldritch etchings
-- Right hand resting on a belt pouch, left hand relaxed but ready
-- Expression: calm determination, eyes slightly narrowed — a survivor who has seen darkness and chose to walk toward it
+- Short, slightly tousled silver-white hair — practical but with a roguish charm, a few strands falling across the forehead
+- Bright crimson-red eyes, clear and earnest — the eyes of someone who meets the world head-on with an open heart
+- Strong jawline, youthful face (early 20s) with a small nick on the left eyebrow from a training accident (and a good story)
+- Athletic, broad-shouldered build clad in well-kept dark leather armor with a polished steel pauldron, a small enamel badge pinned to the chest (a personal emblem — perhaps a rising sun)
+- A longsword strapped across the back, well-maintained with a leather-wrapped grip worn smooth by dedicated practice
+- Right hand resting on the sword hilt, left hand open and relaxed — a posture of readiness, not aggression
+- Expression: a confident, slightly crooked grin — the kind of smile that rallies allies before a hard fight
 
-Background element: faint crimson sparks drifting upward like dying embers, with subtle dark tendrils creeping at the edges of the frame — the Lovecraftian corruption is always nearby
+Background element: warm golden sunlight filtering through broken clouds behind the shoulders, as if dawn is breaking after a long night. Subtle dark shapes at the edges of the frame pull back from the light.
 
-Color palette: steel greys, dark leathers, silver-white hair as bright focal point. Crimson eyes and ember particles as warm accents against the cold dark tones. Subtle eldritch green in the sword etchings.
+Color palette: steel greys, warm leather browns, silver-white hair as bright focal point. Crimson eyes and golden sunlight as warm accents that cut through the surrounding dark tones.
 
-Mood: A blade forged in silence. The white hair catches the last light in a world going dark. Those red eyes have stared into the abyss — and the abyss looked away first.
+Mood: A shield raised for others. The white hair catches the dawn light like a banner. Those red eyes hold courage, not cruelty — the steady warmth of someone who has decided that if the darkness comes for his friends, it has to go through him first.
 
 Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
 ```
@@ -210,23 +210,23 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 ```
 Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
 
-Character: A young human adventurer, level 5 ranger. Swift, silent, and more at home in the wild than among people. A hunter who tracks things most people pray they never encounter.
+Character: A young human adventurer, level 5 ranger. Gentle, free-spirited, and deeply connected to the wilderness — a guardian of the wild places and a friend to creatures most people fear.
 
 Visual details:
-- Shoulder-length silver-white hair tied back in a loose low ponytail, with shorter strands framing the face — practical for the wilderness
-- Sharp crimson-red eyes with a predatory alertness — constantly scanning, never truly at rest
-- Lean, agile build with wiry muscle — built for speed and precision rather than brute force
-- Wearing a dark forest-green hooded cloak over fitted dark leather armor, hood currently down
-- A recurve bow slung across the back, and a hunting knife visible at the belt
-- A thin leather cord necklace with a small animal fang pendant
-- One hand partially raised, fingers slightly curled — the gesture of someone perpetually ready to nock an arrow
-- Expression: watchful, reserved, a flicker of wildness in the eyes — half-civilized, comfortable with solitude
+- Shoulder-length silver-white hair tied back in a loose low ponytail with a braided leather cord, with a few softer strands framing the face — a small green leaf tucked into the braid
+- Warm crimson-red eyes with a calm, observant quality — the patient gaze of someone who has learned to listen to the forest
+- Lean, agile build with a relaxed, natural posture — at ease in her own skin
+- Wearing a forest-green hooded cloak over fitted dark leather armor, hood currently down. The cloak is adorned with small embroidered patterns of leaves and birds
+- A recurve bow slung across the back, its limbs carved with gentle floral motifs, and a hunting knife at the belt
+- A small songbird perched trustingly on the shoulder or a leather-cord necklace with a smooth river stone pendant
+- One hand gently extended, palm up, as if inviting something to land — the gesture of someone who asks, not takes
+- Expression: a soft, quiet smile with thoughtful eyes — the warmth of someone content under open sky
 
-Background element: shadowy forest silhouettes behind, with pairs of faintly glowing eyes watching from between the trees — things in the dark that the ranger is aware of. Wisps of pale fog curl at the bottom edge.
+Background element: a soft sunlit forest glade behind, with drifting motes of pollen or fireflies catching golden light, and the faint silhouette of a deer pausing trustfully at the treeline. The wilderness here is alive and welcoming.
 
-Color palette: forest greens, earth browns, dark leather. Silver-white hair as bright contrast against the dark wilderness. Crimson eyes matching the faint glow of the watching eyes in the forest — hunter and hunted share the same red gaze.
+Color palette: warm forest greens, earth browns, soft leather tones. Silver-white hair as a moonlit highlight. Crimson eyes balanced by the golden light of the glade — a scene of natural harmony rather than predation.
 
-Mood: The forest whispers, and this one whispers back. White hair like moonlight through dead branches. Red eyes that can spot a corruption-touched beast at two hundred paces — and know exactly where to put the arrow.
+Mood: The forest speaks, and this one answers with kindness. White hair like sunlight on birch bark. Those red eyes carry the quiet joy of someone who has found their place in the world — and will defend its wild heart from anything that threatens it.
 
 Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
 ```
@@ -238,23 +238,23 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 ```
 Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
 
-Character: A young human adventurer, level 5 cleric. A healer and protector whose faith burns like a torch against encroaching darkness. Sturdy, compassionate, but with a steel core that bends for no evil.
+Character: A young human adventurer, level 5 cleric. Kind, steady, and quietly hopeful — a healer first and a warrior second. Someone who believes every person is worth saving, and lives by it.
 
 Visual details:
-- Short, neatly kept silver-white hair with a slight wave, brushed back from the forehead — disciplined but soft
-- Warm crimson-red eyes that carry both compassion and an unshakable conviction — the eyes of someone who has prayed over the dying and refused to let them go
-- Sturdy, solid build — a cleric who wears heavy armor and stands in the front line
-- Wearing dark chainmail under a deep charcoal tabard bearing a faded holy sun symbol in dull gold thread
-- A round steel shield on the back, and a flanged mace at the belt
-- A worn holy symbol pendant (sun disc) hanging at the chest, emitting a faint warm golden glow against the surrounding darkness
-- One hand touching the pendant in a gesture of quiet prayer
-- Expression: gentle strength, a serene face with eyes that have witnessed horror and chosen hope — the calm at the center of a storm
+- Short, neatly kept silver-white hair with a gentle wave, brushed back from the forehead — tidy and soft
+- Warm crimson-red eyes full of compassion and patient strength — the eyes of a healer who has stayed up all night at a bedside and counted it a privilege
+- Sturdy but approachable build — strong enough to stand in the front line, gentle enough to cradle a wounded sparrow
+- Wearing clean chainmail under a deep sky-blue tabard bearing a bright golden sun symbol in embroidered thread — the holy symbol well-kept and proudly displayed
+- A round steel shield decorated with a simple sunburst engraving on the back, and a flanged mace at the belt (but clearly used for defense, not conquest)
+- A holy symbol pendant (sun disc) at the chest emitting a soft, steady golden glow
+- One hand resting gently on the pendant in a gesture of heartfelt prayer, the other hand open at the side in welcome
+- Expression: a calm, reassuring smile with kind eyes — the face you want to see when you wake up injured, the face that tells you "you're safe now"
 
-Background element: soft golden divine light radiating from behind like a fractured halo, pushing back creeping dark tendrils and shadow shapes that recoil from the radiance. The boundary between light and dark is sharp and contested.
+Background element: soft golden divine light radiating from behind in a warm, complete halo, like morning sunlight through a stained-glass window. Small motes of golden light drift peacefully. Any darkness at the edges is gentle twilight, not menace — the light here has already won its space.
 
-Color palette: charcoal, steel grey, dull gold for the holy elements. Silver-white hair lit by the warm golden glow. Crimson eyes as a striking contrast — faith and fire in one gaze. The dark tendrils in void-purple and eldritch green.
+Color palette: warm charcoals, sky blues, rich golds. Silver-white hair haloed by golden radiance. Crimson eyes softened by the warm light — faith expressed as tenderness rather than fire.
 
-Mood: Where this one walks, the darkness pulls back — but only just. The white hair glows like a candle flame in a cathedral of shadows. Those red eyes have seen what waits beyond death, and they chose to fight for the living anyway. The holy light is real, but so are the things it keeps at bay.
+Mood: A light that does not flinch. The white hair glows like a lantern held for lost travelers. Those red eyes have seen suffering and answered it with open hands — a healer whose faith is quiet, steady, and absolutely unshakable.
 
 Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
 ```

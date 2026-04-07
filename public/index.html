@@ -366,6 +366,27 @@
       font-size: 18px; color: #4ecdc4;
       flex-shrink: 0;
     }
+    .chud-player-portrait {
+      width: 44px; height: 44px;
+      border-radius: 4px;
+      background: #0a1a1a;
+      border: 1px solid #4ecdc4;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(78, 205, 196, 0.25), inset 0 0 4px rgba(78, 205, 196, 0.1);
+    }
+    .chud-player-portrait img {
+      width: 100%; height: 100%;
+      image-rendering: pixelated;
+      object-fit: cover;
+    }
+    .chud-player-portrait .fallback-icon {
+      font-size: 20px; color: #4ecdc4;
+    }
+    @media (max-width: 600px) {
+      .chud-player-portrait { width: 36px; height: 36px; }
+    }
     .chud-player-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 2px;
@@ -1269,35 +1290,66 @@
       background: linear-gradient(180deg, #141828 0%, #0e1220 100%);
       border: 1px solid rgba(184, 134, 11, 0.2);
       color: #d0d0d0;
-      padding: 14px 16px;
-      border-radius: 4px;
+      padding: 0;
+      border-radius: 6px;
       cursor: pointer;
       text-align: center;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       transition: all 0.2s;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .class-btn:hover {
       border-color: rgba(184, 134, 11, 0.5);
-      box-shadow: 0 0 12px rgba(184, 134, 11, 0.1);
+      box-shadow: 0 0 12px rgba(184, 134, 11, 0.15);
+      transform: translateY(-1px);
     }
 
     .class-btn.selected {
-      border-color: #b8860b;
+      border-color: #d4a017;
       background: linear-gradient(180deg, #1a1830 0%, #141020 100%);
-      box-shadow: 0 0 16px rgba(184, 134, 11, 0.15);
+      box-shadow: 0 0 20px rgba(212, 160, 23, 0.35), inset 0 0 12px rgba(212, 160, 23, 0.08);
+    }
+
+    .class-btn .pc-portrait {
+      width: 100%;
+      aspect-ratio: 1;
+      background: #0a0f1e;
+      display: block;
+      image-rendering: pixelated;
+      object-fit: cover;
+      border-bottom: 1px solid rgba(184, 134, 11, 0.15);
+    }
+
+    .class-btn.selected .pc-portrait {
+      border-bottom-color: rgba(212, 160, 23, 0.5);
+    }
+
+    .class-btn .pc-info {
+      padding: 8px 10px 10px;
     }
 
     .class-btn .name {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       color: #d4a017;
+      letter-spacing: 0.5px;
     }
 
     .class-btn .desc {
-      font-size: 12px;
+      font-size: 11px;
       color: #888;
-      margin-top: 4px;
+      margin-top: 3px;
+      line-height: 1.3;
+    }
+
+    .class-btn .persona {
+      font-size: 10px;
+      color: #6a8aa0;
+      margin-top: 2px;
+      font-style: italic;
     }
 
     #start-btn {
@@ -2937,20 +2989,36 @@
     <p style="color:#aaa; margin-bottom:10px">选择职业:</p>
     <div class="class-grid">
       <div class="class-btn" data-class="fighter" onclick="selectClass(this)">
-        <div class="name"><i class="ra ra-sword"></i> 剑士</div>
-        <div class="desc">力量与勇气 STR 16</div>
+        <img class="pc-portrait" src="portraits/pc-fighter.png" alt="剑士">
+        <div class="pc-info">
+          <div class="name"><i class="ra ra-sword"></i> 剑士</div>
+          <div class="desc">力量与勇气 · STR 18</div>
+          <div class="persona">守护伙伴的盾兄弟</div>
+        </div>
       </div>
       <div class="class-btn" data-class="mage" onclick="selectClass(this)">
-        <div class="name"><i class="ra ra-crystal-ball"></i> 法师</div>
-        <div class="desc">奥术知识 INT 16</div>
+        <img class="pc-portrait" src="portraits/pc-mage.png" alt="法师">
+        <div class="pc-info">
+          <div class="name"><i class="ra ra-crystal-ball"></i> 法师</div>
+          <div class="desc">奥术知识 · INT 18</div>
+          <div class="persona">温和好奇的学者</div>
+        </div>
       </div>
       <div class="class-btn" data-class="ranger" onclick="selectClass(this)">
-        <div class="name"><i class="ra ra-archery-target"></i> 游侠</div>
-        <div class="desc">敏捷感知 DEX 16</div>
+        <img class="pc-portrait" src="portraits/pc-ranger.png" alt="游侠">
+        <div class="pc-info">
+          <div class="name"><i class="ra ra-archery-target"></i> 游侠</div>
+          <div class="desc">敏捷感知 · DEX 18</div>
+          <div class="persona">荒野的友善守护者</div>
+        </div>
       </div>
       <div class="class-btn" data-class="cleric" onclick="selectClass(this)">
-        <div class="name"><i class="ra ra-fairy-wand"></i> 牧师</div>
-        <div class="desc">信仰治疗 WIS 16</div>
+        <img class="pc-portrait" src="portraits/pc-cleric.png" alt="牧师">
+        <div class="pc-info">
+          <div class="name"><i class="ra ra-fairy-wand"></i> 牧师</div>
+          <div class="desc">信仰治疗 · WIS 18</div>
+          <div class="persona">坚定温暖的治愈者</div>
+        </div>
       </div>
     </div>
     <button id="start-btn" disabled onclick="startGame()">开始冒险</button>
@@ -2980,7 +3048,7 @@
     <div id="combat-hud">
       <div class="chud-party">
         <div class="chud-player">
-          <div class="chud-class-icon" id="chud-player-icon"><i class="ra ra-sword"></i></div>
+          <div class="chud-player-portrait" id="chud-player-portrait"><i class="ra ra-sword fallback-icon"></i></div>
           <div class="chud-player-info">
             <div class="chud-name" id="chud-player-name">--</div>
             <div class="chud-hp-row">
@@ -3182,6 +3250,7 @@
       localStorage.removeItem(SAVE_KEYS.session)
       localStorage.removeItem(SAVE_KEYS.messages)
       localStorage.removeItem(SAVE_KEYS.dossier)
+      localStorage.removeItem('trpg_player_class')
     }
 
     // ─── DM 思考面板 ───
@@ -4367,6 +4436,9 @@
       const name = document.getElementById('player-name').value.trim()
       if (!name || !selectedClass) return
 
+      // Persist class for portrait lookup across reloads
+      try { localStorage.setItem('trpg_player_class', selectedClass) } catch (e) { /* ignore */ }
+
       document.getElementById('create-screen').style.display = 'none'
       const gameScreen = document.getElementById('game-screen')
       gameScreen.style.display = 'flex'
@@ -4898,7 +4970,16 @@
     const CHUD_CLASS_ICONS = { fighter: 'ra-sword', mage: 'ra-fairy-wand', ranger: 'ra-archery-target', cleric: 'ra-health' }
 
     function getPlayerClassId() {
+      // 1. Current session (fresh creation)
       if (selectedClass) return selectedClass
+      // 2. Dedicated localStorage key (persisted on game creation)
+      try {
+        const stored = localStorage.getItem('trpg_player_class')
+        if (stored && ['fighter', 'mage', 'ranger', 'cleric'].includes(stored)) {
+          return stored
+        }
+      } catch (e) { /* ignore */ }
+      // 3. Fallback: reverse-engineer from ability scores (legacy saves)
       const s = getSavedSession()
       if (!s?.player?.abilities) return 'fighter'
       const a = s.player.abilities
@@ -4917,10 +4998,15 @@
       const session = getSavedSession()
       const player = session?.player
 
-      // Player class icon
+      // Player portrait (square, matches enemy portraits)
       const classId = getPlayerClassId()
-      const iconEl = document.getElementById('chud-player-icon')
-      if (iconEl) iconEl.innerHTML = '<i class="ra ' + (CHUD_CLASS_ICONS[classId] || 'ra-sword') + '"></i>'
+      const portraitEl = document.getElementById('chud-player-portrait')
+      if (portraitEl) {
+        const iconFallback = CHUD_CLASS_ICONS[classId] || 'ra-sword'
+        portraitEl.innerHTML =
+          '<img src="portraits/pc-' + classId + '.png" alt="' + classId + '" ' +
+          'onerror="this.parentElement.innerHTML=\'<i class=\\\'ra ' + iconFallback + ' fallback-icon\\\'></i>\'">'
+      }
 
       // Player name
       const nameEl = document.getElementById('chud-player-name')
@@ -5588,10 +5674,17 @@
       const hint = data.continueHint || ''
       overlay.innerHTML = `
     <div class="npc-card-popup" style="max-width:440px;text-align:center" onclick="event.stopPropagation()">
-      <div style="padding:40px 28px 24px">
-        <div style="font-size:11px;color:#8a7eb5;letter-spacing:3px;margin-bottom:20px">— 冒险终章 —</div>
-        <div style="font-size:14px;color:#c0b8d0;line-height:1.9;margin-bottom:24px;font-style:italic;white-space:pre-line">${esc(data.reason)}</div>
-        ${hint ? '<div style="font-size:12px;color:#888;margin-bottom:20px;font-style:italic">' + esc(hint) + '</div>' : ''}
+      <!-- Header: 固定标题 -->
+      <div style="padding:32px 28px 16px;flex-shrink:0">
+        <div style="font-size:11px;color:#8a7eb5;letter-spacing:3px">— 冒险终章 —</div>
+      </div>
+      <!-- Body: 可滚动正文区 -->
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:8px 28px 16px;text-align:center">
+        <div style="font-size:14px;color:#c0b8d0;line-height:1.9;font-style:italic;white-space:pre-line">${esc(data.reason)}</div>
+        ${hint ? '<div style="font-size:12px;color:#888;margin-top:20px;font-style:italic">' + esc(hint) + '</div>' : ''}
+      </div>
+      <!-- Footer: 按钮始终固定在底部，与正文用一道淡分隔线区隔 -->
+      <div style="padding:16px 28px 24px;flex-shrink:0;border-top:1px solid rgba(230,184,0,0.12);background:linear-gradient(180deg, rgba(18,18,42,0) 0%, rgba(18,18,42,0.6) 100%)">
         <div style="display:flex;flex-direction:column;gap:10px">
           <button onclick="location.reload()" style="background:#533483;color:white;border:none;padding:12px;border-radius:8px;font-size:15px;cursor:pointer">重新开始新冒险</button>
           ${canContinue ? '<button onclick="this.closest(\'.npc-card-overlay\').remove()" style="background:#0f3460;color:#888;border:1px solid #333;padding:10px;border-radius:8px;font-size:13px;cursor:pointer">继续坚持...</button>' : ''}
