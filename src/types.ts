@@ -63,7 +63,8 @@ export interface Spell {
 // ─── 怪物 ─────────────────────────────────────
 
 export interface Monster {
-  name: string
+  name: string          // 英文规则 ID（用于查表、kills_X flag）
+  nameZh?: string       // 中文显示名（给 DM/玩家看）
   hp: number
   dc: number // 命中/闪避难度 (用作 AC)
   damageDice: string // "1d6+2"

@@ -183,22 +183,22 @@ Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited 
 ```
 Create a pixel art character portrait in dark Cthulhu-themed 2D RPG style.
 
-Character: A young human adventurer, level 5 wizard. Brilliant, intense, and slightly unnerving — someone who reads forbidden tomes the way others read newspapers.
+Character: A young human adventurer, level 5 wizard. Brilliant, curious, and quietly kind — a scholar who studies forbidden knowledge not out of hunger for power, but to understand and protect others from it.
 
 Visual details:
-- Medium-length silver-white hair, slightly unkempt and flowing, parted to one side — strands occasionally lift as if touched by invisible arcane currents
-- Deep crimson irises that glow faintly in dim light — a side effect of channeling raw magical energy
-- Slim, almost gaunt build suggesting late nights and skipped meals — intellect over body
-- Wearing a dark navy-blue robe with silver thread arcane patterns along the collar and cuffs, over a simple black tunic
-- A leather-bound grimoire tucked under one arm, its cover marked with an eye-like sigil that seems to shift
-- Slender fingers with faint arcane burn marks — the cost of handling volatile spells
-- Expression: a thin, knowing half-smile with eyes that see deeper than the surface — curiosity laced with something dangerous
+- Medium-length silver-white hair, softly flowing, parted to one side — neat but a little windswept from long nights of study
+- Warm crimson-red eyes, bright and thoughtful — the eyes of a curious student, not a cultist
+- Slim but upright build, with a gentle, composed posture
+- Wearing a dark navy-blue robe with silver thread stars and constellation patterns along the collar and cuffs, over a simple white undershirt
+- A leather-bound spellbook tucked against the chest with both hands, held close like a cherished friend — its cover embossed with a simple silver open-book sigil
+- A wooden wand or rune-carved staff visible at the side, its tip crowned with a small blue crystal
+- Expression: a gentle half-smile, eyes lit with wonder and warmth — the look of someone who finds joy in learning and wants to share it
 
-Background element: floating arcane glyphs and geometric sigils orbiting slowly behind the head, glowing in dim violet and amber. One sigil is subtly wrong — twisted, non-Euclidean, as if borrowed from something older than human magic
+Background element: floating motes of soft blue-white mage light drifting gently around the head like fireflies, with faint silver constellation lines connecting them — peaceful and studious, like a small private planetarium
 
-Color palette: deep navy, silver-white hair, violet and amber magical highlights. Crimson eyes as the unsettling focal point. The twisted sigil in sickly yellow-green.
+Color palette: deep navy, silver-white hair, soft blue and silver magical highlights. Warm crimson eyes as a gentle focal point. The mage lights in bright silvery blue — light pushing back the surrounding darkness rather than being consumed by it.
 
-Mood: Knowledge is power, and power has a price written in languages that predate humanity. The white hair aged early from touching forces mortals weren't meant to wield. Those red eyes see the magical weave of reality — and the things hiding between its threads.
+Mood: A young scholar who believes knowledge should serve kindness. The white hair is not a mark of corruption but of long nights reading by candlelight. Those red eyes hold the warmth of someone who still believes the world is worth saving — and is quietly working out how to do it.
 
 Style: pixel art, 2D, retro RPG portrait, dark Lovecraftian atmosphere, limited palette, visible pixel texture.
 ```

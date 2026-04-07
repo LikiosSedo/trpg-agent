@@ -16,13 +16,30 @@ import { timingSafeEqual, createHash } from 'crypto'
 import { initItemRegistry, getFacts, getRegistry } from './game-state.js'
 import { GameEngine, type TurnEvent, type CommandResult } from './engine.js'
 import { TransferItemTool } from './tools/transfer-item.js'
+import { localize } from './i18n-terms.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 /** Strip ANSI escape codes for web output */
-function stripAnsi(s: string): string {
+export function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;]*m/g, '')
+}
+
+/**
+ * 递归剥离对象内所有字符串字段的 ANSI 颜色码。
+ * 用于 send() 出口兜底，防止任何用 chalk 写出的 CLI 文本意外推到前端
+ * 显示成字面 [2m / [22m 等垃圾字符。
+ */
+export function stripAnsiDeep(value: any): any {
+  if (typeof value === 'string') return stripAnsi(value)
+  if (Array.isArray(value)) return value.map(stripAnsiDeep)
+  if (value && typeof value === 'object') {
+    const out: Record<string, any> = {}
+    for (const k of Object.keys(value)) out[k] = stripAnsiDeep(value[k])
+    return out
+  }
+  return value
 }
 
 // ─── Express + WebSocket Server ───
@@ -192,7 +209,7 @@ wss.on('connection', (ws: WebSocket, req) => {
 
   function send(type: string, data: any) {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type, ...data }))
+      ws.send(JSON.stringify({ type, ...stripAnsiDeep(data) }))
     }
   }
 
@@ -200,6 +217,8 @@ wss.on('connection', (ws: WebSocket, req) => {
   async function streamEvents(events: AsyncGenerator<TurnEvent>) {
     for await (const ev of events) {
       switch (ev.type) {
+        // dm_text_delta 已经在 engine 层做过流式术语替换（StreamingLocalizer），
+        // 这里不再 localize 避免对同一 chunk 多次处理（也不必要）。
         case 'dm_text_delta':
           send('dm', { text: ev.text }); break
         case 'dm_end':
@@ -207,25 +226,27 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'dm_error':
           send('error', { text: ev.message }); break
         case 'broken_promise':
-          send('system', { text: `💔 ${ev.npcName}对你失望了：${ev.reason}` }); break
+          send('system', { text: `💔 ${ev.npcName}对你失望了：${localize(ev.reason)}` }); break
         case 'safety_block':
-          send('system', { text: `⛔ ${ev.reason}` }); break
+          send('system', { text: `⛔ ${localize(ev.reason)}` }); break
+        // 以下非流式文本事件：服务端边界统一兜底本地化
+        // 绝大多数已在发射点用了中文名，这里是双重保险
         case 'combat_narrative':
-          send('combat_narrative', { text: ev.text }); break
+          send('combat_narrative', { text: localize(ev.text) }); break
         case 'combat_monster':
-          send('combat_monster', { text: ev.text, playerHp: (ev as any).playerHp, playerMaxHp: (ev as any).playerMaxHp, allies: (ev as any).allies }); break
+          send('combat_monster', { text: localize(ev.text), playerHp: (ev as any).playerHp, playerMaxHp: (ev as any).playerMaxHp, allies: (ev as any).allies }); break
         case 'combat_ally':
-          send('combat_ally', { text: (ev as any).text }); break
+          send('combat_ally', { text: localize((ev as any).text) }); break
         case 'combat_status':
-          send('combat_status', { text: ev.text, ended: ev.ended, result: ev.result }); break
+          send('combat_status', { text: localize(ev.text), ended: ev.ended, result: ev.result }); break
         case 'combat_init':
-          send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative, allies: (ev as any).allies }); break
+          send('combat_init', { monsters: ev.monsters, round: ev.round, initiative: ev.initiative, narrative: ev.narrative ? localize(ev.narrative) : ev.narrative, allies: (ev as any).allies }); break
         case 'combat_action_req':
           send('combat_action_req', { targets: ev.targets, spells: ev.spells, items: ev.items, playerHp: ev.playerHp, playerMaxHp: ev.playerMaxHp, activeEffects: ev.activeEffects, allies: (ev as any).allies }); break
         case 'quest_completed':
-          send('system', { text: `✓ 任务完成: ${ev.questName} — ${ev.text}` }); break
+          send('system', { text: `✓ 任务完成: ${ev.questName} — ${localize(ev.text)}` }); break
         case 'quest_progress':
-          send('quest_progress', { quest: ev.questName, text: ev.text, current: ev.current, required: ev.required }); break
+          send('quest_progress', { quest: ev.questName, text: localize(ev.text), current: ev.current, required: ev.required }); break
         case 'npc_unlock':
           send('npc_card', {
             npcName: ev.npcName,
@@ -234,24 +255,29 @@ wss.on('connection', (ws: WebSocket, req) => {
             title: engine!.dossier.getBaseInfo(ev.npcName)?.title ?? '',
             appearance: engine!.dossier.getBaseInfo(ev.npcName)?.appearance ?? '',
           }); break
-        case 'poi_unlock':
-          send('poi_unlock', { poiId: (ev as any).poiId, poiName: (ev as any).poiName, areaId: (ev as any).areaId, areaName: (ev as any).areaName, description: (ev as any).description }); break
+        case 'discovery':
+          send('discovery', {
+            source: (ev as any).source,
+            poi: (ev as any).poi,
+            items: (ev as any).items,
+            gold: (ev as any).gold,
+          }); break
         case 'npc_update':
-          send('system', { text: ev.text }); break
+          send('system', { text: localize(ev.text) }); break
         case 'npc_speaking':
           send('npc_speaking', { npcName: ev.npcName, portrait: ev.portrait }); break
         case 'combat_portraits':
           send('combat_portraits', { monsters: ev.monsters }); break
         case 'game_over':
-          send('game_over', { reason: ev.reason, canContinue: ev.canContinue, continueHint: ev.continueHint }); break
+          send('game_over', { reason: localize(ev.reason), canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
-          send('system', { text: ev.text }); break
+          send('system', { text: localize(ev.text) }); break
         case 'system_message':
-          send('system_message', { text: ev.text }); break
+          send('system_message', { text: localize(ev.text) }); break
         case 'important_warning':
-          send('important_warning', { title: ev.title, text: ev.text }); break
+          send('important_warning', { title: ev.title, text: localize(ev.text) }); break
         case 'item_acquired':
-          send('item_acquired', { text: ev.text }); break
+          send('item_acquired', { text: localize(ev.text) }); break
         case 'trade_proposal':
           send('trade_proposal', { npc: ev.npc, items: ev.items, totalPrice: ev.totalPrice, canBargain: ev.canBargain }); break
         case 'audio':

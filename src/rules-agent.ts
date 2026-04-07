@@ -40,6 +40,8 @@ export interface ActionResult {
   unknownDestination?: boolean // Move 目的地不在地图注册表中（降级为叙事）
   notFound?: boolean           // Look 目标不在注册表中（降级为叙事）
   discoveredPoi?: { id: string; nameZh: string; description: string } // Search 发现的新 POI
+  /** Search 工具系统发放的物品/金币（用于前端发现弹窗，与 discoveredPoi 可同时存在） */
+  lootGranted?: { items: Array<{ name: string; description?: string }>; gold: number }
 }
 
 // ─── 第一级：快速正则匹配 ────────────────────

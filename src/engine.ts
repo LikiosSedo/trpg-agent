@@ -40,6 +40,7 @@ import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 import { consumeTradeProposal } from './tools/propose-trade.js'
+import { localize, StreamingLocalizer } from './i18n-terms.js'
 import { readFileSync } from 'fs'
 
 // ─── <think> 标签流式解析器 ─────────────────────────
@@ -352,7 +353,18 @@ export type TurnEvent =
   | { type: 'combat_narrative_actions'; actions: SceneActions }
   | { type: 'dm_thinking'; text: string }
   | { type: 'system_message'; text: string }
-  | { type: 'poi_unlock'; poiId: string; poiName: string; areaId: string; areaName: string; description: string }
+  /**
+   * 统一的"发现"弹窗事件，承载 POI 发现、物品获取（系统发放）或两者兼有的场景。
+   * - Search 同时找到 POI + 物品 → 单条事件包含 poi + items + gold（前端单一弹窗）
+   * - Move 首次到达 POI → 仅 poi
+   * - Search 找到物品但无新 POI → 仅 items / gold
+   */
+  | { type: 'discovery';
+      source: 'search' | 'arrival';
+      poi?: { id: string; nameZh: string; areaId: string; areaName: string; description: string };
+      items?: Array<{ name: string; quantity: number; description?: string }>;
+      gold?: number;
+    }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -1785,21 +1797,39 @@ export class GameEngine {
             text: '刀刃所向，非善非恶...只是选择。\n\n但选择，终将塑造你。',
           }
         }
-        // Search 发现新 POI → 弹出解锁卡片（同时标记已访问，Move 时不再重复）
-        if (actionResult.discoveredPoi) {
-          const dp = actionResult.discoveredPoi
+        // Search 发现：POI / 物品 / 金币 合并到单条 discovery 事件
+        // （前端复用同一个弹窗组件展示，避免连续弹两次）
+        const dp = actionResult.discoveredPoi
+        const lg = actionResult.lootGranted
+        if (dp || lg) {
           const areaId = session.worldState.currentLocation
           const area = locations[areaId]
-          session.worldState.flags[`poi_visited_${dp.id}`] = true
-          yield {
-            type: 'poi_unlock',
-            poiId: dp.id,
-            poiName: dp.nameZh,
-            areaId,
-            areaName: area?.nameZh ?? areaId,
-            description: dp.description,
+          if (dp) session.worldState.flags[`poi_visited_${dp.id}`] = true
+
+          // 物品按 name 聚合数量（蜘蛛丝 x2 而不是两条）
+          let aggregatedItems: Array<{ name: string; quantity: number; description?: string }> | undefined
+          if (lg && lg.items.length > 0) {
+            const counter = new Map<string, { name: string; quantity: number; description?: string }>()
+            for (const it of lg.items) {
+              const exist = counter.get(it.name)
+              if (exist) exist.quantity++
+              else counter.set(it.name, { name: it.name, quantity: 1, description: it.description })
+            }
+            aggregatedItems = Array.from(counter.values())
           }
-          console.log(`[poi-unlock] 搜索发现: ${dp.nameZh} (${dp.id})`)
+
+          yield {
+            type: 'discovery',
+            source: 'search',
+            poi: dp ? {
+              id: dp.id, nameZh: dp.nameZh,
+              areaId, areaName: area?.nameZh ?? areaId,
+              description: dp.description,
+            } : undefined,
+            items: aggregatedItems,
+            gold: lg && lg.gold > 0 ? lg.gold : undefined,
+          }
+          console.log(`[discovery] 搜索: ${dp ? dp.nameZh : ''}${dp && lg ? ' + ' : ''}${lg ? `${lg.items.length}件物品/${lg.gold}金` : ''}`)
         }
       }
     } else {
@@ -1846,7 +1876,7 @@ export class GameEngine {
           yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
         }
       }
-      // POI 首次到达 → 弹出解锁卡片
+      // POI 首次到达 → 弹出发现卡片
       const poiId = session.worldState.currentSubLocation
       const visitKey = `poi_visited_${poiId}`
       if (poiId && !session.worldState.flags[visitKey]) {
@@ -1856,14 +1886,17 @@ export class GameEngine {
         const poi = area?.pointsOfInterest.find((p: any) => p.id === poiId)
         if (poi) {
           yield {
-            type: 'poi_unlock',
-            poiId,
-            poiName: poi.nameZh,
-            areaId,
-            areaName: area.nameZh,
-            description: poi.description,
+            type: 'discovery',
+            source: 'arrival',
+            poi: {
+              id: poiId,
+              nameZh: poi.nameZh,
+              areaId,
+              areaName: area.nameZh,
+              description: poi.description,
+            },
           }
-          console.log(`[poi-unlock] 首次到达: ${poi.nameZh} (${poiId})`)
+          console.log(`[discovery] 首次到达: ${poi.nameZh} (${poiId})`)
         }
       }
     }
@@ -1979,6 +2012,7 @@ export class GameEngine {
       ? actionResult.toolsCalled.map(t => ({ toolName: t }))
       : []
     const thinkParser = new ThinkTagParser()
+    const localizer = new StreamingLocalizer()  // 术语中文化安全网
     try {
       const timeoutMs = 60000 // 60 秒超时
       let timedOut = false
@@ -2008,7 +2042,9 @@ export class GameEngine {
               repetitionDetected = true
               break
             }
-            yield { type: 'dm_text_delta', text: parsed.narrative }
+            // 流式术语替换：buffer 可能跨越 token 边界的英文术语片段
+            const localized = localizer.feed(parsed.narrative)
+            if (localized) yield { type: 'dm_text_delta', text: localized }
           }
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
@@ -2028,11 +2064,16 @@ export class GameEngine {
       const flushed = thinkParser.flush()
       if (flushed.thinking) yield { type: 'dm_thinking', text: flushed.thinking }
       if (flushed.narrative) { fullText += flushed.narrative }
+      // Flush streaming localizer 尾部 buffer（防止最后几个字符卡在 buffer 里）
+      const tail = localizer.flush()
+      if (tail) yield { type: 'dm_text_delta', text: tail }
       // Post-hoc 清理：streaming 分片可能绕过逐 chunk 过滤
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
       // 过滤 DM 泄漏的调试/元信息行
       fullText = fullText.split('\n').filter(line => !line.startsWith('[DEBUG]')).join('\n')
+      // 同步中文化到完整文本（记录/存档用），和流式输出保持一致
+      fullText = localize(fullText)
       console.log(`[dm] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[dm] DM 错误:`, (err as Error).message)
@@ -2319,11 +2360,12 @@ export class GameEngine {
         const { startCombat: startCombatFn } = await import('./combat-manager.js')
         startCombatFn(session, monsterNames, allDb as any)
         console.log(`[combat] 区域遭遇触发：${monsterNames.join(', ')}`)
-        yield { type: 'narrative_warning', text: `⚔️ 遭遇战斗！${monsterNames.join('和')}向你发起攻击！` }
+        const namesZh = monsterNames.map(n => localize(n)).join('和')
+        yield { type: 'narrative_warning', text: `⚔️ 遭遇战斗！${namesZh}向你发起攻击！` }
         // Emit combat_init + combat_action_req for structured combat UI
-        yield* this.emitCombatStart(`${monsterNames.join('和')}向你发起攻击！`)
+        yield* this.emitCombatStart(`${namesZh}向你发起攻击！`)
         const loc = session.worldState.currentLocation === 'twilight-woods' ? '暮色森林' : session.worldState.currentLocation === 'greyspine-mines' ? '灰脊矿道' : '碎石荒原'
-        yield* this.combatDMNarrative(`${monsterNames.join('和')}从暗处现身，向玩家发起突袭！描写怪物出现的方式、它们的外貌和威胁感，以及战斗一触即发的紧迫氛围。`)
+        yield* this.combatDMNarrative(`${namesZh}从暗处现身，向玩家发起突袭！描写怪物出现的方式、它们的外貌和威胁感，以及战斗一触即发的紧迫氛围。`)
       } catch (err) {
         console.error(`[combat] 遭遇触发失败:`, (err as Error).message)
       }
@@ -2507,6 +2549,7 @@ export class GameEngine {
     const dmStart = Date.now()
     let fullText = ''
     const toolsCalled: ToolCallRecord[] = []
+    const bargainLocalizer = new StreamingLocalizer()
     try {
       const timeoutMs = 60000
       let timedOut = false
@@ -2523,7 +2566,8 @@ export class GameEngine {
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
-          yield { type: 'dm_text_delta', text }
+          const localized = bargainLocalizer.feed(text)
+          if (localized) yield { type: 'dm_text_delta', text: localized }
           fullText += text
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
@@ -2536,8 +2580,11 @@ export class GameEngine {
         }
       }
       clearTimeout(timer)
+      const tail = bargainLocalizer.flush()
+      if (tail) yield { type: 'dm_text_delta', text: tail }
       const bargainEmptyIdx = fullText.indexOf('(Empty response:')
       if (bargainEmptyIdx !== -1) fullText = fullText.substring(0, bargainEmptyIdx)
+      fullText = localize(fullText)
       console.log(`[bargain] DM 响应完成: ${fullText.length}字, ${Date.now() - dmStart}ms`)
     } catch (err) {
       console.error(`[bargain] DM 错误:`, (err as Error).message)
@@ -2617,7 +2664,9 @@ export class GameEngine {
         enemyDesc = alive.map(m => {
           const ePct = Math.round((m.hp / m.maxHp) * 100)
           const eState = ePct > 60 ? '' : ePct > 25 ? '（已受伤）' : '（重伤）'
-          return `${m.name}${eState}`
+          // 给 DM 看中文名：localize 会把 "Cockatrice" 之类替换成 "鸡蛇兽"
+          // （NPC 战斗体已经是中文名，localize 不会动）
+          return `${localize(m.name)}${eState}`
         }).join('、')
       }
     }
@@ -2666,7 +2715,7 @@ export class GameEngine {
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
       if (fullText.trim()) {
-        yield { type: 'combat_narrative', text: fullText.trim() }
+        yield { type: 'combat_narrative', text: localize(fullText.trim()) }
       }
       // 如果 DM 调用了 SetActions 生成了选项，传出去
       const narrativeActions = consumeActions()
@@ -2733,7 +2782,7 @@ export class GameEngine {
 
       const emptyIdx = epilogue.indexOf('(Empty response:')
       if (emptyIdx !== -1) epilogue = epilogue.substring(0, emptyIdx)
-      epilogue = epilogue.trim()
+      epilogue = localize(epilogue.trim())
     } catch (err) {
       console.error('[death] 结局生成失败:', (err as Error).message?.slice(0, 80))
     } finally {
@@ -2836,7 +2885,8 @@ export class GameEngine {
 
     // 保留 combat.monsters 引用，战后用于 NPC 状态同步
     const combatMonsters = combat.monsters
-    const enemyNames = combatMonsters.map(m => m.id).join('、')
+    // enemyNames 用于注入 DM 叙事 prompt —— 用中文显示名（localize 保证英文怪物名被替换）
+    const enemyNames = combatMonsters.map(m => localize(m.id)).join('、')
 
     let skipAfterPhase = false
 
@@ -2859,12 +2909,15 @@ export class GameEngine {
     const afterPlayerIds = afterMonsterIds
 
     // 怪物命中叙事 helper
+    // 注意：monsterName/targetName 可能是英文怪物名（"Cockatrice"/"Goblin_2"），
+    // 走 localize 把它们转成中文显示名再代入模板。
     const emitMonsterNarratives = function* (hits: any[]) {
       for (const mhit of hits) {
+        const monsterZh = localize(mhit.monsterName)
         if (mhit.targetIsAlly) {
           // 怪物攻击同伴的叙事
           const outcome = mhit.isCritical ? 'monster_critical_ally' : mhit.hit ? 'monster_hit_ally' : 'monster_miss_ally'
-          const text = pickNarrative(outcome as any, { monster: mhit.monsterName, ally: mhit.targetName })
+          const text = pickNarrative(outcome as any, { monster: monsterZh, ally: mhit.targetName })
           if (text) yield { type: 'combat_narrative' as const, text }
           if (mhit.allyKilled) {
             const downText = pickNarrative('ally_down' as any, { ally: mhit.targetName })
@@ -2874,7 +2927,7 @@ export class GameEngine {
           const isNpc = session.npcs.some(n => n.name === mhit.monsterName)
           const prefix = isNpc ? 'npc' : 'monster'
           const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
-          const text = pickNarrative(outcome as any, { monster: mhit.monsterName })
+          const text = pickNarrative(outcome as any, { monster: monsterZh })
           if (text) yield { type: 'combat_narrative' as const, text }
         }
       }
@@ -2893,7 +2946,8 @@ export class GameEngine {
             : ahit.hit
               ? (isSubdue ? 'ally_subdue_hit' : 'ally_hit')
               : 'ally_miss'
-        const text = pickNarrative(outcome as any, { ally: ahit.allyName, target: ahit.targetName })
+        // target 可能是英文怪物名，localize
+        const text = pickNarrative(outcome as any, { ally: ahit.allyName, target: localize(ahit.targetName) })
         if (text) yield { type: 'combat_narrative' as const, text }
       }
     }
@@ -3004,7 +3058,7 @@ export class GameEngine {
         else if (turnResult.hit) narrativeOutcome = 'player_hit'
         else narrativeOutcome = 'player_miss'
         const weaponName = session.player.equipped.weapon?.name ?? '武器'
-        const narrative = pickNarrative(narrativeOutcome as any, { target: turnResult.targetName ?? '敌人', weapon: weaponName })
+        const narrative = pickNarrative(narrativeOutcome as any, { target: localize(turnResult.targetName ?? '敌人'), weapon: weaponName })
         if (narrative) yield { type: 'combat_narrative', text: narrative }
       }
 
@@ -3194,6 +3248,7 @@ export class GameEngine {
     ].join('\n')
 
     let fullText = ''
+    const openingLocalizer = new StreamingLocalizer()
     try {
       const timeoutMs = 90000 // 开场叙事给 90 秒（首次调用可能较慢）
       let timedOut = false
@@ -3210,13 +3265,17 @@ export class GameEngine {
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
-          yield { type: 'dm_text_delta', text }
+          const localized = openingLocalizer.feed(text)
+          if (localized) yield { type: 'dm_text_delta', text: localized }
           fullText += text
         }
       }
       clearTimeout(timer)
+      const tail = openingLocalizer.flush()
+      if (tail) yield { type: 'dm_text_delta', text: tail }
       const openEmptyIdx = fullText.indexOf('(Empty response:')
       if (openEmptyIdx !== -1) fullText = fullText.substring(0, openEmptyIdx)
+      fullText = localize(fullText)
     } catch (err) {
       yield { type: 'dm_error', message: (err as Error).message.slice(0, 100) }
     }

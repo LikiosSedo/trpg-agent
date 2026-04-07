@@ -201,9 +201,18 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
         ? `【系统已发放】找到：${lootParts.join(' + ')}。DM只需叙事描述玩家如何发现这些物品，禁止重复调用 TransferItem。`
         : '仔细搜索后未发现有价值的物品。'
 
+      // 把发放的物品/金币结构化暴露出去，供 engine 发出发现弹窗
+      const lootGranted = (loot.items.length > 0 || loot.gold > 0)
+        ? {
+            items: loot.items.map(i => ({ name: i.name, description: i.description })),
+            gold: loot.gold,
+          }
+        : undefined
+
       return {
         output: [checkLine, poiLine, lootStr].filter(Boolean).join('\n'),
         discoveredPoi,
+        lootGranted,
       }
     }
 

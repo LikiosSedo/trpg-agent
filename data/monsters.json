@@ -1,6 +1,7 @@
 [
   {
     "name": "Goblin",
+    "nameZh": "哥布林",
     "hp": 15,
     "dc": 12,
     "damageDice": "1d6+2",
@@ -10,6 +11,7 @@
   },
   {
     "name": "Hobgoblin",
+    "nameZh": "大哥布林",
     "hp": 30,
     "dc": 14,
     "damageDice": "1d8+3",
@@ -19,6 +21,7 @@
   },
   {
     "name": "Wolf",
+    "nameZh": "野狼",
     "hp": 20,
     "dc": 13,
     "damageDice": "1d8+2",
@@ -28,6 +31,7 @@
   },
   {
     "name": "Cockatrice",
+    "nameZh": "鸡蛇兽",
     "hp": 25,
     "dc": 13,
     "damageDice": "1d8+2",
@@ -37,6 +41,7 @@
   },
   {
     "name": "Skeleton",
+    "nameZh": "骷髅",
     "hp": 22,
     "dc": 13,
     "damageDice": "1d8+2",
@@ -46,6 +51,7 @@
   },
   {
     "name": "Shadow",
+    "nameZh": "暗影",
     "hp": 24,
     "dc": 13,
     "damageDice": "1d8+3",
@@ -55,6 +61,7 @@
   },
   {
     "name": "Giant Spider",
+    "nameZh": "巨型蜘蛛",
     "hp": 30,
     "dc": 14,
     "damageDice": "1d10+3",
@@ -64,6 +71,7 @@
   },
   {
     "name": "Ghoul",
+    "nameZh": "食尸鬼",
     "hp": 28,
     "dc": 13,
     "damageDice": "1d10+3",
@@ -73,6 +81,7 @@
   },
   {
     "name": "Orc Warrior",
+    "nameZh": "兽人战士",
     "hp": 32,
     "dc": 14,
     "damageDice": "1d10+4",
@@ -82,6 +91,7 @@
   },
   {
     "name": "Mimic",
+    "nameZh": "拟态怪",
     "hp": 38,
     "dc": 14,
     "damageDice": "1d10+4",
@@ -91,6 +101,7 @@
   },
   {
     "name": "Eclipsed Beast",
+    "nameZh": "蚀日兽",
     "hp": 65,
     "dc": 15,
     "damageDice": "2d8+4",

@@ -335,9 +335,11 @@ export class DossierManager {
     else if (trust <= 4) entry.relationship = '朋友'
     else entry.relationship = '挚友'
 
-    let notice = chalk.dim(`\n  📋 你对${name}有了新的了解:`)
+    // 注意：返回的字符串既会发到前端 npc_update 事件，也会用于 CLI。
+    // 不要用 chalk —— 终端转义码在 web 上会显示为字面字符（[2m / [22m 等）。
+    let notice = `\n  📋 你对${name}有了新的了解:`
     for (const f of newFacts) {
-      notice += chalk.dim(`\n    · [${f.category}] ${f.fact}`)
+      notice += `\n    · [${f.category}] ${f.fact}`
     }
     return notice
   }

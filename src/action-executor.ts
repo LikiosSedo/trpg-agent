@@ -78,6 +78,7 @@ export async function executeAction(action: PlayerAction, session: GameSession):
           action, success: !result.isError,
           output: result.output, toolsCalled: ['Search'],
           discoveredPoi: result.discoveredPoi,
+          lootGranted: result.lootGranted,
         }
       }
 

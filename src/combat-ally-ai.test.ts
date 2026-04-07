@@ -59,14 +59,14 @@ function makeTestSession(): GameSession {
 function makeNpc(name: string): NPC {
   return {
     name,
-    description: 'test ally',
-    location: 'test-area',
-    personality: 'test',
-    topics: [],
     trust: 10,
-    conditions: [],
-    condition: 'healthy',
-  } as NPC
+    knownFacts: [],
+    playerPromises: [],
+    interactionLog: [],
+    location: 'test-area',
+    mood: 'neutral',
+    condition: 'normal',
+  }
 }
 
 // ─── Monster DB with ally templates + test dummies ─────────────────────────
