@@ -125,7 +125,18 @@ const RULES_AGENT_PROMPT = `你是TRPG规则解析器。分析玩家输入，输
 {"type":"REST","restType":"short|long"}
 {"type":"LOOK","target":"观察目标"}
 {"type":"FLEE"}
-{"type":"NARRATIVE"}`
+{"type":"NARRATIVE"}
+
+TALK approach 严格区分（常见错分：单纯的自我陈述≠persuade）：
+- normal: 日常对话、问候、自我介绍、真诚陈述、合理请求、提问
+    例："我是来找工作的冒险者"、"我的实力不错"、"这里最近怎么样？"
+- persuade: 试图让 NPC 做她本不想做的事（请求特权、讨要折扣、请求破例）
+    例："请给我打个折"、"让我破例带队"
+- deceive: 编造谎言、伪造身份、隐瞒事实
+    例："我是公会长老派来的"
+- intimidate: 威胁、恐吓、施加心理压力
+    例："不给我任务你会后悔"
+核心：persuade 的本质是"请求特权或改变决定"，不是"表达自己"。`
 
 function loadConfig() {
   if (process.env.TRPG_API_KEY) {

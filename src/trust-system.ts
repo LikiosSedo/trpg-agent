@@ -29,6 +29,20 @@ export interface TrustChangeEvent {
   grudgeTag?: string
 }
 
+/**
+ * Dialogue 通道正向信任冷却轮数。
+ *
+ * 含义：同一 NPC 通过 dialogue 通道获得正向 trust 的最小间隔回合。
+ *   normal 对话 10% 概率 +1 与 DM 主动 ChangeTrust(dialogue, +delta) 共享此冷却，
+ *   防止"靠话术刷信任"。
+ *
+ * 不影响：persuade/deceive/intimidate 成功的奖励、gift/quest/action 等其他通道、
+ *   所有负向 trust 变化。
+ *
+ * 当前值由 CLAUDE.md §4 数值平衡规范跟踪 — 如需调整请先阅读并记录理由。
+ */
+const DIALOGUE_TRUST_COOLDOWN_TURNS = 3
+
 export type NPCResponseType = 'normal' | 'curt' | 'hostile_dialogue' | 'avoidance' | 'combat_trigger'
 
 export interface NPCResponse {
@@ -82,6 +96,20 @@ export function changeTrust(session: GameSession, event: TrustChangeEvent): Trus
     if (event.channel === 'gift' && event.delta <= 1) {
       return { applied: false, reason: `${npc.name}冷冷地推开了你的小恩小惠` }
     }
+  }
+
+  // Dialogue 通道正向信任冷却（防刷）：
+  //   normal 对话 10% 触发 + DM 主动 ChangeTrust(dialogue) 共享此锁。
+  //   不影响 persuade 成功、gift/quest/action 等其他通道，也不影响负向变化。
+  if (event.delta > 0 && event.channel === 'dialogue') {
+    const lastTurn = npc.lastDialogueTrustTurn
+    if (lastTurn !== undefined && event.turn - lastTurn < DIALOGUE_TRUST_COOLDOWN_TURNS) {
+      return {
+        applied: false,
+        reason: `${npc.name} 的对话信任冷却中（上次+${event.turn - lastTurn}轮前）`,
+      }
+    }
+    npc.lastDialogueTrustTurn = event.turn
   }
 
   // 章节信任软上限：超过上限后增长衰减为 1/3（向下取整，可能为0）

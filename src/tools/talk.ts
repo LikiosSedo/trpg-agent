@@ -13,6 +13,13 @@ import { ChapterManager } from '../chapter-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName, moveNPC } from '../npc-mobility.js'
 import { evaluateResponse, getAttitudeDirective, changeTrust } from '../trust-system.js'
 
+/**
+ * normal 对话自动获得 +1 信任的概率。
+ * 当前值：10%。与 trust-system.ts 的 DIALOGUE_TRUST_COOLDOWN_TURNS 配合使用，
+ * 平均每 3 轮最多触发一次（因为冷却锁）。待调参，详见 CLAUDE.md §4 + 信任度系统章节。
+ */
+const NORMAL_DIALOGUE_TRUST_CHANCE = 0.10
+
 // ─── 对话中的 NPC 追踪（供引擎读取） ───
 const speakingNPCs: string[] = []
 
@@ -27,12 +34,23 @@ export const TalkTool: Tool = {
   name: 'Talk',
   description: `与 NPC 对话。DM Agent 用此工具将对话请求转发给对应的 NPC Agent。
 NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
-特殊对话行为 (说服/欺骗/威吓) 可能触发对抗检定。`,
+
+approach 的判断标准（请严格区分，不要把"表达自己"误判为"说服"）：
+- normal: 日常对话、问候、自我介绍、真诚陈述、合理请求、提问。不触发检定。
+    例：打招呼、询问任务、"我是来找工作的冒险者"、"我的实力不错"、"这里最近有什么消息？"
+- persuade: 试图让 NPC 做她原本不太愿意做的事 —— 请求特权、讨要折扣、请求破例、改变立场。触发 CHA 说服对抗。
+    例："请给我打个折"、"让我破例带队"、"能不能先不交定金"
+- deceive: 编造谎言、伪造身份、隐瞒事实。触发 CHA 欺骗对抗。
+    例："我是公会长老派来的"、伪装身份、虚构来历
+- intimidate: 威胁、恐吓、施加心理压力。触发 CHA 威吓对抗。
+    例："不给我任务你会后悔"、暗示暴力
+
+核心原则：单纯的自我表达或陈述属于 normal，不是 persuade。persuade 的本质是"请求特权或改变决定"。`,
   inputSchema: z.object({
     npcId: z.string().describe('目标 NPC 的 ID'),
     message: z.string().describe('玩家对 NPC 说的话'),
     approach: z.enum(['normal', 'persuade', 'deceive', 'intimidate']).optional()
-      .describe('对话策略。非 normal 时触发对应的技能对抗检定'),
+      .describe('对话策略。normal=日常/真诚陈述（不检定），persuade=请求特权，deceive=说谎，intimidate=威胁。详见工具 description。'),
   }),
   isConcurrencySafe: false,
   isReadOnly: false,
@@ -97,6 +115,7 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
 
     // Social skill check if non-normal approach
     if (approach && approach !== 'normal') {
+      const oldTrust = npc.trust
       const skillMap = { persuade: 'CHA', deceive: 'CHA', intimidate: 'CHA' } as const
       const mod = session.player.abilityModifiers[skillMap[approach as keyof typeof skillMap]]
       const proficient = (approach === 'persuade' && session.player.skills.includes('persuasion'))
@@ -121,21 +140,31 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
 
       const approachZh = { persuade: '说服', deceive: '欺骗', intimidate: '威吓' }
 
-      // Trust changes based on check result
-      const trustDelta = result.success ? 1 : -1
-      changeTrust(session, {
-        npcName: npc.name,
-        channel: 'dialogue',
-        delta: trustDelta,
-        reason: `${approachZh[approach as keyof typeof approachZh]}${result.success ? '成功' : '失败'}`,
-        turn: session.turnCount,
-      })
+      // 信任变化规则（见 CLAUDE.md §4 数值平衡修改规范 + 当前系统关键设计/信任度系统）：
+      //   - persuade 成功 → +1（对话层的主要正向路径）
+      //   - persuade 失败 → 0（D&D 5e RAW: nothing happens，不双重惩罚）
+      //   - deceive 成功 → 0（骗过 NPC 不代表她更信任你，只是暂时没拆穿）
+      //   - deceive 失败 → 0（失败本身就是惩罚，不扣信任）
+      //   - intimidate 成功 → 0（威胁屈服不等于信任提升）
+      //   - intimidate 失败 → 0（同上）
+      //   信任的主要下降路径是"实际的坏行为"（攻击/偷窃），由 attack.ts + trust-system.ts
+      //   propagateViolenceTrust 承担，不走这里。
+      const trustDelta = (approach === 'persuade' && result.success) ? 1 : 0
+      if (trustDelta !== 0) {
+        changeTrust(session, {
+          npcName: npc.name,
+          channel: 'dialogue',
+          delta: trustDelta,
+          reason: `${approachZh[approach as keyof typeof approachZh]}成功`,
+          turn: session.turnCount,
+        })
+      }
       const skillAttitude = getAttitudeDirective(npc)
       return {
         output: [
           `对话(${approachZh[approach as keyof typeof approachZh]})：玩家对${npc.name}说"${message}"。`,
           `${approachZh[approach as keyof typeof approachZh]}检定：d20=${result.roll}, 修正+${totalMod}, 总计=${result.total} vs DC${dc} → ${result.isCritical ? '大成功！' : result.isCritFail ? '大失败！' : result.success ? '成功' : '失败'}。`,
-          `信任度变化: ${npc.trust + (result.success ? -1 : 1)} → ${npc.trust}`,
+          `信任度变化: ${oldTrust} → ${npc.trust}`,
           `NPC上下文：${npcContext}${skillAttitude ? '\n' + skillAttitude : ''}`,
         ].join('\n'),
       }
@@ -146,6 +175,25 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
     npc.interactionLog.push(`第${session.turnCount}轮：玩家对${npc.name}说"${message.slice(0, 40)}"`)
     if (npc.interactionLog.length > 10) npc.interactionLog.shift()
 
+    // ── normal 对话的小概率正向信任 ──
+    // 见 CLAUDE.md §4 数值平衡规范 / 信任度系统：
+    //   - 概率：NORMAL_DIALOGUE_TRUST_CHANCE（当前 10%，待调参）
+    //   - 冷却：与 DM 主动 ChangeTrust(dialogue) 共享 3 轮锁（trust-system.ts）
+    //   - 天花板：trustCeiling 章节软上限自然衰减，后期无效
+    // 只在正常态（normal/礼貌/友好，非 curt/hostile/avoidance/combat_trigger）下触发。
+    const currentResp = evaluateResponse(npc).type
+    let autoTrustBumped = false
+    if (currentResp === 'normal' && Math.random() < NORMAL_DIALOGUE_TRUST_CHANCE) {
+      const bumped = changeTrust(session, {
+        npcName: npc.name,
+        channel: 'dialogue',
+        delta: 1,
+        reason: '日常对话建立好感',
+        turn: session.turnCount,
+      })
+      if (bumped.applied) autoTrustBumped = true
+    }
+
     // ── 任务自动完成 + 分配 ──
     const completionInfo = tryAutoComplete(session, npc.name)
     const questInfo = tryAssignQuest(session, npc.name)
@@ -154,6 +202,10 @@ NPC Agent 会根据自己的性格、记忆和对玩家的态度生成回应。
     return {
       output: [
         `对话：玩家对${npc.name}说"${message}"。`,
+        autoTrustBumped ? `[系统：此次对话自然建立了一点好感 (trust +1)]` : '',
+        // DM 主动加信任的引导：仅在玩家明显展现真诚/共情/建设性态度时使用。
+        // 冷却由 trust-system 的 dialogue 通道锁控制（3 轮一次），超出冷却的调用会被静默拒绝。
+        `[DM 信任指导：若本轮玩家明显展现真诚、共情或建设性态度（不是普通问答），可调用 ChangeTrust(channel='dialogue', delta=+1) 给 ${npc.name} 一点正向信任。请克制使用，同一 NPC 在冷却期内只能生效一次。]`,
         `NPC上下文：${npcContext}${attitude ? '\n' + attitude : ''}`,
         completionInfo ?? '',
         questInfo ?? '',

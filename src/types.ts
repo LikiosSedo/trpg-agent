@@ -174,6 +174,8 @@ export interface NPC {
   permanentGrudge?: boolean
   condition?: 'normal' | 'wounded' | 'unconscious' | 'recovering'
   conditionTurn?: number
+  /** 最近一次 dialogue 通道获得正向信任的回合。用于对话通道 +1 的冷却(trust-system.ts) */
+  lastDialogueTrustTurn?: number
 }
 
 // ─── 任务 ──────────────────────────────────────
