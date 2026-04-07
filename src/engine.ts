@@ -264,6 +264,10 @@ function classifySuggestion(text: string): ClassifiedSuggestion {
 }
 
 function classifyActions(actions: SceneActions): ClassifiedSceneActions {
+  if (!actions.suggestions || !Array.isArray(actions.suggestions)) {
+    console.error(`[debug-actions] classifyActions: suggestions 不是数组!`, typeof actions.suggestions, JSON.stringify(actions.suggestions))
+    return { details: actions.details ?? [], suggestions: [] }
+  }
   return {
     details: actions.details,
     suggestions: actions.suggestions.map(s => classifySuggestion(s)),
@@ -2152,42 +2156,42 @@ export class GameEngine {
     const fallback = buildFallbackActions(session)
     console.log(`[debug-actions] fallback.suggestions=${JSON.stringify(fallback.suggestions?.slice(0, 3))}`)
     const actions = dmActions ?? fallback
-    // DM 提供了选项时，把 fallback 中的★主线建议智能合并（去重）
-    if (dmActions && fallback.suggestions) {
-      const questSuggestions = fallback.suggestions.filter(s => s.startsWith('★'))
-      if (questSuggestions.length > 0) {
-        if (!actions.suggestions) actions.suggestions = []
-        for (const qs of questSuggestions) {
-          const questText = qs.slice(1) // 去掉★
-          // 提取关键词（NPC名、地点名）用于语义匹配
-          const keywords = extractKeywords(questText, session)
-          // 检查 DM 的 suggestions 中是否已有语义相似的选项
-          const dupIdx = actions.suggestions.findIndex(s =>
-            keywords.some(kw => s.includes(kw))
-          )
-          // 也检查 details 中是否有重复
-          const detailDup = (actions.details ?? []).some(d =>
-            keywords.some(kw => d.label.includes(kw))
-          )
-          if (dupIdx >= 0) {
-            // 升级已有选项为★样式（保留DM的原始措辞）
-            actions.suggestions[dupIdx] = `★${actions.suggestions[dupIdx]}`
-          } else if (!detailDup) {
-            // 没有重复，追加★建议
-            actions.suggestions.push(qs)
+    try {
+      // DM 提供了选项时，把 fallback 中的★主线建议智能合并（去重）
+      if (dmActions && fallback.suggestions) {
+        const questSuggestions = fallback.suggestions.filter(s => s.startsWith('★'))
+        if (questSuggestions.length > 0) {
+          if (!actions.suggestions) actions.suggestions = []
+          for (const qs of questSuggestions) {
+            const questText = qs.slice(1)
+            const keywords = extractKeywords(questText, session)
+            const dupIdx = actions.suggestions.findIndex(s =>
+              keywords.some(kw => s.includes(kw))
+            )
+            const detailDup = (actions.details ?? []).some(d =>
+              keywords.some(kw => d.label.includes(kw))
+            )
+            if (dupIdx >= 0) {
+              actions.suggestions[dupIdx] = `★${actions.suggestions[dupIdx]}`
+            } else if (!detailDup) {
+              actions.suggestions.push(qs)
+            }
           }
-          // detailDup 为 true 时：DM 的 detail 已覆盖，不额外追加
         }
       }
-    }
-    // 过滤无效选项：不能和昏迷/死亡 NPC 交互
-    if (actions.suggestions) {
-      const invalidNpcs = session.npcs
-        .filter(n => n.condition === 'unconscious' || n.condition === 'recovering')
-        .map(n => n.name)
-      actions.suggestions = actions.suggestions.filter(s =>
-        !invalidNpcs.some(name => s.includes(name) && (s.includes('交谈') || s.includes('对话') || s.includes('聊') || s.includes('问') || s.includes('说')))
-      )
+      // 过滤无效选项：不能和昏迷/死亡 NPC 交互
+      if (actions.suggestions) {
+        const invalidNpcs = session.npcs
+          .filter(n => n.condition === 'unconscious' || n.condition === 'recovering')
+          .map(n => n.name)
+        actions.suggestions = actions.suggestions.filter(s =>
+          !invalidNpcs.some(name => s.includes(name) && (s.includes('交谈') || s.includes('对话') || s.includes('聊') || s.includes('问') || s.includes('说')))
+        )
+      }
+    } catch (mergeErr) {
+      console.error(`[debug-actions] 选项合并崩溃:`, (mergeErr as Error).message)
+      console.error(`[debug-actions] stack:`, (mergeErr as Error).stack?.split('\n').slice(0, 5).join('\n'))
+      console.error(`[debug-actions] actions.suggestions=`, JSON.stringify(actions.suggestions))
     }
     // ─── 暴力后果战斗打断（DM 叙事完毕后触发） ───
     if (pendingCombatInterrupt) {
