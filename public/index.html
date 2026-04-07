@@ -667,11 +667,12 @@
       display: none;
     }
     /* ─── BGM 切换提示 ─── */
-    /* 每次背景音乐切换时左下角短暂浮现，3 秒后淡出。点击可固定显示。 */
+    /* 每次背景音乐切换时左下角短暂浮现，3 秒后淡出。点击可立即收起（避免挡住底部 tab 栏）。 */
     #bgm-toast {
       position: fixed;
       left: 12px;
-      bottom: 12px;
+      /* 必须在 tab-bar(52px) 之上，否则会挡住"状态" tab 的点击 */
+      bottom: 64px;
       z-index: 250;
       max-width: 70vw;
       padding: 6px 12px;
@@ -681,7 +682,8 @@
       color: #d6c89c;
       font-size: 11px;
       letter-spacing: 0.5px;
-      pointer-events: auto;
+      /* 关键：默认隐藏时不响应点击，避免在淡出动画期间继续拦截下方按钮 */
+      pointer-events: none;
       cursor: pointer;
       opacity: 0;
       transform: translateY(6px);
@@ -693,10 +695,8 @@
     #bgm-toast.show {
       opacity: 1;
       transform: translateY(0);
-    }
-    #bgm-toast.pinned {
-      border-color: #d4a017;
-      color: #e6c866;
+      /* 显示时才接收点击 */
+      pointer-events: auto;
     }
     #bgm-toast .bgm-icon {
       color: #b8860b;
@@ -3085,7 +3085,7 @@
       </div>
     </div>
     <!-- BGM 切换浮动提示（点击切换"短暂显示"/"固定显示"） -->
-    <div id="bgm-toast" onclick="toggleBgmToastPin()"><span class="bgm-icon">♪</span><span id="bgm-toast-text">--</span><span class="bgm-id" id="bgm-toast-id"></span></div>
+    <div id="bgm-toast" onclick="dismissBgmToast()" title="点击收起"><span class="bgm-icon">♪</span><span id="bgm-toast-text">--</span><span class="bgm-id" id="bgm-toast-id"></span></div>
 
     <!-- 常驻主线任务提示条 -->
     <div id="quest-hint-bar">
@@ -5360,12 +5360,15 @@
       }
       progressEl.innerHTML = done + '/' + total + '<span class="quest-hint-progress-dots">' + dotsHtml + '</span>'
 
-      // 点击 → 执行推荐动作
+      // 点击 → 把推荐动作填入输入框（不直接发送，让玩家自己确认 / 改写后再发）
       bar.onclick = () => {
-        if (hint.action) {
-          document.getElementById('input').value = hint.action
-          sendInput()
-        }
+        if (!hint.action) return
+        const inputEl = document.getElementById('input')
+        if (!inputEl) return
+        inputEl.value = hint.action
+        inputEl.focus()
+        // 把光标放到末尾，方便玩家继续编辑
+        inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length)
       }
     }
     function showSceneActions(actions) {
@@ -5909,9 +5912,8 @@
       'peaceful': '宁静',
     }
 
-    // BGM 浮动提示：3 秒后淡出。点击元素可"固定显示"切换。
+    // BGM 浮动提示：3 秒后淡出。点击 toast 可立即收起。
     let bgmToastTimer = null
-    let bgmToastPinned = false
     function showBgmToast(bgmId) {
       const el = document.getElementById('bgm-toast')
       const txt = document.getElementById('bgm-toast-text')
@@ -5922,26 +5924,17 @@
       if (idEl) idEl.textContent = bgmId ? `[${bgmId}]` : ''
       el.classList.add('show')
       if (bgmToastTimer) clearTimeout(bgmToastTimer)
-      // 固定显示模式不自动淡出
-      if (!bgmToastPinned) {
-        bgmToastTimer = setTimeout(() => {
-          el.classList.remove('show')
-          bgmToastTimer = null
-        }, 3500)
-      }
+      bgmToastTimer = setTimeout(() => {
+        el.classList.remove('show')
+        bgmToastTimer = null
+      }, 3500)
     }
-    function toggleBgmToastPin() {
-      bgmToastPinned = !bgmToastPinned
+    // 点击 toast 立即收起（避免它挡住下方的 tab 栏菜单）
+    function dismissBgmToast() {
       const el = document.getElementById('bgm-toast')
       if (!el) return
-      el.classList.toggle('pinned', bgmToastPinned)
-      if (bgmToastPinned) {
-        if (bgmToastTimer) { clearTimeout(bgmToastTimer); bgmToastTimer = null }
-        el.classList.add('show')  // 固定时确保可见
-      } else {
-        // 取消固定后立即开始 3 秒淡出
-        bgmToastTimer = setTimeout(() => { el.classList.remove('show'); bgmToastTimer = null }, 3500)
-      }
+      el.classList.remove('show')
+      if (bgmToastTimer) { clearTimeout(bgmToastTimer); bgmToastTimer = null }
     }
     // 暴露给 console：随时输入 __bgm() 查看当前播放
     window.__bgm = () => ({ bgm: currentBgm, label: BGM_LABELS[currentBgm] || currentBgm, ambient: currentAmbient })
