@@ -4396,12 +4396,12 @@
           combatMode = true
           combatRound = msg.round || 1
           combatTargets = (msg.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
-          // Store full monster list + portraits for HUD
           combatAllMonsters = (msg.monsters || []).map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp }))
           for (const m of (msg.monsters || [])) { if (m.portrait) combatMonsterPortraits[m.id] = m.portrait }
           combatAllies = (msg.allies || []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp, portrait: a.portrait }))
           combatSelectedTarget = null
           updateCombatPanel()
+          setCombatButtonsEnabled(false)  // 开场叙事期间禁用按钮，等 combat_action_req 再启用
           if (msg.narrative) appendMsg(msg.narrative, 'combat-monster')
           playSfx('combat_start', 0.5)
           break
