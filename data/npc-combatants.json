@@ -24,7 +24,7 @@
     "description": "340岁高等精灵，冒险者公会会长。占卜魔法使她几乎无法被偷袭。",
     "loot": [],
     "nonlethal": false,
-    "combatBehavior": "call_reinforcements",
+    "combatBehavior": "fight",
     "recoveryTurns": 4
   },
   {

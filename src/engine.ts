@@ -2705,6 +2705,12 @@ export class GameEngine {
           const text = event.text ?? ''
           if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
           epilogue += text
+          const truncated = detectRepetition(epilogue)
+          if (truncated) {
+            console.warn(`[death] 重复检测触发，截断结局 (${epilogue.length}→${truncated.length}字)`)
+            epilogue = truncated
+            break
+          }
         }
       }
       clearTimeout(timer)
