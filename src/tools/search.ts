@@ -115,7 +115,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       const lightBonus = darkLocations.includes(locId) ? getEffectBonus(player, 'light') : 0
       const mod = player.abilityModifiers.WIS + (player.skills.includes('perception') ? 2 : 0) + lightBonus
       // DC 根据场景动态调整
-      let dc = 15  // 野外/矿道默认：找隐藏物品
+      let dc = 12  // 野外/矿道默认：找隐藏物品（避免卡关）
       const subLoc = session.worldState.currentSubLocation ?? ''
       // 有昏迷 NPC 在场（战后搜刮）→ 几乎自动成功
       const hasUnconsciousNpc = session.npcs.some(n =>
