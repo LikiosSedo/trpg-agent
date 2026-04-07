@@ -2961,11 +2961,11 @@
     <div id="combat-panel">
       <div class="combat-round" id="combat-round-label"></div>
       <div class="combat-actions" id="combat-actions">
-        <button class="combat-btn" onclick="combatAttack()"><i class="ra ra-sword"></i> 攻击</button>
-        <button class="combat-btn" onclick="combatSpell()"><i class="ra ra-fairy-wand"></i> 法术</button>
-        <button class="combat-btn" onclick="combatItem()"><i class="ra ra-potion"></i> 物品</button>
-        <button class="combat-btn" onclick="combatFlee()"><i class="ra ra-footprint"></i> 逃跑</button>
-        <button class="combat-btn" onclick="combatDefend()"><i class="ra ra-shield"></i> 防御</button>
+        <button class="combat-btn" id="btn-attack" onclick="combatAttack()"><i class="ra ra-sword"></i> 攻击</button>
+        <button class="combat-btn" id="btn-spell" onclick="combatSpell()"><i class="ra ra-fairy-wand"></i> 法术</button>
+        <button class="combat-btn" id="btn-item" onclick="combatItem()"><i class="ra ra-potion"></i> 物品</button>
+        <button class="combat-btn" id="btn-flee" onclick="combatFlee()"><i class="ra ra-footprint"></i> 逃跑</button>
+        <button class="combat-btn" id="btn-defend" onclick="combatDefend()"><i class="ra ra-shield"></i> 防御</button>
       </div>
       <div class="combat-selector" id="combat-selector"></div>
     </div>
@@ -4379,12 +4379,16 @@
           thinkingTurnCount++
           if (msg.pendingMonster) {
             combatMode = true
+          } else if (msg.combat) {
+            // 战斗即将开始——不解锁输入，等战斗系统（combat_narrative_actions/combat_player_turn）自行解锁
+            combatMode = true
+            updateCombatPanel()
           } else {
             // 有交易卡片时不解锁输入——玩家必须先处理交易
             if (!msg.hasPendingTrade) unlockInput()
-            combatMode = !!msg.combat
+            combatMode = false
             updateCombatPanel()
-            if (!combatMode) showSceneActions(msg.actions)
+            showSceneActions(msg.actions)
           }
           break
 
@@ -4438,13 +4442,18 @@
           break
 
         case 'combat_monster':
+          // 立即更新 HP 数据（HUD 在延迟显示时同步刷新）
+          if (msg.playerHp != null) combatPlayerHp = msg.playerHp
+          if (msg.playerMaxHp != null) combatPlayerMaxHp = msg.playerMaxHp
+          if (msg.allies) combatAllies = msg.allies
           // 怪物回合延迟显示（让玩家先看到自己的结果）
           setTimeout(() => {
             appendMsg('── 敌方回合 ──', 'combat-divider')
             setTimeout(() => {
               playSfx('enemy_hit', 0.45)
               appendMsg(msg.text, 'combat-monster')
-              // Flash player side of HUD
+              // Flash player side of HUD + 刷新 HP 条
+              updateCombatHUD()
               const ps = document.querySelector('.chud-player')
               if (ps) { ps.style.animation = 'chudDamageFlash 0.4s ease-out'; setTimeout(() => ps.style.animation = '', 500) }
             }, 400)
@@ -4805,6 +4814,18 @@
           }).join('')
         } else {
           effectsBar.innerHTML = ''
+        }
+        // 禁用没有内容的按钮
+        const itemBtn = document.getElementById('btn-item')
+        if (itemBtn) {
+          itemBtn.disabled = combatItems.length === 0
+          itemBtn.title = combatItems.length === 0 ? '没有可用的物品' : ''
+        }
+        const spellBtn = document.getElementById('btn-spell')
+        if (spellBtn) {
+          const usable = combatSpells.filter(s => s.remaining > 0 || s.isCantrip)
+          spellBtn.disabled = usable.length === 0
+          spellBtn.title = usable.length === 0 ? '没有可用的法术' : ''
         }
       }
       updateCombatHUD()

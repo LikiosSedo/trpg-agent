@@ -213,7 +213,7 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'combat_narrative':
           send('combat_narrative', { text: ev.text }); break
         case 'combat_monster':
-          send('combat_monster', { text: ev.text }); break
+          send('combat_monster', { text: ev.text, playerHp: (ev as any).playerHp, playerMaxHp: (ev as any).playerMaxHp, allies: (ev as any).allies }); break
         case 'combat_ally':
           send('combat_ally', { text: (ev as any).text }); break
         case 'combat_status':

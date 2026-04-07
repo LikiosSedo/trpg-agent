@@ -270,6 +270,18 @@ function classifyActions(actions: SceneActions): ClassifiedSceneActions {
   }
 }
 
+// ─── 重复检测工具 ────────────────────────────────
+
+/** 检测流式文本是否陷入重复循环。返回截断后的文本，或 null 表示无重复 */
+function detectRepetition(text: string, windowSize = 80): string | null {
+  if (text.length <= windowSize * 2) return null
+  const tail = text.slice(-windowSize)
+  const head = text.slice(0, -windowSize)
+  const idx = head.indexOf(tail)
+  if (idx !== -1) return text.slice(0, idx + windowSize)
+  return null
+}
+
 // ─── NPC 立绘映射 ──────────────────────────────
 
 const NPC_PORTRAITS: Record<string, string> = {
@@ -311,7 +323,7 @@ export type TurnEvent =
   | { type: 'dm_text_delta'; text: string }
   | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | ClassifiedSceneActions | null; hasPendingTrade?: boolean }
   | { type: 'dm_error'; message: string }
-  | { type: 'combat_monster'; text: string }
+  | { type: 'combat_monster'; text: string; playerHp?: number; playerMaxHp?: number; allies?: any[] }
   | { type: 'combat_ally'; text: string }
   | { type: 'combat_status'; text: string; ended: boolean; result?: string }
   | { type: 'combat_init'; monsters: any[]; round: number; initiative: any[]; narrative?: string; allies?: any[] }
@@ -1544,26 +1556,40 @@ export class GameEngine {
           const guard = guards[0]!
           yield { type: 'narrative_warning', text: `${guard.name}将在 2 轮后赶到。` }
 
-          // 收集目击者（当前位置所有其他 NPC）
-          const witnesses = session.npcs
-            .filter(n =>
-              n.name !== hostileNPC &&
-              n.location === session.worldState.currentLocation &&
-              (!session.worldState.currentSubLocation || n.subLocation === session.worldState.currentSubLocation)
-            )
-            .map(n => n.name)
+          // 如果已有 violence_alert（原始暴力事件），复用其 victim 并更新响应者
+          // 不要把"因信任级联变敌对的NPC"误设为暴力受害者
+          const existingAlertJson = session.worldState.flags['violence_alert'] as string | undefined
+          if (existingAlertJson) {
+            try {
+              const existingAlert = JSON.parse(existingAlertJson)
+              // 原始 alert 还没处理完 → 更新响应者为守卫，缩短延迟
+              if (!existingAlert.responded) {
+                existingAlert.forceResponder = guard.name
+                existingAlert.delay = Math.min(existingAlert.delay, (session.turnCount - existingAlert.triggerTurn) + 2)
+                session.worldState.flags['violence_alert'] = JSON.stringify(existingAlert)
+              }
+            } catch { /* malformed, fall through to create new */ }
+          } else {
+            // 没有现有 alert（纯信任敌对，无原始暴力事件）→ 创建新 alert
+            const witnesses = session.npcs
+              .filter(n =>
+                n.name !== hostileNPC &&
+                n.location === session.worldState.currentLocation &&
+                (!session.worldState.currentSubLocation || n.subLocation === session.worldState.currentSubLocation)
+              )
+              .map(n => n.name)
 
-          // 创建 violence_alert（使用旧系统的 JSON 格式）
-          session.worldState.flags['violence_alert'] = JSON.stringify({
-            triggerTurn: session.turnCount,
-            victimName: hostileNPC,
-            location: session.worldState.currentLocation,
-            subLocation: session.worldState.currentSubLocation,
-            delay: 2,
-            responded: false,
-            forceResponder: guard.name,
-            witnesses,
-          })
+            session.worldState.flags['violence_alert'] = JSON.stringify({
+              triggerTurn: session.turnCount,
+              victimName: hostileNPC,
+              location: session.worldState.currentLocation,
+              subLocation: session.worldState.currentSubLocation,
+              delay: 2,
+              responded: false,
+              forceResponder: guard.name,
+              witnesses,
+            })
+          }
         }
       } else if (combatResponse === 'flee') {
         // 逃跑
@@ -1940,10 +1966,11 @@ export class GameEngine {
       await new Promise(r => setTimeout(r, 1500))
     }
 
-    // DM 流式响应（带超时保护）
+    // DM 流式响应（带超时保护 + 重复检测）
     console.log(`[dm] 调用 DM API...`)
     const dmStart = Date.now()
     let fullText = ''
+    let repetitionDetected = false
     const toolsCalled: ToolCallRecord[] = actionResult
       ? actionResult.toolsCalled.map(t => ({ toolName: t }))
       : []
@@ -1969,8 +1996,15 @@ export class GameEngine {
           const parsed = thinkParser.process(text)
           if (parsed.thinking) yield { type: 'dm_thinking', text: parsed.thinking }
           if (parsed.narrative) {
-            yield { type: 'dm_text_delta', text: parsed.narrative }
             fullText += parsed.narrative
+            const truncated = detectRepetition(fullText)
+            if (truncated) {
+              console.warn(`[dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
+              fullText = truncated
+              repetitionDetected = true
+              break
+            }
+            yield { type: 'dm_text_delta', text: parsed.narrative }
           }
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
@@ -2114,7 +2148,9 @@ export class GameEngine {
 
     // DM 结束 + 场景选项
     const dmActions = consumeActions()
+    console.log(`[debug-actions] dmActions.suggestions=${JSON.stringify(dmActions?.suggestions?.slice(0, 3))}, dmActions.details=${dmActions?.details?.length}`)
     const fallback = buildFallbackActions(session)
+    console.log(`[debug-actions] fallback.suggestions=${JSON.stringify(fallback.suggestions?.slice(0, 3))}`)
     const actions = dmActions ?? fallback
     // DM 提供了选项时，把 fallback 中的★主线建议智能合并（去重）
     if (dmActions && fallback.suggestions) {
@@ -2310,7 +2346,7 @@ export class GameEngine {
       const combatMonstersSnapshot = session.combat.monsters.map(m => ({ name: m.name, hp: m.hp, maxHp: m.maxHp }))
       const monsterResult = executeMonsterPhase(session)
       if (monsterResult.log.length > 0) {
-        yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+        yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: session.player.hp, playerMaxHp: session.player.maxHp, allies: (session.combat?.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
       }
       if (monsterResult.ended) {
         syncNPCConditionAfterCombat(session, combatMonstersSnapshot, session.combat?.allies)
@@ -2602,6 +2638,12 @@ export class GameEngine {
           const text = event.text ?? ''
           if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
           fullText += text
+          const truncated = detectRepetition(fullText)
+          if (truncated) {
+            console.warn(`[combat-dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
+            fullText = truncated
+            break
+          }
         }
       }
       clearTimeout(timer)
@@ -2832,7 +2874,7 @@ export class GameEngine {
 
       yield* emitMonsterNarratives(monsterResult.hits ?? [])
       if (monsterResult.log.length > 0) {
-        yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+        yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: session.player.hp, playerMaxHp: session.player.maxHp, allies: (session.combat?.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
       }
 
       if (monsterResult.ended && monsterResult.result === 'defeat') {
@@ -3026,7 +3068,7 @@ export class GameEngine {
 
       yield* emitMonsterNarratives(monsterResult.hits ?? [])
       if (monsterResult.log.length > 0) {
-        yield { type: 'combat_monster', text: monsterResult.log.join('\n') }
+        yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: session.player.hp, playerMaxHp: session.player.maxHp, allies: (session.combat?.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
       }
 
       if (monsterResult.ended) {
