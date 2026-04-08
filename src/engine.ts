@@ -2227,8 +2227,49 @@ export class GameEngine {
     }
 
     // DM 结束 + 场景选项
-    const dmActions = consumeActions()
+    let dmActions = consumeActions()
     console.log(`[debug-actions] dmActions.suggestions=${JSON.stringify(dmActions?.suggestions?.slice(0, 3))}, dmActions.details=${dmActions?.details?.length}`)
+
+    // ─── SetActions 遗漏补丁 ────────────────────────────────
+    // DM 有时会"忘记"调用 SetActions,导致前端没有可点选的后续选项。
+    // 如果本轮 DM 没调 SetActions、且当前场景确实**需要**选项(非战斗、非交易
+    // 弹窗、非 game over),发一个"补丁请求"让 DM 补调一次,只保留 SetActions
+    // 工具,prompt 明确要求"不要再写叙事,只调 SetActions"。
+    //
+    // 关键效果:补丁请求的 user+assistant 消息会被持久化到 dmMessages,后续
+    // LLM 看到这段"系统反馈"后会逐渐学会每轮都主动调用 SetActions。
+    // 这是典型的反馈学习(in-context learning),几个 turn 后问题应该自然消失。
+    //
+    // 补丁失败时(LLM 再次漏调 / 网络错误)静默走 fallback,不中断主流程。
+    const needsActions = !dmActions && !hasPendingTrade && !session.combat?.active
+    if (needsActions) {
+      console.log('[dm-patch] DM 遗漏 SetActions,发送补丁请求...')
+      try {
+        muteDMTools(['SetActions'])
+        for await (const _ev of dmRespond(
+          '【系统反馈】你刚才的叙事结束后没有调用 SetActions 为玩家提供后续行动选项。\n' +
+          '请**只调用 SetActions 工具**(不要再写任何叙事、不要调用其他工具),' +
+          '为当前场景生成 2-3 个玩家此刻最自然的后续行动选项。',
+        )) {
+          // 只消费事件,不 yield 给前端 —— 补丁请求对用户透明,
+          // 玩家感知到的只是 dm_end 前多等了几秒。
+        }
+        const patched = consumeActions()
+        if (patched) {
+          dmActions = patched
+          console.log(`[dm-patch] ✓ 补丁成功,获得 ${patched.suggestions?.length ?? 0} 个选项`)
+        } else {
+          console.log('[dm-patch] ⚠ DM 在补丁请求中仍未调用 SetActions,走 fallback')
+        }
+      } catch (patchErr) {
+        console.warn(
+          `[dm-patch] 补丁请求异常: ${(patchErr as Error).message},走 fallback`,
+        )
+      } finally {
+        unmuteDMTools()
+      }
+    }
+
     const fallback = buildFallbackActions(session)
     console.log(`[debug-actions] fallback.suggestions=${JSON.stringify(fallback.suggestions?.slice(0, 3))}`)
     const actions = dmActions ?? fallback
