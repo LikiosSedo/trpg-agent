@@ -9,7 +9,7 @@
  */
 
 import type { GameSession } from './types.js'
-import { Agent } from 'open-claude-cli/engine'
+import { createAgent } from './agent/index.js'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -182,7 +182,7 @@ async function llmClassify(input: string, session: GameSession): Promise<PlayerA
   console.log(`[rules-agent] LLM 分类请求: ${prompt.slice(0, 100)}...`)
 
   try {
-    const agent = new Agent({
+    const agent = createAgent({
       provider: {
         model: config.model,
         apiKey: config.apiKey,
@@ -199,7 +199,7 @@ async function llmClassify(input: string, session: GameSession): Promise<PlayerA
 
     let text = ''
     for await (const event of agent.run(prompt)) {
-      if (event.type === 'text_delta') text += event.text ?? ''
+      if (event.type === 'text_delta') text += event.text
     }
 
     console.log(`[rules-agent] LLM 原始返回: "${text.slice(0, 200)}"`)
