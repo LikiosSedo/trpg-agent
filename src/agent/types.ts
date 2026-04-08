@@ -1,15 +1,15 @@
 /**
  * TRPG 专用 Agent 层 — 类型定义
  *
- * 这个文件是 Phase 0 解耦的核心:把工具层(19 个 src/tools/*.ts)从
- * `open-claude-cli/engine` 解除依赖,后续 Phase 1+ 会在 src/agent/ 下实现
- * 真正的 Agent 主循环、Provider、ContextManager 等。
- *
+ * 这个文件定义工具层(19 个 src/tools/*.ts)和 Agent 层之间的接口契约。
  * 设计原则:
  * - 只覆盖 TRPG 实际需要的功能,不做 coding agent 包袱
  * - 工具接口向 zod 友好(便于类型推断)
- * - 事件类型保持和 open-claude-cli 现有 `{ type: 'text_delta' | 'thinking_delta' | 'tool_result' }`
- *   兼容,方便 Phase 1 平滑切换
+ * - 事件类型设计为 `{ type: 'text_delta' | 'thinking_delta' | 'tool_result' }`
+ *   一组简单离散事件,便于 engine.ts 的消费代码 switch 处理。
+ *
+ * 历史:Phase 0-5 期间此文件作为"解耦层",让项目可以从 open-claude-cli 平滑
+ * 迁移到自己的 TRPGAgent 实现。迁移完成后,它是项目 Agent 抽象的唯一 source of truth。
  */
 
 import type { ZodType } from 'zod'
@@ -92,8 +92,9 @@ export type AgentEvent =
 /**
  * Agent 接口 — 封装"发送输入 → 流式返回事件"的抽象。
  *
- * Phase 0 只定义接口,运行时实现还是 open-claude-cli 的 Agent。
- * Phase 1+ 会在 src/agent/agent.ts 提供 TRPG 专用实现。
+ * 运行时实现在 src/agent/agent.ts (`TRPGAgent` 类)。
+ * 此接口历史上曾兼容 open-claude-cli 的 Agent(Phase 0-3 迁移期间),
+ * 现在是项目的唯一 Agent 抽象。
  */
 export interface IAgent {
   /** 发送用户输入,返回事件流 */
