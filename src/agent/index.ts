@@ -69,3 +69,13 @@ export {
 
 // Tool runner(高级用法)
 export { runToolCall, executeTool, findTool } from './tool-runner.js'
+
+// Context manager (Phase 4: 上下文压缩)
+export {
+  ContextManager,
+  type ContextManagerConfig,
+  type CompactResult,
+} from './context-manager.js'
+
+// Archival snapshot (Phase 4: 结构化归档快照生成)
+export { buildArchivalSnapshot, type SnapshotOptions } from './archival-snapshot.js'

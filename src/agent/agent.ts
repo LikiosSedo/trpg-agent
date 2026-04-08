@@ -46,6 +46,7 @@ import {
   RetryableError,
   isRetryable,
 } from './errors.js'
+import { ContextManager, type ContextManagerConfig } from './context-manager.js'
 
 // ─── 构造配置 ────────────────────────────────────────
 
@@ -65,6 +66,12 @@ export interface AgentConfig {
   maxRetries?: number
   /** 执行 tool 时传给 tool.execute(input, context) 的上下文 */
   toolContext?: any
+  /**
+   * 上下文管理器配置。传入后 Agent 会在每个 turn 开始前检查 messages 是否
+   * 需要压缩(token 估算 >= threshold),需要则原地压缩(不阻塞 turn,不调 LLM)。
+   * 不传 = 不启用压缩(messages 无限增长,直到撞 context window)。
+   */
+  contextManager?: ContextManagerConfig
 }
 
 // ─── 默认值 ──────────────────────────────────────────
@@ -89,6 +96,7 @@ export class TRPGAgent implements IAgent {
   private readonly maxTokens: number
   private readonly temperature?: number
   private readonly toolContext?: any
+  private readonly contextManager: ContextManager | null
 
   public messages: any[] = []
   private lastApiCallTime = 0
@@ -103,6 +111,7 @@ export class TRPGAgent implements IAgent {
     this.maxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS
     this.temperature = config.temperature
     this.toolContext = config.toolContext
+    this.contextManager = config.contextManager ? new ContextManager(config.contextManager) : null
   }
 
   // ─── 公开 API(IAgent 接口) ──────────────────────
@@ -123,6 +132,19 @@ export class TRPGAgent implements IAgent {
     this.messages.push({ role: 'user', content: input })
 
     for (let turn = 0; turn < this.maxTurns; turn++) {
+      // 0. 上下文压缩检查(只在第一个 turn 即 LLM 调用前,后续 continuation
+      //    turn 的 messages 增加量有限,一般在同一 run 内不需要再压)
+      if (turn === 0 && this.contextManager?.needsCompact(this.messages)) {
+        const result = this.contextManager.compact(this.messages, this.activeTools)
+        if (result.strategy !== 'noop') {
+          console.log(
+            `[context-manager] 压缩触发: ${result.droppedCount} 条归档, ` +
+              `保留 ${result.keptCount} 条, ` +
+              `tokens ${result.tokensBefore} → ${result.tokensAfter}`,
+          )
+        }
+      }
+
       // 1. API throttle
       await this.throttle()
 

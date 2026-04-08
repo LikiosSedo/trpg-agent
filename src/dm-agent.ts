@@ -9,7 +9,7 @@
  * dmRespond / getDMAgent)保持不变,engine.ts 零改动。
  */
 
-import { createAgent, type TRPGAgent } from './agent/index.js'
+import { createAgent, type TRPGAgent, buildArchivalSnapshot } from './agent/index.js'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -85,6 +85,15 @@ export function initDMAgent(): void {
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,
     apiThrottleMs: 1500,
+    // Phase 4: 上下文压缩 —— token >= 60% 阈值时把早期对话压成"归档快照"
+    // 消息(从 session 代码生成,零 LLM 调用)。最近 12 turn 完整保留。
+    contextManager: {
+      modelContextWindow: 100_000,
+      compactThreshold: 0.6,
+      keepRecentTurns: 12,
+      buildArchivalSnapshot: ({ keepRecentTurns, availableToolNames }) =>
+        buildArchivalSnapshot(getSession(), { keepRecentTurns, availableToolNames }),
+    },
   })
 
   console.log(`  DM 模式: TRPG Agent (${model})`)
