@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 import { getSession } from '../game-state.js'
 import { propagateViolenceTrust } from '../trust-system.js'
 
@@ -42,7 +42,7 @@ export const TriggerTrustCascade: Tool = {
     // 验证受害者存在
     const victimNpc = session.npcs.find(n => n.name === victim)
     if (!victimNpc) {
-      return `错误：找不到名为"${victim}"的 NPC。`
+      return { output: `错误：找不到名为"${victim}"的 NPC。`, isError: true }
     }
 
     // 验证响应者存在（如果提供）
@@ -50,7 +50,7 @@ export const TriggerTrustCascade: Tool = {
     if (responder) {
       const responderNpc = session.npcs.find(n => n.name === responder)
       if (!responderNpc) {
-        return `错误：找不到名为"${responder}"的 NPC。`
+        return { output: `错误：找不到名为"${responder}"的 NPC。`, isError: true }
       }
       responderName = responder
     }
@@ -62,7 +62,7 @@ export const TriggerTrustCascade: Tool = {
       for (const name of names) {
         const witnessNpc = session.npcs.find(n => n.name === name)
         if (!witnessNpc) {
-          return `错误：找不到名为"${name}"的 NPC。`
+          return { output: `错误：找不到名为"${name}"的 NPC。`, isError: true }
         }
         witnessList.push(name)
       }
@@ -94,6 +94,6 @@ export const TriggerTrustCascade: Tool = {
       ...cascadeResult.changes.map(c => `- ${c.npcName}: ${c.delta} (${c.reason})`),
     ].filter(Boolean)
 
-    return lines.join('\n')
+    return { output: lines.join('\n') }
   },
 }

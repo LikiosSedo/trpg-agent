@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 import type { Item, GameSession } from '../types.js'
 import { getSession, getFacts, getRegistry } from '../game-state.js'
 import { validateTransfer, type TransferRequest } from '../item-validator.js'

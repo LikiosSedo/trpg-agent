@@ -2,7 +2,7 @@
  * 🤝 队伍管理工具 — DM 招募/解散战斗型 NPC 同伴
  */
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 import { getSession, getFacts } from '../game-state.js'
 import { recruitAlly, dismissAlly } from '../party-manager.js'
 
