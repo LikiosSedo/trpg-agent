@@ -17,6 +17,10 @@ import { initItemRegistry, getFacts, getRegistry } from './game-state.js'
 import { GameEngine, type TurnEvent, type CommandResult } from './engine.js'
 import { TransferItemTool } from './tools/transfer-item.js'
 import { localize } from './i18n-terms.js'
+import { initSessionLogger, logEvent } from './debug-logger.js'
+
+// 必须在任何 console.log 前初始化 —— 这样启动阶段的日志也被捕获
+initSessionLogger()
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -24,6 +28,48 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;]*m/g, '')
+}
+
+/**
+ * 用于 logEvent 的数据瘦身:
+ * - 截断过长字符串
+ * - 对 session / dossier / messages 等大对象只留 meta 信息
+ * - 保证 JSON.stringify 不产生 > ~2KB 的日志行
+ */
+function summarize(obj: any, depth = 0): any {
+  if (obj == null) return obj
+  if (typeof obj === 'string') {
+    return obj.length > 200 ? obj.slice(0, 200) + '…[+' + (obj.length - 200) + ']' : obj
+  }
+  if (typeof obj !== 'object') return obj
+  if (depth > 3) return '[…depth]'
+  if (Array.isArray(obj)) {
+    if (obj.length > 10) return `[Array len=${obj.length}]`
+    return obj.map(v => summarize(v, depth + 1))
+  }
+  const out: Record<string, any> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    // 已知大字段特殊处理
+    if (k === 'session') {
+      const s = v as any
+      out[k] = {
+        player: s?.player?.name,
+        level: s?.player?.level,
+        location: s?.worldState?.currentLocation,
+        turn: s?.turnCount,
+        chapter: s?.chapter?.currentChapter,
+      }
+    } else if (k === 'dossier') {
+      out[k] = '[dossier]'
+    } else if (k === 'messages' || k === 'dmMessages') {
+      out[k] = `[messages len=${(v as any[])?.length ?? '?'}]`
+    } else if (k === 'initiative') {
+      out[k] = `[initiative len=${(v as any[])?.length ?? '?'}]`
+    } else {
+      out[k] = summarize(v, depth + 1)
+    }
+  }
+  return out
 }
 
 /**
@@ -210,6 +256,21 @@ wss.on('connection', (ws: WebSocket, req) => {
   function send(type: string, data: any) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type, ...stripAnsiDeep(data) }))
+      // 日志:WS 出站消息
+      // 对高频流式事件(dm, dm_thinking)只记录长度 + 前 120 字预览,避免
+      // 日志被字符级 delta 淹没; 其它事件全量记录(通常体积小)
+      try {
+        if (type === 'dm' || type === 'dm_thinking') {
+          const text = (data as any)?.text ?? ''
+          logEvent('ws.send', {
+            type,
+            len: text.length,
+            preview: text.slice(0, 120),
+          })
+        } else {
+          logEvent('ws.send', { type, data: summarize(data) })
+        }
+      } catch { /* 日志失败不影响主流程 */ }
     }
   }
 
@@ -340,6 +401,14 @@ wss.on('connection', (ws: WebSocket, req) => {
       send('error', { text: '消息格式错误' })
       return
     }
+
+    // 日志:WS 入站消息。密码字段不记录,避免明文泄露
+    try {
+      const safe = { ...msg }
+      if (safe.password) safe.password = '***'
+      if (safe.token) safe.token = '***'
+      logEvent('ws.recv', { type: msg.type, data: summarize(safe) })
+    } catch { /* 日志失败不影响主流程 */ }
 
     // ── 恢复存档 ──
     if (msg.type === 'resume') {

@@ -1,6 +1,7 @@
 node_modules/
 saves/
 dist/
+logs/
 *.json.bak
 tmp.env
 *.env
