@@ -39,6 +39,7 @@ import { getDefaultSubLocation, getSubLocationName, getPlayerSubLocation, getNPC
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
 import { getLoreStore } from './lore/index.js'
+import { resetJournalTurnCounter } from './dm-journal.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 import { consumeTradeProposal } from './tools/propose-trade.js'
 import { localize, StreamingLocalizer } from './i18n-terms.js'
@@ -723,6 +724,10 @@ export function migrateSession(session: GameSession): void {
   if (session.worldState.currentSubLocation === undefined) {
     session.worldState.currentSubLocation = getDefaultSubLocation(session.worldState.currentLocation)
   }
+  // Phase 6: DM Journal 字段(旧存档没有)
+  if (session.dmJournal === undefined) {
+    session.dmJournal = []
+  }
 }
 
 // ─── 重连回顾 ──────────────────────────────────
@@ -1278,6 +1283,8 @@ export class GameEngine {
 
     // Phase 5: 重置 lore 工具的 per-turn 调用计数(每 turn 5 次上限)
     getLoreStore().resetTurnCounter()
+    // Phase 6: 重置 DM Journal 的 per-turn 写入计数(每 turn 2 次上限)
+    resetJournalTurnCounter()
 
     // NPC 状态恢复检查 + 队伍校验
     checkNPCConditionRecovery(session)

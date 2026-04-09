@@ -21,6 +21,7 @@ import {
   ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
   ManagePartyTool,
   ListLoreTool, ReadLoreTool, GrepLoreTool,
+  RecordJournalTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -84,6 +85,8 @@ export function initDMAgent(): void {
       ManagePartyTool,
       // Phase 5: Lore System — 剧本级记忆的按需查询
       ListLoreTool, ReadLoreTool, GrepLoreTool,
+      // Phase 6: DM Journal — 存档级叙事札记(写入)
+      RecordJournalTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,

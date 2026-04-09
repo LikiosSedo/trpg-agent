@@ -3,6 +3,7 @@ import type { GameSession, GameEvent, NPC } from './types.js'
 import { getCombatSummary } from './combat-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
 import { getGatedFacts } from './trust-system.js'
+import { getRecentJournal, formatJournalForPrompt, CONTEXT_INJECT_COUNT } from './dm-journal.js'
 
 export class GameFactStore {
   constructor(private session: GameSession) {}
@@ -103,6 +104,10 @@ export class GameFactStore {
         return `商店库存:\n${shopInfo}`
       })(),
       getCombatSummary(this.session) ?? '',
+      // Phase 6: DM Journal 最近 N 条 —— 给 DM 跨 turn 的叙事锚点记忆
+      formatJournalForPrompt(
+        getRecentJournal(this.session, CONTEXT_INJECT_COUNT),
+      ),
     ].filter(Boolean).join('\n')
   }
 

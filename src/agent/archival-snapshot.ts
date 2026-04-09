@@ -25,6 +25,7 @@
  */
 
 import type { GameSession } from '../types.js'
+import { getRecentJournal, formatJournalForPrompt, SNAPSHOT_INJECT_COUNT } from '../dm-journal.js'
 
 // ─── 对外主函数 ────────────────────────────────────
 
@@ -91,6 +92,13 @@ export function buildArchivalSnapshot(
   // ── 章节 beat 进度 ──
   const beatLine = formatChapterBeats(session)
   if (beatLine) lines.push(beatLine)
+
+  // ── Phase 6: DM 札记 —— 存档级叙事锚点,跨压缩保留 ──
+  const journalEntries = getRecentJournal(session, SNAPSHOT_INJECT_COUNT)
+  if (journalEntries.length > 0) {
+    lines.push('')
+    lines.push(formatJournalForPrompt(journalEntries, '• DM 札记(历史叙事锚点)'))
+  }
 
   lines.push('')
 
