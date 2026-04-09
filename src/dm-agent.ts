@@ -20,6 +20,7 @@ import {
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
   ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
   ManagePartyTool,
+  ListLoreTool, ReadLoreTool, GrepLoreTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -81,6 +82,8 @@ export function initDMAgent(): void {
       // GameOverTool 不给 DM — Game Over 由代码条件触发(HP=0 / 全镇驱逐)
       ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
       ManagePartyTool,
+      // Phase 5: Lore System — 剧本级记忆的按需查询
+      ListLoreTool, ReadLoreTool, GrepLoreTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,

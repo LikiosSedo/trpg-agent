@@ -38,6 +38,7 @@ import { WORLD_OVERVIEW, locations, connections } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName, getPlayerSubLocation, getNPCSubLocation } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
+import { getLoreStore } from './lore/index.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 import { consumeTradeProposal } from './tools/propose-trade.js'
 import { localize, StreamingLocalizer } from './i18n-terms.js'
@@ -1274,6 +1275,9 @@ export class GameEngine {
     }
 
     session.turnCount++
+
+    // Phase 5: 重置 lore 工具的 per-turn 调用计数(每 turn 5 次上限)
+    getLoreStore().resetTurnCounter()
 
     // NPC 状态恢复检查 + 队伍校验
     checkNPCConditionRecovery(session)
