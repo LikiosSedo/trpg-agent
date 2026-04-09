@@ -94,7 +94,7 @@ console.log(`  rollInitiative(+2): roll=${init.roll}, total=${init.total}`)
 assert(parseAttackMod('1d6+2') === 2, 'parseAttackMod("1d6+2") = 2')
 assert(parseAttackMod('2d8') === 0, 'parseAttackMod("2d8") = 0')
 assert(parseAttackMod('2d8+4') === 4, 'parseAttackMod("2d8+4") = 4')
-assert(parseAttackMod('1d4-1') === 1, 'parseAttackMod("1d4-1") = 1')
+assert(parseAttackMod('1d4-1') === -1, 'parseAttackMod("1d4-1") = -1')
 console.log('  parseAttackMod: all correct')
 
 const testP = makeTestSession().player
