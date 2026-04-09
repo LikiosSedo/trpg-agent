@@ -34,6 +34,35 @@ export function consumeActions(): SceneActions | null {
   return a
 }
 
+/**
+ * 合成一条 SetActions —— 用于从 DM 的 inline text 块解析出的 fallback 路径。
+ *
+ * 背景: 有时候 LLM 会在文本里写 `<setactions>{...}</setactions>` 伪 XML 而
+ * 不是真正调用工具。engine 层的流式过滤器会把这种块剥离出来,尝试 JSON
+ * parse 并通过本函数注入为 pendingActions,让玩家仍然能拿到选项。
+ *
+ * 如果输入非法(不是合法的 details/suggestions 结构),静默返回 false。
+ */
+export function injectPendingActions(raw: any): boolean {
+  if (!raw || typeof raw !== 'object') return false
+  const details = Array.isArray(raw.details) ? raw.details : []
+  const suggestions = Array.isArray(raw.suggestions) ? raw.suggestions : []
+  if (details.length === 0 && suggestions.length === 0) return false
+  // 标准化 details 结构
+  const normDetails = details
+    .filter((d: any) => d && typeof d === 'object' && d.label && d.content)
+    .map((d: any) => ({ label: String(d.label), content: String(d.content) }))
+    .slice(0, 3)
+  // suggestions 可能是 string[] 或 { text }[] — 两种都接受
+  const normSuggestions = suggestions
+    .map((s: any) => typeof s === 'string' ? s : (s?.text ?? ''))
+    .filter((s: string) => s.length > 0)
+    .slice(0, 4)
+  if (normDetails.length === 0 && normSuggestions.length === 0) return false
+  pendingActions = { details: normDetails, suggestions: normSuggestions }
+  return true
+}
+
 export const SetActionsTool: Tool = {
   name: 'SetActions',
   description: `设置当前场景的可交互选项。每次回应最后调用一次。

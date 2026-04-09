@@ -43,6 +43,8 @@ import { resetJournalTurnCounter } from './dm-journal.js'
 import { consumeGameOver, type GameOverData } from './tools/game-over.js'
 import { consumeTradeProposal } from './tools/propose-trade.js'
 import { localize, StreamingLocalizer } from './i18n-terms.js'
+import { SetActionsStreamFilter, parseSetActionsBlock } from './setactions-stream-filter.js'
+import { injectPendingActions } from './tools/set-actions.js'
 import { readFileSync } from 'fs'
 
 // ─── <think> 标签流式解析器 ─────────────────────────
@@ -2041,6 +2043,7 @@ export class GameEngine {
       : []
     const thinkParser = new ThinkTagParser()
     const localizer = new StreamingLocalizer()  // 术语中文化安全网
+    const saFilter = new SetActionsStreamFilter()  // 防御 DM 的 inline <setactions> 幻觉
     try {
       const timeoutMs = 120000 // 120 秒超时（之前 60 秒对长 thinking 流太紧张）
       let timedOut = false
@@ -2062,17 +2065,27 @@ export class GameEngine {
           const parsed = thinkParser.process(text)
           if (parsed.thinking) yield { type: 'dm_thinking', text: parsed.thinking }
           if (parsed.narrative) {
-            fullText += parsed.narrative
-            const truncated = detectRepetition(fullText)
-            if (truncated) {
-              console.warn(`[dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
-              fullText = truncated
-              repetitionDetected = true
-              break
+            // 过滤 DM 的 inline <setactions> 伪 XML 块
+            const filtered = saFilter.feed(parsed.narrative)
+            for (const block of filtered.detectedBlocks) {
+              const parsedBlock = parseSetActionsBlock(block)
+              if (parsedBlock && injectPendingActions(parsedBlock)) {
+                console.log(`[dm] 拦截 inline <setactions> 块并注入 (details=${(parsedBlock.details ?? []).length}, suggestions=${(parsedBlock.suggestions ?? []).length})`)
+              }
             }
-            // 流式术语替换：buffer 可能跨越 token 边界的英文术语片段
-            const localized = localizer.feed(parsed.narrative)
-            if (localized) yield { type: 'dm_text_delta', text: localized }
+            if (filtered.output) {
+              fullText += filtered.output
+              const truncated = detectRepetition(fullText)
+              if (truncated) {
+                console.warn(`[dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
+                fullText = truncated
+                repetitionDetected = true
+                break
+              }
+              // 流式术语替换：buffer 可能跨越 token 边界的英文术语片段
+              const localized = localizer.feed(filtered.output)
+              if (localized) yield { type: 'dm_text_delta', text: localized }
+            }
           }
         } else if (event.type === 'tool_result' && event.name) {
           toolsCalled.push({ toolName: event.name })
@@ -2091,7 +2104,25 @@ export class GameEngine {
       // Flush think parser 残留 buffer
       const flushed = thinkParser.flush()
       if (flushed.thinking) yield { type: 'dm_thinking', text: flushed.thinking }
-      if (flushed.narrative) { fullText += flushed.narrative }
+      if (flushed.narrative) {
+        // flushed.narrative 也过一遍 filter
+        const flushedFiltered = saFilter.feed(flushed.narrative)
+        for (const block of flushedFiltered.detectedBlocks) {
+          const parsedBlock = parseSetActionsBlock(block)
+          if (parsedBlock) injectPendingActions(parsedBlock)
+        }
+        fullText += flushedFiltered.output
+      }
+      // flush saFilter 尾部
+      const saTailMain = saFilter.flush()
+      for (const block of saTailMain.detectedBlocks) {
+        const parsedBlock = parseSetActionsBlock(block)
+        if (parsedBlock) {
+          injectPendingActions(parsedBlock)
+          console.log(`[dm] flush 时拦截 inline <setactions> 残留块`)
+        }
+      }
+      if (saTailMain.output) fullText += saTailMain.output
       // Flush streaming localizer 尾部 buffer（防止最后几个字符卡在 buffer 里）
       const tail = localizer.flush()
       if (tail) yield { type: 'dm_text_delta', text: tail }
@@ -2792,6 +2823,7 @@ export class GameEngine {
     const context = this.buildCombatContext()
     let fullText = ''
     muteDMTools()  // 🔇 静音：只保留 SetActions
+    const combatSaFilter = new SetActionsStreamFilter()  // 防御 inline <setactions> 幻觉
     let combatDmTimedOut = false
     try {
       const timeoutMs = 120000
@@ -2799,7 +2831,8 @@ export class GameEngine {
       for await (const event of dmRespond(
         `[战斗叙事请求]\n${context}\n${scene}\n\n` +
         `用2-3句话描写这个场景。语言要有画面感和冲击力，像小说一样。不要提及HP/AC/骰子等数值。\n\n` +
-        `叙事结束后，思考玩家此刻最自然的后续行动，调用 SetActions 提供选项。`
+        `叙事结束后，思考玩家此刻最自然的后续行动，通过工具调用接口调用 SetActions 提供选项。` +
+        `不要在文本中写 <setactions> 标签或 JSON — 必须通过真正的 function calling 接口。`
       )) {
         if (combatDmTimedOut) {
           console.error(`[combat-dm] 战斗叙事超时 (${timeoutMs}ms)`)
@@ -2808,16 +2841,33 @@ export class GameEngine {
         if (event.type === 'text_delta') {
           const text = event.text ?? ''
           if (text.includes('(Empty response:') || text.includes("'type': 'thinking'")) continue
-          fullText += text
-          const truncated = detectRepetition(fullText)
-          if (truncated) {
-            console.warn(`[combat-dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
-            fullText = truncated
-            break
+          // 过滤 inline <setactions> 块
+          const filtered = combatSaFilter.feed(text)
+          for (const block of filtered.detectedBlocks) {
+            const parsedBlock = parseSetActionsBlock(block)
+            if (parsedBlock && injectPendingActions(parsedBlock)) {
+              console.log(`[combat-dm] 拦截 inline <setactions> 块并注入`)
+            }
+          }
+          if (filtered.output) {
+            fullText += filtered.output
+            const truncated = detectRepetition(fullText)
+            if (truncated) {
+              console.warn(`[combat-dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
+              fullText = truncated
+              break
+            }
           }
         }
       }
       clearTimeout(timer)
+      // flush filter
+      const saTailCombat = combatSaFilter.flush()
+      for (const block of saTailCombat.detectedBlocks) {
+        const parsedBlock = parseSetActionsBlock(block)
+        if (parsedBlock) injectPendingActions(parsedBlock)
+      }
+      if (saTailCombat.output) fullText += saTailCombat.output
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
       // 超时兜底：DM 没给战斗叙事时，发一段通用文本保证不空白
@@ -3355,11 +3405,13 @@ export class GameEngine {
     const prompt = [
       `新游戏开始。玩家角色: ${session.player.name}，${classZh}。`,
       '请开始第一幕：马车上醒来。简短3-4段。',
-      '叙事结束后调用 SetActions 提供初始选项。',
+      '叙事结束后通过工具调用接口调用 SetActions 提供初始选项。',
+      '重要：不要在文本中写 <setactions> 标签、JSON 或任何伪工具调用 — 必须通过真正的 function calling 接口调用。',
     ].join('\n')
 
     let fullText = ''
     const openingLocalizer = new StreamingLocalizer()
+    const openingSaFilter = new SetActionsStreamFilter()
     let openingTimedOut = false
     try {
       const timeoutMs = 120000 // 开场叙事给 120 秒（首次调用可能较慢）
@@ -3376,12 +3428,36 @@ export class GameEngine {
         } else if (event.type === 'text_delta') {
           const text = event.text ?? ''
           if (text.includes("'content': [") || text.includes('(Empty response:') || text.includes("'type': 'thinking'") || text.includes('[DEBUG]')) continue
-          const localized = openingLocalizer.feed(text)
-          if (localized) yield { type: 'dm_text_delta', text: localized }
-          fullText += text
+          // 防御 DM 的 inline tool call 幻觉:先过滤掉 <setactions>...</setactions>
+          // 伪 XML 块,把块内的 JSON 注入为真正的 pendingActions
+          const filtered = openingSaFilter.feed(text)
+          for (const block of filtered.detectedBlocks) {
+            const parsed = parseSetActionsBlock(block)
+            if (parsed && injectPendingActions(parsed)) {
+              console.log(`[opening] 拦截 DM inline <setactions> 块,已注入为真 SetActions (details=${(parsed.details ?? []).length}, suggestions=${(parsed.suggestions ?? []).length})`)
+            }
+          }
+          if (filtered.output) {
+            const localized = openingLocalizer.feed(filtered.output)
+            if (localized) yield { type: 'dm_text_delta', text: localized }
+            fullText += filtered.output
+          }
         }
       }
       clearTimeout(timer)
+      // flush filter 尾部
+      const saTail = openingSaFilter.flush()
+      for (const block of saTail.detectedBlocks) {
+        const parsed = parseSetActionsBlock(block)
+        if (parsed && injectPendingActions(parsed)) {
+          console.log(`[opening] flush 时拦截 DM inline <setactions> 残留块并注入`)
+        }
+      }
+      if (saTail.output) {
+        const localized = openingLocalizer.feed(saTail.output)
+        if (localized) yield { type: 'dm_text_delta', text: localized }
+        fullText += saTail.output
+      }
       const tail = openingLocalizer.flush()
       if (tail) yield { type: 'dm_text_delta', text: tail }
       const openEmptyIdx = fullText.indexOf('(Empty response:')
