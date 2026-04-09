@@ -2,15 +2,15 @@
 /**
  * 🎲 破晓酒馆 · 骰子赌局
  *
- * 一个用 open-claude-cli Agent SDK 驱动的酒馆小游戏。
+ * 一个用 TRPG 专用 Agent 驱动的酒馆小游戏。
  * 你和酒馆老板格雷格玩骰子，赌金币，还能作弊（如果你够胆）。
  *
  * 运行: npm run play
  */
 
-import { Agent } from 'open-claude-cli/engine'
+import { createAgent } from './agent/index.js'
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from './agent/types.js'
 import * as readline from 'node:readline'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -221,7 +221,7 @@ const GameStatusTool: Tool = {
 //  DM Agent
 // ═══════════════════════════════════
 
-const dm = new Agent({
+const dm = createAgent({
   provider: { model: config.model, apiKey: config.apiKey, baseUrl: config.baseUrl, type: 'openai' },
   tools: [NarrateTool, GregSpeakTool, RollDiceTool, CheatCheckTool, DrinkTool, GameStatusTool],
   systemPrompt: `你是一个TRPG的DM（地下城主），正在主持一场酒馆骰子赌局。
@@ -271,7 +271,7 @@ const dm = new Agent({
 console.log()
 console.log('╔═══════════════════════════════════════════╗')
 console.log('║  🎲 破晓酒馆 · 骰子赌局                  ║')
-console.log('║  powered by open-claude-cli Agent SDK     ║')
+console.log('║  powered by TRPG Agent                    ║')
 console.log('╚═══════════════════════════════════════════╝')
 console.log()
 console.log('  暴风雨在窗外咆哮。你推开酒馆的门，')

@@ -249,6 +249,39 @@ export interface ChapterState {
   trustBlockedBeats?: TrustBlockedBeat[]  // 本轮因信任不足被阻挡的 beats（供 Talk 工具注入"欲言又止"提示）
 }
 
+// ─── DM Journal（Phase 6: 存档级叙事札记） ──────
+
+/**
+ * DM 札记条目 —— 由 DM 主动记录的"本次冒险独有的叙事锚点"。
+ *
+ * 和其他系统的区别:
+ *   - events      → 机械状态变化(自动,代码写入)
+ *   - quests      → 结构化任务进度
+ *   - player.clues→ 玩家拾取的事实线索
+ *   - dmJournal   → DM 决定记录的叙事细节(承诺/抉择/揭示/备忘)
+ *
+ * 价值:札记会被注入到 [游戏状态] 上下文 + Phase 4 归档快照,
+ *       所以会跨压缩、跨 session 持续影响 DM 叙事。
+ */
+export interface DMJournalEntry {
+  /** 记录时的 turnCount */
+  turn: number
+  /** 记录时的章节 id（例 'ch2'） */
+  chapter: string
+  /**
+   * 札记类型:
+   *   - decision:   玩家做出了一个影响后续剧情走向的选择
+   *   - revelation: 本次叙事中透露了一个只有这个存档才知道的关键信息
+   *   - promise:    玩家向 NPC 做出的承诺(和 trust-system 的结构化 promise 互补)
+   *   - note:       DM 希望 10 轮后仍然记得的叙事细节/玩家立场
+   */
+  type: 'decision' | 'revelation' | 'promise' | 'note'
+  /** 札记内容(最多 300 字符,超出截断) */
+  content: string
+  /** 自由标签,供未来检索 */
+  tags?: string[]
+}
+
 // ─── 游戏会话 ──────────────────────────────────
 
 export interface GameSession {
@@ -262,6 +295,7 @@ export interface GameSession {
   dossierData?: Record<string, any>
   chapter?: ChapterState        // 章节系统（新游戏有，旧存档可能没有）
   dmMessages?: any[]            // DM Agent 对话历史（持久化到 localStorage）
+  dmJournal?: DMJournalEntry[]  // Phase 6: DM 札记（追加型叙事锚点）
   interactionNpc?: string       // 当前正在交互的 NPC（对话/交易状态绑定）
   timeAccum?: number            // 加权时间累积值（达到阈值自动推进时段）
   npcHostileCooldowns?: Map<string, number>  // NPC 敌对响应冷却记录（npcName -> 触发回合数）

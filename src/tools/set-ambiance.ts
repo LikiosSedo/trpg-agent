@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 
 export interface AmbianceOverride {
   bgm?: string

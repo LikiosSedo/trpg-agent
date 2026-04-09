@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 import { rollDice, skillCheck } from '../rules-engine.js'
 
 export const DiceTool: Tool = {

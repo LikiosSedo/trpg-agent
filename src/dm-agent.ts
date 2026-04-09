@@ -1,11 +1,15 @@
 /**
  * DM Agent — 地下城主 Agent
  *
- * 使用 open-claude-cli Agent SDK，通过 ~/.occ/config.json 配置的 API 运行。
- * 支持任何 OpenAI-compatible API（Kimi、DeepSeek、Ollama 等）。
+ * 使用 TRPG 专用 Agent(src/agent/),通过 ~/.occ/config.json 或环境变量
+ * 配置的 OpenAI-compatible API 运行(Kimi / DeepSeek / GLM / Doubao 等)。
+ *
+ * Phase 3 迁移自 open-claude-cli —— 运行时实现替换,外部 API
+ * (initDMAgent / muteDMTools / unmuteDMTools / getDMMessages / restoreDMMessages /
+ * dmRespond / getDMAgent)保持不变,engine.ts 零改动。
  */
 
-import { Agent } from 'open-claude-cli/engine'
+import { createAgent, type TRPGAgent, buildArchivalSnapshot } from './agent/index.js'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -16,6 +20,8 @@ import {
   // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
   ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
   ManagePartyTool,
+  ListLoreTool, ReadLoreTool, GrepLoreTool,
+  RecordJournalTool,
 } from './tools/index.js'
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
@@ -53,13 +59,13 @@ function loadConfig() {
 
 // ─── Agent ───────────────────────────────────
 
-let agent: Agent | null = null
+let agent: TRPGAgent | null = null
 
 export function initDMAgent(): void {
   const config = loadConfig()
   const model = process.env.TRPG_MODEL ?? config.model
 
-  agent = new Agent({
+  agent = createAgent({
     provider: {
       model,
       apiKey: config.apiKey,
@@ -68,74 +74,80 @@ export function initDMAgent(): void {
       headers: config.headers,
       streamUsage: config.streamUsage,
     },
-    // 注意：AttackTool 不在 DM 工具列表——战斗由代码入口控制
-    // （玩家攻击意图 / 区域遭遇 / 章节事件）
+    // 注意:AttackTool 不在 DM 工具列表 — 战斗由代码入口控制
+    // (玩家攻击意图 / 区域遭遇 / 章节事件)
     tools: [
       DiceTool, MoveTool, LookTool, TalkTool,
       UseItemTool, SearchTool, RestTool,
       RenderSceneTool, TransferItemTool, MoveNPCTool, SetActionsTool, SetAmbianceTool,
-  // GameOverTool 不给 DM — Game Over 由代码条件触发（HP=0 / 全镇驱逐）
+      // GameOverTool 不给 DM — Game Over 由代码条件触发(HP=0 / 全镇驱逐)
       ChangeTrustTool, ProposeTradeActionTool, TriggerHostileNPCTool, TriggerTrustCascade,
       ManagePartyTool,
+      // Phase 5: Lore System — 剧本级记忆的按需查询
+      ListLoreTool, ReadLoreTool, GrepLoreTool,
+      // Phase 6: DM Journal — 存档级叙事札记(写入)
+      RecordJournalTool,
     ],
     systemPrompt: buildDMPrompt(),
     maxTurns: 20,
     apiThrottleMs: 1500,
+    // Phase 4: 上下文压缩 —— token >= 60% 阈值时把早期对话压成"归档快照"
+    // 消息(从 session 代码生成,零 LLM 调用)。最近 12 turn 完整保留。
+    contextManager: {
+      modelContextWindow: 100_000,
+      compactThreshold: 0.6,
+      keepRecentTurns: 12,
+      buildArchivalSnapshot: ({ keepRecentTurns, availableToolNames }) =>
+        buildArchivalSnapshot(getSession(), { keepRecentTurns, availableToolNames }),
+    },
   })
 
-  console.log(`  DM 模式: open-claude-cli (${model})`)
+  console.log(`  DM 模式: TRPG Agent (${model})`)
 }
 
-export function getDMAgent(): Agent {
+export function getDMAgent(): TRPGAgent {
   if (!agent) throw new Error('DM Agent 未初始化 — 先调用 initDMAgent()')
   return agent
 }
 
-// ─── 工具开关（战斗叙事等场景用） ──────
-
-/** 暂存被静音的工具，unmute 时恢复 */
-let mutedTools: Map<string, any> | null = null
+// ─── 工具开关(战斗叙事等场景用) ──────
+//
+// Phase 3 迁移:旧实现直接操作 open-claude-cli 的内部 registry
+// `(agent as any).tools.tools`,这是个 hack。新 Agent 提供干净的
+// muteTools/unmuteTools 公开 API,这里只是包一层并保留"强制 SetActions"兜底。
 
 /**
- * 静音 DM 的工具——只保留白名单中的工具，其余全部移除。
- * 下一次 dm.run() 只会向 LLM 发送白名单工具的 schema。
+ * 静音 DM 的工具 — 只保留白名单中的工具,其余全部临时移除。
+ * 下一次 agent.run() 只会向 LLM 发送白名单工具的 schema。
  * 调用后必须配对 unmuteDMTools()。
  *
- * @param keep 要保留的工具名数组，默认 ['SetActions']（允许生成选项）
+ * @param keep 要保留的工具名数组,默认 ['SetActions'](允许生成选项)
  *
- * 注意：SetActions 会被强制保留（即使传入空数组），确保 DM 始终能生成后续选项。
+ * **架构陷阱兜底**:SetActions 会被**强制保留**(即使调用方传入空数组),
+ * 确保 DM 始终能生成后续选项。这是 CLAUDE.md 架构陷阱 #2 的防护:
+ * `muteDMTools([])` 如果不加兜底会禁用所有工具包括 SetActions,导致战斗叙事
+ * 结束后前端拿不到选项。我们在 dm-agent 这一层兜,新 Agent 的 muteTools 本身
+ * 保持严格(按白名单)的通用语义。
  */
 export function muteDMTools(keep: string[] = ['SetActions']): void {
   if (!agent) return
-  if (mutedTools) return // 已经静音，防止重复
-  const registry = (agent as any).tools
-  // 强制保留 SetActions（即使调用方传入空数组），确保战斗叙事后能生成选项
-  const keepSet = new Set([...keep, 'SetActions'])
-  mutedTools = new Map()
-  // 遍历所有工具，不在白名单里的移除并暂存
-  for (const [name, tool] of registry.tools) {
-    if (!keepSet.has(name)) {
-      mutedTools.set(name, tool)
-    }
-  }
-  for (const name of mutedTools.keys()) {
-    registry.tools.delete(name)
-  }
-  const kept = Array.from(keepSet).filter(k => registry.tools.has(k))
-  console.log(`[dm-agent] 工具已静音 (${mutedTools.size} muted, 保留: ${kept.join(', ') || '无'})`)
+  const keepWithFallback = keep.includes('SetActions') ? keep : [...keep, 'SetActions']
+  agent.muteTools(keepWithFallback)
+  const activeNames = agent.tools.map(t => t.name)
+  console.log(
+    `[dm-agent] 工具已静音 (active: ${activeNames.join(', ') || '无'})`,
+  )
 }
 
-/**
- * 恢复 DM 的所有工具。与 muteDMTools() 配对使用。
- */
+/** 恢复 DM 的所有工具。与 muteDMTools() 配对使用。幂等。 */
 export function unmuteDMTools(): void {
-  if (!agent || !mutedTools) return
-  const registry = (agent as any).tools
-  for (const [name, tool] of mutedTools) {
-    registry.tools.set(name, tool)
+  if (!agent) return
+  const before = agent.tools.length
+  agent.unmuteTools()
+  const after = agent.tools.length
+  if (after !== before) {
+    console.log(`[dm-agent] 工具已恢复 (${before} → ${after} tools)`)
   }
-  console.log(`[dm-agent] 工具已恢复 (${mutedTools.size} tools restored)`)
-  mutedTools = null
 }
 
 /** 导出 DM 对话历史（用于持久化） */

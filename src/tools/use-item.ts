@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod'
-import type { Tool } from 'open-claude-cli/engine'
+import type { Tool } from '../agent/types.js'
 import { getSession, getFacts } from '../game-state.js'
 import { rollDice } from '../rules-engine.js'
 import { executeMonsterTurns, checkCombatEnd, endCombat, getCombatSummary } from '../combat-manager.js'
