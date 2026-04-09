@@ -1685,6 +1685,138 @@
       margin-bottom: 8px;
     }
 
+    /* ─── 存档槽位卡片 ─── */
+    .save-slots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 4px;
+    }
+
+    .save-slot-card {
+      background: linear-gradient(135deg, rgba(26, 26, 46, 0.85), rgba(15, 15, 35, 0.85));
+      border: 1px solid rgba(184, 134, 11, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      transition: all 0.2s ease;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .save-slot-card:hover {
+      border-color: rgba(230, 200, 102, 0.6);
+      background: linear-gradient(135deg, rgba(32, 28, 52, 0.9), rgba(20, 18, 40, 0.9));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .save-slot-empty {
+      border-style: dashed;
+      border-color: rgba(100, 100, 120, 0.25);
+    }
+
+    .save-slot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(184, 134, 11, 0.15);
+      margin-bottom: 8px;
+    }
+
+    .save-slot-label {
+      font-size: 13px;
+      color: #c8a45c;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .save-slot-badge {
+      display: inline-block;
+      font-size: 10px;
+      color: #0a0a1a;
+      background: #e6c866;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 4px;
+      font-weight: bold;
+    }
+
+    .save-slot-delete {
+      background: transparent;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .save-slot-delete:hover {
+      background: rgba(255, 80, 80, 0.15);
+      color: #ff6b6b;
+    }
+
+    .save-slot-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .save-slot-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #e8d5a3;
+      margin-bottom: 2px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    .save-slot-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    .save-slot-chapter {
+      font-size: 12px;
+      color: #a88c4a;
+      font-style: italic;
+      padding: 4px 0 2px;
+    }
+
+    .save-slot-location {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .save-slot-location i {
+      color: #c8a45c;
+      margin-right: 2px;
+    }
+
+    .save-slot-date {
+      font-size: 10px;
+      color: #555;
+      text-align: right;
+      margin-top: auto;
+      padding-top: 6px;
+    }
+
+    .save-slot-empty-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
     /* HP / 信任度条 */
     .bar-track {
       width: 100%;
@@ -3022,6 +3154,8 @@
     <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
       <button id="menu-resume-btn" onclick="resumeGame()"
         style="display:none; background:rgba(184,134,11,0.15); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#e6c866; border:1px solid rgba(184,134,11,0.4); padding:14px 36px; border-radius:6px; font-size:16px; cursor:pointer; font-weight:bold; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,0.6); min-width:200px;">继续冒险</button>
+      <button id="menu-load-btn" onclick="openLoadGameFromTitle()"
+        style="display:none; background:rgba(20,18,30,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#c8a45c; border:1px solid rgba(184,134,11,0.25); padding:14px 36px; border-radius:6px; font-size:15px; cursor:pointer; text-shadow:0 1px 4px rgba(0,0,0,0.6); min-width:200px;">读档</button>
       <button onclick="newGame()"
         style="background:rgba(20,18,30,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#aaa; border:1px solid rgba(100,100,120,0.3); padding:14px 36px; border-radius:6px; font-size:15px; cursor:pointer; text-shadow:0 1px 4px rgba(0,0,0,0.6); min-width:200px;">新游戏</button>
     </div>
@@ -3253,53 +3387,227 @@
     let currentThinkingEntry = null  // current turn's thinking DOM element
     let thinkingTurnCount = 0        // local turn counter for thinking labels
 
-    // ─── localStorage 存档 ───
-    const SAVE_KEYS = { session: 'trpg_session', messages: 'trpg_messages', dossier: 'trpg_dossier' }
+    // ─── localStorage 多槽位存档系统 ───
+    //
+    // 数据布局:
+    //   trpg_save_auto       — 自动存档(系统写入,每轮更新)
+    //   trpg_save_slot_1..6  — 手动存档槽(玩家通过 UI 写入)
+    //
+    // 每个槽位存的 JSON:
+    //   { session, dossier, messages, savedAt, classId }
+    //
+    // 旧版本单槽的 key (trpg_session / trpg_messages / trpg_dossier) 在首次
+    // 加载时会被 migrate 到自动存档,然后删除,保证平滑升级。
+    const SAVE_KEYS = {
+      auto: 'trpg_save_auto',
+      slotPrefix: 'trpg_save_slot_',
+      MAX_SLOTS: 6,
+      // 旧版本 key(仅用于 migration)
+      legacySession: 'trpg_session',
+      legacyMessages: 'trpg_messages',
+      legacyDossier: 'trpg_dossier',
+    }
 
-    function saveToLocal(session, dossier) {
+    /** 从 slotId ('auto' | 1..6) 得到 localStorage 的 key */
+    function slotStorageKey(slotId) {
+      if (slotId === 'auto') return SAVE_KEYS.auto
+      return SAVE_KEYS.slotPrefix + slotId
+    }
+
+    /** 读槽位原始数据。损坏/不存在返回 null。 */
+    function readSaveSlot(slotId) {
       try {
-        if (session) localStorage.setItem(SAVE_KEYS.session, JSON.stringify(session))
-        if (dossier) localStorage.setItem(SAVE_KEYS.dossier, JSON.stringify(dossier))
-      } catch { }
+        const raw = localStorage.getItem(slotStorageKey(slotId))
+        return raw ? JSON.parse(raw) : null
+      } catch { return null }
+    }
+
+    /** 写槽位。messages 可选,不传则保留原有(或空数组)。 */
+    function writeSaveSlot(slotId, session, dossier, messages) {
+      try {
+        const existing = readSaveSlot(slotId)
+        const payload = {
+          session,
+          dossier,
+          messages: messages ?? (existing?.messages ?? []),
+          savedAt: Date.now(),
+          classId: localStorage.getItem('trpg_player_class') || existing?.classId || '',
+        }
+        localStorage.setItem(slotStorageKey(slotId), JSON.stringify(payload))
+        return true
+      } catch (err) {
+        console.warn('[save] writeSaveSlot failed:', err)
+        return false
+      }
+    }
+
+    function deleteSaveSlot(slotId) {
+      if (slotId === 'auto') return  // autosave 不能被玩家手动删除
+      try { localStorage.removeItem(slotStorageKey(slotId)) } catch { }
+    }
+
+    /** 返回所有槽位(包括空的)的元信息,按显示顺序排列:auto 在前 + slot 1..6 */
+    function getAllSaveSlots() {
+      const slots = []
+      const autoData = readSaveSlot('auto')
+      slots.push({ id: 'auto', data: autoData, metadata: deriveSlotMetadata(autoData, 'auto') })
+      for (let i = 1; i <= SAVE_KEYS.MAX_SLOTS; i++) {
+        const data = readSaveSlot(i)
+        slots.push({ id: i, data, metadata: deriveSlotMetadata(data, i) })
+      }
+      return slots
+    }
+
+    /** 找到最近保存的槽位 id(auto 或 1..6)。全空返回 null。 */
+    function getMostRecentSlotId() {
+      let best = null
+      let bestTime = 0
+      const all = getAllSaveSlots()
+      for (const s of all) {
+        if (!s.data) continue
+        const t = s.data.savedAt || 0
+        if (t > bestTime) {
+          bestTime = t
+          best = s.id
+        }
+      }
+      return best
+    }
+
+    /** 从 session/slotData 派生用于渲染的元信息卡片数据 */
+    function deriveSlotMetadata(slotData, slotId) {
+      const isAuto = slotId === 'auto'
+      const base = {
+        slotId,
+        isAuto,
+        label: isAuto ? '自动存档' : `存档 ${slotId}`,
+        isEmpty: !slotData || !slotData.session,
+      }
+      if (base.isEmpty) return base
+      const s = slotData.session
+      const p = s.player ?? {}
+      const classNames = { fighter: '剑士', mage: '法师', ranger: '游侠', cleric: '牧师' }
+      const className = classNames[slotData.classId] || classNames[s.classId] || ''
+      const locationNames = {
+        'dawnbreak-town': '破晓镇',
+        'twilight-woods': '暮色森林',
+        'greyspine-mines': '灰脊矿道',
+        'shatterstone-wastes': '碎石荒原',
+      }
+      const chapterNames = {
+        'ch1': '第一章 · 夜抵破晓镇',
+        'ch2': '第二章 · 森林之谜',
+        'ch3': '第三章 · 矿道深处',
+        'ch4': '第四章 · 蚀目之影',
+      }
+      const loc = s.worldState?.currentLocation ?? ''
+      const ch = s.chapter?.currentChapter ?? ''
+      return {
+        ...base,
+        playerName: p.name || '未命名',
+        level: p.level ?? 1,
+        className,
+        hp: p.hp ?? 0,
+        maxHp: p.maxHp ?? 0,
+        gold: p.gold ?? 0,
+        locationName: locationNames[loc] || loc || '未知之地',
+        chapterTitle: chapterNames[ch] || ch || '—',
+        turn: s.turnCount ?? 0,
+        savedAt: slotData.savedAt || 0,
+      }
+    }
+
+    /** 首次加载时把旧版单槽 key 迁移到 autosave */
+    function migrateLegacySave() {
+      try {
+        const legacyRaw = localStorage.getItem(SAVE_KEYS.legacySession)
+        if (!legacyRaw) return
+        // 如果已经有新的 autosave,不覆盖
+        if (localStorage.getItem(SAVE_KEYS.auto)) {
+          // 但可以清理旧 key
+          localStorage.removeItem(SAVE_KEYS.legacySession)
+          localStorage.removeItem(SAVE_KEYS.legacyMessages)
+          localStorage.removeItem(SAVE_KEYS.legacyDossier)
+          return
+        }
+        const session = JSON.parse(legacyRaw)
+        const dossier = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEYS.legacyDossier) || 'null') } catch { return null } })()
+        const messages = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEYS.legacyMessages) || '[]') } catch { return [] } })()
+        writeSaveSlot('auto', session, dossier, messages)
+        localStorage.removeItem(SAVE_KEYS.legacySession)
+        localStorage.removeItem(SAVE_KEYS.legacyMessages)
+        localStorage.removeItem(SAVE_KEYS.legacyDossier)
+        console.log('[save] migrated legacy single-slot save → autosave')
+      } catch (err) {
+        console.warn('[save] migration failed:', err)
+      }
+    }
+
+    // 立即执行 migration,保证后续调用都看到新结构
+    migrateLegacySave()
+
+    // ─── 向后兼容 shim ──────────────────────────────
+    // 旧代码到处调用 saveToLocal/getSavedSession,改成 shim 路由到
+    // autosave(写)/最新槽位(读),免得到处改动。
+
+    /** 系统自动存档 — 只写到 autosave 槽 */
+    function saveToLocal(session, dossier) {
+      if (!session) return
+      writeSaveSlot('auto', session, dossier, undefined)
     }
 
     function saveMessage(role, text) {
       try {
-        const raw = localStorage.getItem(SAVE_KEYS.messages)
+        // message 历史单独存一个 key,不跟具体槽位绑定(简化消息流追加)
+        const raw = localStorage.getItem('trpg_messages_current')
         const msgs = raw ? JSON.parse(raw) : []
         msgs.push({ role, text: text.slice(0, 500) })
-        // 保留最近 50 条
         while (msgs.length > 50) msgs.shift()
-        localStorage.setItem(SAVE_KEYS.messages, JSON.stringify(msgs))
+        localStorage.setItem('trpg_messages_current', JSON.stringify(msgs))
+        // 同时更新 autosave 槽里的 messages 快照(如果有 session 的话)
+        const autoSlot = readSaveSlot('auto')
+        if (autoSlot?.session) {
+          autoSlot.messages = msgs
+          try { localStorage.setItem(SAVE_KEYS.auto, JSON.stringify(autoSlot)) } catch { }
+        }
       } catch { }
     }
 
     function getSavedSession() {
-      try {
-        const raw = localStorage.getItem(SAVE_KEYS.session)
-        return raw ? JSON.parse(raw) : null
-      } catch { return null }
+      const slotId = getMostRecentSlotId()
+      if (slotId === null) return null
+      return readSaveSlot(slotId)?.session ?? null
     }
 
     function getSavedDossier() {
-      try {
-        const raw = localStorage.getItem(SAVE_KEYS.dossier)
-        return raw ? JSON.parse(raw) : null
-      } catch { return null }
+      const slotId = getMostRecentSlotId()
+      if (slotId === null) return null
+      return readSaveSlot(slotId)?.dossier ?? null
     }
 
     function getSavedMessages() {
+      // 优先用最新槽位里的 messages,否则 fallback 到 current 消息流
+      const slotId = getMostRecentSlotId()
+      if (slotId !== null) {
+        const slot = readSaveSlot(slotId)
+        if (slot?.messages?.length) return slot.messages
+      }
       try {
-        const raw = localStorage.getItem(SAVE_KEYS.messages)
+        const raw = localStorage.getItem('trpg_messages_current')
         return raw ? JSON.parse(raw) : []
       } catch { return [] }
     }
 
     function clearSave() {
-      localStorage.removeItem(SAVE_KEYS.session)
-      localStorage.removeItem(SAVE_KEYS.messages)
-      localStorage.removeItem(SAVE_KEYS.dossier)
-      localStorage.removeItem('trpg_player_class')
+      // 清理所有槽位 + message 流 + 职业记录
+      try {
+        localStorage.removeItem(SAVE_KEYS.auto)
+        for (let i = 1; i <= SAVE_KEYS.MAX_SLOTS; i++) {
+          localStorage.removeItem(SAVE_KEYS.slotPrefix + i)
+        }
+        localStorage.removeItem('trpg_messages_current')
+        localStorage.removeItem('trpg_player_class')
+      } catch { }
     }
 
     // ─── DM 思考面板 ───
@@ -3389,32 +3697,90 @@
       })()
 
     function showEntryScreen() {
-      const session = getSavedSession()
       const menuTitle = document.getElementById('menu-title')
       const menuSub = document.getElementById('menu-subtitle')
       const resumeInfo = document.getElementById('resume-info')
       const resumeBtn = document.getElementById('menu-resume-btn')
+      const loadBtn = document.getElementById('menu-load-btn')
 
-      if (session && session.player) {
-        // 有存档 → 显示欢迎回来 + 继续冒险按钮
-        const p = session.player
+      // 扫描所有槽位,找到最近使用的
+      const slots = getAllSaveSlots()
+      const hasAnySlot = slots.some(s => !s.metadata.isEmpty)
+      const recentSlotId = getMostRecentSlotId()
+      const recentSlot = recentSlotId !== null ? readSaveSlot(recentSlotId) : null
+      const recentSession = recentSlot?.session
+
+      if (recentSession && recentSession.player) {
+        // 有存档 → 显示欢迎回来 + 继续冒险(最新槽) + 读档(多槽)
+        const p = recentSession.player
         const classNames = { fighter: '剑士', mage: '法师', ranger: '游侠', cleric: '牧师' }
-        const className = classNames[session.classId] || session.classId || ''
+        const className = classNames[recentSlot.classId] || classNames[recentSession.classId] || ''
+        const locLabel = recentSlotId === 'auto' ? '自动存档' : `槽位 ${recentSlotId}`
         menuTitle.innerHTML = '<i class="ra ra-sword"></i> 欢迎回来'
         menuSub.style.display = 'none'
         resumeInfo.style.display = ''
         resumeInfo.innerHTML =
           `<strong style="color:#e0e0e0;font-size:18px">${esc(p.name)}</strong><br>` +
-          `${p.level}级${esc(className)} · HP ${p.hp}/${p.maxHp} · 金币 ${p.gold}`
+          `${p.level}级${esc(className)} · HP ${p.hp}/${p.maxHp} · 金币 ${p.gold}<br>` +
+          `<span style="color:#888;font-size:12px">来源: ${locLabel}</span>`
         resumeBtn.style.display = ''
-      } else {
-        // 无存档 → 显示游戏标题 + 仅新游戏按钮
+        loadBtn.style.display = ''
+      } else if (hasAnySlot) {
+        // 边缘情况:getMostRecentSlotId 没找到最新但 slot 有数据 — 仍然允许读档
         menuTitle.innerHTML = '<i class="ra ra-sword"></i> 破晓镇 · 蚀目之影'
         menuSub.style.display = ''
         resumeInfo.style.display = 'none'
         resumeBtn.style.display = 'none'
+        loadBtn.style.display = ''
+      } else {
+        // 全空 → 只显示新游戏
+        menuTitle.innerHTML = '<i class="ra ra-sword"></i> 破晓镇 · 蚀目之影'
+        menuSub.style.display = ''
+        resumeInfo.style.display = 'none'
+        resumeBtn.style.display = 'none'
+        loadBtn.style.display = 'none'
       }
       document.getElementById('resume-screen').style.display = 'flex'
+    }
+
+    /** 标题屏上的"读档"按钮入口 —— 在主菜单上打开槽位面板 */
+    function openLoadGameFromTitle() {
+      // 标题屏没有常规的 tab-bar,我们临时借用 overlay 显示一个槽位对话框
+      const slots = getAllSaveSlots()
+      const cards = slots.map(s => renderSlotCard(s, 'load')).join('')
+      const html = `
+        <div style="max-width:760px;margin:40px auto;padding:24px;background:rgba(10,10,24,0.92);border:1px solid rgba(184,134,11,0.3);border-radius:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="color:#e8d5a3;margin:0;font-family:Georgia,serif;letter-spacing:1px">
+              <i class="ra ra-scroll-unfurled"></i> 读取存档
+            </h3>
+            <button onclick="closeTitleLoadDialog()" style="background:transparent;border:none;color:#888;font-size:20px;cursor:pointer">✕</button>
+          </div>
+          <div style="color:#888;font-size:12px;margin-bottom:12px">点击一个已有存档继续游戏。空槽位不可读取。</div>
+          <div class="save-slots-grid">${cards}</div>
+        </div>
+      `
+      // 复用现有 overlay
+      const overlay = document.getElementById('panel-overlay')
+      const sheet = document.getElementById('panel-sheet')
+      const body = document.getElementById('panel-body')
+      const title = document.getElementById('panel-title')
+      if (title) title.textContent = '读取存档'
+      if (body) body.innerHTML = html
+      overlay.classList.add('open')
+      sheet.classList.add('open')
+      // 标记一下,让 closeTitleLoadDialog 知道现在是标题屏模式
+      sheet.dataset.titleLoadMode = '1'
+      playSfx('ui_open', 0.3)
+    }
+
+    function closeTitleLoadDialog() {
+      const overlay = document.getElementById('panel-overlay')
+      const sheet = document.getElementById('panel-sheet')
+      overlay.classList.remove('open')
+      sheet.classList.remove('open')
+      delete sheet.dataset.titleLoadMode
+      playSfx('ui_close', 0.2)
     }
 
     async function authenticate() {
@@ -4034,6 +4400,175 @@
       setTimeout(() => openPanel('guide', '游戏指南', renderGuidePanel()), 80)
     }
 
+    // ─── 存档槽位 UI ───────────────────────────────
+
+    /**
+     * 打开存档面板。
+     * mode='load' = 读档; mode='save' = 存档;
+     * 面板复用现有 openPanel infra,内容是一组槽位卡片
+     */
+    function openSavesModal(mode) {
+      playSfx('ui_open', 0.3)
+      const title = mode === 'save' ? '保存游戏' : '读取存档'
+      openPanel('saves', title, renderSavesModalBody(mode))
+    }
+
+    function renderSavesModalBody(mode) {
+      const slots = getAllSaveSlots()
+      const cards = slots.map(s => renderSlotCard(s, mode)).join('')
+      const hint = mode === 'save'
+        ? '点击一个槽位保存当前游戏。自动存档槽位不可手动覆盖。'
+        : '点击一个已有存档继续游戏。空槽位不可读取。'
+      return `
+        <div class="panel-card">
+          <div class="panel-card-title">${mode === 'save' ? '保存到...' : '读取存档'}</div>
+          <div style="color:#888;font-size:12px;line-height:1.6;padding:6px 2px 12px">${hint}</div>
+          <div class="save-slots-grid">
+            ${cards}
+          </div>
+        </div>
+      `
+    }
+
+    function renderSlotCard(slot, mode) {
+      const m = slot.metadata
+      const isEmpty = m.isEmpty
+      const isAuto = m.isAuto
+      const unclickable = (mode === 'save' && isAuto) || (mode === 'load' && isEmpty)
+      const onClick = unclickable
+        ? ''
+        : `onclick="handleSlotClick('${slot.id}', '${mode}')"`
+      const cursor = unclickable ? 'default' : 'pointer'
+      const opacity = unclickable ? '0.55' : '1'
+
+      // 头部:槽位名字 + 删除按钮(只在非空且非 auto 时显示)
+      const deleteBtn = (!isEmpty && !isAuto)
+        ? `<button class="save-slot-delete" onclick="event.stopPropagation();handleSlotDelete('${slot.id}')" title="删除此存档"><i class="ra ra-cancel"></i></button>`
+        : ''
+
+      const badge = isAuto ? '<span class="save-slot-badge">自动</span>' : ''
+
+      if (isEmpty) {
+        const hint = mode === 'save' ? '点击保存到此槽位' : '空'
+        return `
+          <div class="save-slot-card save-slot-empty" ${onClick} style="cursor:${cursor};opacity:${opacity}">
+            <div class="save-slot-header">
+              <span class="save-slot-label">${m.label} ${badge}</span>
+            </div>
+            <div class="save-slot-empty-body">
+              <i class="ra ra-scroll-unfurled" style="font-size:32px;color:#555"></i>
+              <div style="color:#666;margin-top:8px">${hint}</div>
+            </div>
+          </div>
+        `
+      }
+
+      const d = new Date(m.savedAt)
+      const dateStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      const hpPct = m.maxHp > 0 ? Math.round((m.hp / m.maxHp) * 100) : 0
+      const hpColor = hpPct < 25 ? '#ff6b6b' : hpPct < 50 ? '#e6c866' : '#8fd97a'
+
+      return `
+        <div class="save-slot-card save-slot-filled" ${onClick} style="cursor:${cursor};opacity:${opacity}">
+          <div class="save-slot-header">
+            <span class="save-slot-label">${m.label} ${badge}</span>
+            ${deleteBtn}
+          </div>
+          <div class="save-slot-body">
+            <div class="save-slot-name">${esc(m.playerName)}</div>
+            <div class="save-slot-meta">
+              <span>${m.level}级${esc(m.className)}</span>
+              <span style="color:${hpColor}">HP ${m.hp}/${m.maxHp}</span>
+              <span>⟡ ${m.gold}</span>
+            </div>
+            <div class="save-slot-chapter">${esc(m.chapterTitle)}</div>
+            <div class="save-slot-location"><i class="ra ra-compass"></i> ${esc(m.locationName)} · 回合 ${m.turn}</div>
+            <div class="save-slot-date">${dateStr}</div>
+          </div>
+        </div>
+      `
+    }
+
+    async function handleSlotClick(slotId, mode) {
+      // slotId 从 HTML onclick 字符串化,auto 保留字符串,数字存为字符串再转
+      const id = slotId === 'auto' ? 'auto' : Number(slotId)
+
+      if (mode === 'save') {
+        if (id === 'auto') return  // 防御性:不应该可点击
+        const existing = readSaveSlot(id)
+        if (existing && !confirm(`槽位 ${id} 已有存档,确定覆盖吗?`)) return
+        // 当前游戏状态的来源:autosave 槽(每次 WS 消息都写入它,所以是最新的)
+        const current = readSaveSlot('auto')
+        if (!current?.session) { appendMsg('当前没有游戏进行中,无法保存', 'error'); return }
+        const messages = (() => { try { return JSON.parse(localStorage.getItem('trpg_messages_current') || '[]') } catch { return current.messages ?? [] } })()
+        const ok = writeSaveSlot(id, current.session, current.dossier, messages)
+        if (ok) {
+          playSfx('ui_confirm', 0.3)
+          appendMsg(`✓ 已保存到槽位 ${id}`, 'system')
+          // 刷新面板内容
+          document.getElementById('panel-body').innerHTML = renderSavesModalBody('save')
+        } else {
+          appendMsg('保存失败(可能是 localStorage 配额已满)', 'error')
+        }
+        return
+      }
+
+      // mode === 'load'
+      const slot = readSaveSlot(id)
+      if (!slot?.session) return
+      if (!confirm(`读取${id === 'auto' ? '自动存档' : '槽位 ' + id}?未保存的进度将丢失。`)) return
+      closePanel()
+      loadFromSlot(id)
+    }
+
+    function handleSlotDelete(slotId) {
+      const id = slotId === 'auto' ? 'auto' : Number(slotId)
+      if (id === 'auto') return  // 防御
+      if (!confirm(`确定删除槽位 ${id} 的存档吗?此操作不可撤销。`)) return
+      deleteSaveSlot(id)
+      playSfx('ui_confirm', 0.25)
+      // 刷新当前面板(保持当前 mode)
+      const body = document.getElementById('panel-body')
+      if (body) {
+        // 判断当前是 load 还是 save 模式 —— 根据面板标题
+        const title = document.getElementById('panel-title')?.textContent || ''
+        const mode = title.includes('保存') ? 'save' : 'load'
+        body.innerHTML = renderSavesModalBody(mode)
+      }
+    }
+
+    /** 从指定槽位加载并启动游戏 */
+    function loadFromSlot(slotId) {
+      const slot = readSaveSlot(slotId)
+      if (!slot?.session) { appendMsg('存档已损坏或为空', 'error'); return }
+
+      // 标题屏上:关掉主菜单,走 resume 流程(复用现有 resumeGame 的后半部分)
+      const titleVisible = document.getElementById('resume-screen')?.style.display !== 'none'
+      if (titleVisible) {
+        // 把这个槽位的数据写到 autosave,让 getSavedSession() 能读到最新的
+        // (因为 resumeGame 从 getSavedSession 读)
+        writeSaveSlot('auto', slot.session, slot.dossier, slot.messages)
+        // 同步 current message stream
+        try { localStorage.setItem('trpg_messages_current', JSON.stringify(slot.messages || [])) } catch { }
+        resumeGame()
+        return
+      }
+
+      // 游戏中:直接发 resume 给服务器
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resume', session: slot.session, dossier: slot.dossier }))
+        // 同步到 autosave 方便"继续"
+        writeSaveSlot('auto', slot.session, slot.dossier, slot.messages)
+        try { localStorage.setItem('trpg_messages_current', JSON.stringify(slot.messages || [])) } catch { }
+        appendMsg(`正在载入${slotId === 'auto' ? '自动存档' : '槽位 ' + slotId}...`, 'reconnect')
+      } else {
+        // 没连接:先写到 autosave 再刷新页面走 resume 路径
+        writeSaveSlot('auto', slot.session, slot.dossier, slot.messages)
+        try { localStorage.setItem('trpg_messages_current', JSON.stringify(slot.messages || [])) } catch { }
+        location.reload()
+      }
+    }
+
     function renderGuidePanel() {
       const s = (title) => `<div style="font-size:13px;color:#e6c866;font-weight:bold;padding:10px 0 6px;border-bottom:1px solid #1a1a3e;margin-bottom:6px">${title}</div>`
       const p = (text) => `<div style="font-size:12px;color:#b0b0b0;line-height:1.7;padding:0 2px 8px">${text}</div>`
@@ -4089,13 +4624,19 @@
       <div class="more-icon"><i class="ra ra-help"></i></div><div class="more-label">游戏指南</div>
     </div>
   </div>
-  <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">系统</div>
+  <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">存档</div>
   <div class="more-grid">
+    <div class="more-item" onclick="openSavesModal('save')">
+      <div class="more-icon"><i class="ra ra-save"></i></div><div class="more-label">保存游戏</div>
+    </div>
+    <div class="more-item" onclick="openSavesModal('load')">
+      <div class="more-icon"><i class="ra ra-scroll-unfurled"></i></div><div class="more-label">读取存档</div>
+    </div>
     <div class="more-item" onclick="downloadSave()">
-      <div class="more-icon"><i class="ra ra-save"></i></div><div class="more-label">下载存档</div>
+      <div class="more-icon"><i class="ra ra-download"></i></div><div class="more-label">导出备份</div>
     </div>
     <div class="more-item" onclick="triggerUploadSave()">
-      <div class="more-icon"><i class="ra ra-load"></i></div><div class="more-label">上传存档</div>
+      <div class="more-icon"><i class="ra ra-upload"></i></div><div class="more-label">导入备份</div>
     </div>
   </div>
   <div style="font-size:12px;color:#666;padding:8px 4px 6px;border-bottom:1px solid #0f3460;margin-bottom:8px">开发者</div>
@@ -4143,14 +4684,16 @@
           const data = JSON.parse(reader.result)
           const session = data.session
           if (!session?.player) throw new Error('无效存档')
-          // 写入 localStorage
-          saveToLocal(session, data.dossier)
-          if (data.messages) localStorage.setItem(SAVE_KEYS.messages, JSON.stringify(data.messages))
+          // 写入自动存档槽(导入的备份视为当前进度)
+          writeSaveSlot('auto', session, data.dossier, data.messages || [])
+          if (data.messages) {
+            try { localStorage.setItem('trpg_messages_current', JSON.stringify(data.messages)) } catch { }
+          }
           closePanel()
           // 如果游戏已在运行，发 resume；否则刷新
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'resume', session, dossier: data.dossier }))
-            appendMsg('存档已上传，正在恢复...', 'reconnect')
+            appendMsg('备份已导入，正在恢复...', 'reconnect')
           } else {
             location.reload()
           }
