@@ -166,8 +166,56 @@ async function test2() {
 
 // ── Run ──────────────────────────────────────────────
 
+// ── Test 3: 自然语言,不强制调工具 ───────────────────
+
+async function test3() {
+  group('Test 3: 自然输入下 DM 是否会主动查 Lore (A+B 验证)')
+
+  // 模拟真实玩家输入 —— 完全不提 "工具" / "ReadLore" / "查询",
+  // 只是问一个需要了解设定才能回答的问题。如果 A+B 生效,DM
+  // 应该在叙述前主动调 ReadLore/GrepLore 核对设定。
+  const input = '告诉我这个酒馆老板格雷格是个什么样的人,他有过什么经历？'
+
+  // 先拍快照确认 [游戏状态] 里有 lore hint(B 的效果)
+  const ctx = getFacts().toPromptContext()
+  const hasHint = ctx.includes('本地可查剧本资料')
+  console.log(`  [游戏状态] 包含 lore hint? ${hasHint ? '✓' : '✗'}`)
+  if (hasHint) {
+    const hintLine = ctx.split('\n').find(l => l.includes('本地可查剧本资料'))
+    console.log(`  hint 内容: ${hintLine}`)
+  }
+
+  const r = await runDMTurn(input)
+
+  if (r.error) {
+    console.error(`  ✗ dmRespond 抛异常: ${r.error.message}`)
+    failed += 1
+    return
+  }
+  dumpTurnStats(r)
+
+  // 关键断言:DM 是否主动调了 Lore 工具
+  const loreCall = r.toolResults.find(tr => /^(ReadLore|ListLore|GrepLore)$/i.test(tr.name ?? ''))
+  assert('[B] [游戏状态] 注入了 lore hint', hasHint)
+  assert(
+    '[A+B] 自然输入下 DM 主动调了 Lore 工具',
+    loreCall !== undefined,
+    `实际工具: ${r.toolResults.map(t => t.name).join(',') || '无'}`,
+  )
+
+  if (loreCall) {
+    assert('Lore 工具无 error', !loreCall.isError)
+    console.log(`  ✓ DM 主动调用了 ${loreCall.name}`)
+  } else {
+    console.log(`  ℹ DM 没调 lore,直接凭记忆叙事了。这是 A+B 改动没能解决的情况。`)
+  }
+}
+
 ;(async () => {
   try {
+    // 先跑 Test 3(自然输入)—— 此时 DM 上下文还是干净的,
+    // 才能验证"DM 在没有先验 lore 信息时是否会主动查"
+    await test3()
     await test1()
     await test2()
   } catch (err) {

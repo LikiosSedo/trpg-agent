@@ -4,6 +4,7 @@ import { getCombatSummary } from './combat-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
 import { getGatedFacts } from './trust-system.js'
 import { getRecentJournal, formatJournalForPrompt, CONTEXT_INJECT_COUNT } from './dm-journal.js'
+import { getLoreStore, parseChapterNumber } from './lore/index.js'
 
 export class GameFactStore {
   constructor(private session: GameSession) {}
@@ -104,6 +105,8 @@ export class GameFactStore {
         return `商店库存:\n${shopInfo}`
       })(),
       getCombatSummary(this.session) ?? '',
+      // Phase 5: 本地可查 lore 提示 —— 让 DM 知道这里有哪些剧本资料可查
+      buildLoreHint(this.session),
       // Phase 6: DM Journal 最近 N 条 —— 给 DM 跨 turn 的叙事锚点记忆
       formatJournalForPrompt(
         getRecentJournal(this.session, CONTEXT_INJECT_COUNT),
@@ -218,5 +221,51 @@ export class GameFactStore {
     const path = slotName.includes('/') ? slotName : `saves/${slotName}.json`
     const data = JSON.parse(fs.readFileSync(path, 'utf-8')) as GameSession
     return new GameFactStore(data)
+  }
+}
+
+// ─── Phase 5: 本地 Lore 提示 ───────────────────────────
+
+/**
+ * 生成"本地可查 lore 条目"的一行提示,注入 [游戏状态]。
+ *
+ * 作用:DM 每回合都能看到当前地点有哪些剧本条目存在,消除
+ * "我不知道有没有 lore"的盲区。看到名字就知道可以用 ReadLore 查。
+ *
+ * 过滤规则:
+ *   - 按当前章节号门控(chapter_visible)
+ *   - 匹配当前 location 的条目(entry.location === currentLocation)
+ *   - 加上没标 location 的条目(视为通用,如 world/faction)
+ *   - 战斗中不显示(战斗里查不了 lore,显示只是噪音)
+ *   - 没条目就返回空字符串(被 filter(Boolean) 丢掉)
+ */
+function buildLoreHint(session: GameSession): string {
+  if (session.combat?.active) return ''
+
+  try {
+    const store = getLoreStore()
+    const chapterNum = parseChapterNumber(session.chapter?.currentChapter)
+    const currentLoc = session.worldState.currentLocation
+
+    const visible = store.list({ currentChapter: chapterNum })
+    const relevant = visible.filter(
+      entry => !entry.location || entry.location === currentLoc,
+    )
+
+    if (relevant.length === 0) return ''
+
+    // 分两组:local(带 location) 和 general(无 location)
+    const local = relevant.filter(e => e.location === currentLoc).map(e => e.id)
+    const general = relevant.filter(e => !e.location).map(e => e.id)
+
+    const parts: string[] = []
+    if (local.length > 0) parts.push(local.join(', '))
+    if (general.length > 0) parts.push(`通用: ${general.join(', ')}`)
+
+    return `本地可查剧本资料: ${parts.join(' · ')}\n(用 ReadLore 读完整条目 / GrepLore 搜关键词)`
+  } catch (err) {
+    // lore 系统异常不应该影响 [游戏状态] 生成
+    console.warn(`[game-facts] buildLoreHint failed: ${(err as Error).message}`)
+    return ''
   }
 }
