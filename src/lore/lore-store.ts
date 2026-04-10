@@ -204,29 +204,42 @@ export class LoreStore {
    * 读取单个条目的完整内容。
    * 支持按 id / name / alias 查找。
    * 被章节门控挡住时,静默返回 null(不告诉 DM "有但不可看")。
+   *
+   * **Section-level gating**: body 里的 `<!-- gate:N -->` 标记会把后续内容
+   * 按当前章节号过滤。ch1 的 DM 看不到 `<!-- gate:3 -->` 之后的深层秘密。
    */
   read(options: { query: string; currentChapter: number }): LoreEntry | null {
     this.ensureLoaded()
     const q = options.query.trim().toLowerCase()
     if (!q) return null
 
-    for (const entry of this.entries.values()) {
-      if (!this.isVisible(entry, options.currentChapter)) continue
-      if (entry.id.toLowerCase() === q) return entry
-      if (entry.frontmatter.name.toLowerCase() === q) return entry
-      const aliases = entry.frontmatter.aliases ?? []
-      if (aliases.some(a => a.toLowerCase() === q)) return entry
+    const findEntry = (): LoreEntry | undefined => {
+      // 精确匹配
+      for (const entry of this.entries.values()) {
+        if (!this.isVisible(entry, options.currentChapter)) continue
+        if (entry.id.toLowerCase() === q) return entry
+        if (entry.frontmatter.name.toLowerCase() === q) return entry
+        const aliases = entry.frontmatter.aliases ?? []
+        if (aliases.some(a => a.toLowerCase() === q)) return entry
+      }
+      // 模糊匹配(包含关系)
+      for (const entry of this.entries.values()) {
+        if (!this.isVisible(entry, options.currentChapter)) continue
+        if (entry.frontmatter.name.toLowerCase().includes(q)) return entry
+        const aliases = entry.frontmatter.aliases ?? []
+        if (aliases.some(a => a.toLowerCase().includes(q))) return entry
+      }
+      return undefined
     }
 
-    // 精确匹配失败,尝试模糊匹配(包含关系)
-    for (const entry of this.entries.values()) {
-      if (!this.isVisible(entry, options.currentChapter)) continue
-      if (entry.frontmatter.name.toLowerCase().includes(q)) return entry
-      const aliases = entry.frontmatter.aliases ?? []
-      if (aliases.some(a => a.toLowerCase().includes(q))) return entry
-    }
+    const entry = findEntry()
+    if (!entry) return null
 
-    return null
+    // Section-level gating: 过滤 body 中被 <!-- gate:N --> 保护的段落
+    return {
+      ...entry,
+      body: filterBodyByChapter(entry.body, options.currentChapter),
+    }
   }
 
   /**
@@ -250,12 +263,14 @@ export class LoreStore {
       if (!this.isVisible(entry, options.currentChapter)) continue
       if (options.type && entry.frontmatter.type !== options.type) continue
 
-      const lines = entry.body.split('\n')
+      // Section-level gating: 只搜索当前章节可见的 body 部分
+      const visibleBody = filterBodyByChapter(entry.body, options.currentChapter)
+      const lines = visibleBody.split('\n')
       const matches: string[] = []
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].toLowerCase().includes(q)) {
           matches.push(lines[i].trim())
-          if (matches.length >= 3) break  // 单文件最多 3 行
+          if (matches.length >= 3) break
         }
       }
       if (matches.length > 0) {
@@ -297,4 +312,43 @@ export class LoreStore {
     this.ensureLoaded()
     return this.entries
   }
+}
+
+// ─── Section-level gating ────────────────────────────
+
+/**
+ * 按章节号过滤 markdown body 中被 `<!-- gate:N -->` 保护的段落。
+ *
+ * 约定:
+ *   - `<!-- gate:3 -->` 之后、到下一个 `<!-- gate:M -->` 或 EOF 为止
+ *     的内容,只有 currentChapter >= 3 时才对 DM 可见。
+ *   - 标记之前的内容始终可见(不需要 gate 标记)。
+ *   - 支持多个递进的 gate 标记(ch2 可见 → ch3 可见 → ch4 可见)。
+ *
+ * 例:
+ *   ```
+ *   # 格雷格·铁拳头
+ *   47 岁,碎盾亭酒馆老板...       ← ch1 就能看到
+ *
+ *   <!-- gate:3 -->
+ *   ## 深层秘密
+ *   矿洞任务中看到了移动的符号...  ← ch3+ 才能看到
+ *   ```
+ */
+export function filterBodyByChapter(body: string, currentChapter: number): string {
+  // 用捕获组 split:偶数下标=内容,奇数下标=gate 数字
+  const parts = body.split(/<!--\s*gate:\s*(\d+)\s*-->/)
+
+  // parts[0] = gate 之前的内容(始终包含)
+  let result = parts[0]
+
+  for (let i = 1; i < parts.length; i += 2) {
+    const gateChapter = parseInt(parts[i], 10)
+    const content = parts[i + 1] ?? ''
+    if (currentChapter >= gateChapter) {
+      result += content
+    }
+  }
+
+  return result.trim()
 }

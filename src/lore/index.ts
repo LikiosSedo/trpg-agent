@@ -19,6 +19,7 @@ export {
   getLoreStore,
   resetLoreStore,
   parseChapterNumber,
+  filterBodyByChapter,
 } from './lore-store.js'
 
 export { parseFrontmatter, type ParsedFrontmatter } from './frontmatter.js'

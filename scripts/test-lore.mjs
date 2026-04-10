@@ -23,6 +23,7 @@ import {
   getLoreStore,
   resetLoreStore,
   parseChapterNumber,
+  filterBodyByChapter,
 } from '../src/lore/index.ts'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -255,6 +256,70 @@ group('Group 8: 单例 getLoreStore()', () => {
   resetLoreStore()
   const s3 = getLoreStore()
   assert('reset 后新实例', s3 !== s1)
+})
+
+// ══════════════════════════════════════════
+// Group 9: filterBodyByChapter (section-level gating)
+// ══════════════════════════════════════════
+group('Group 9: section-level gating', () => {
+  const body = `# 格雷格
+47 岁,酒馆老板
+
+## 关系网
+小莉是他的软肋
+
+<!-- gate:3 -->
+## 深层秘密
+矿洞里看到了移动的符号
+
+<!-- gate:4 -->
+## 最终真相
+达里安的死另有隐情`
+
+  const ch1 = filterBodyByChapter(body, 1)
+  assert('ch1 看不到 gate:3 内容', !ch1.includes('移动的符号'))
+  assert('ch1 看不到 gate:4 内容', !ch1.includes('另有隐情'))
+  assert('ch1 看得到基础内容', ch1.includes('47 岁') && ch1.includes('小莉是他的软肋'))
+
+  const ch3 = filterBodyByChapter(body, 3)
+  assert('ch3 看得到 gate:3 内容', ch3.includes('移动的符号'))
+  assert('ch3 看不到 gate:4 内容', !ch3.includes('另有隐情'))
+  assert('ch3 仍有基础内容', ch3.includes('47 岁'))
+
+  const ch4 = filterBodyByChapter(body, 4)
+  assert('ch4 看得到全部内容', ch4.includes('移动的符号') && ch4.includes('另有隐情'))
+
+  // 无 gate 标记的 body 应原样返回
+  const plain = '# 碎盾亭\n酒馆描述'
+  assert('无 gate 标记原样返回', filterBodyByChapter(plain, 1) === plain)
+})
+
+// ══════════════════════════════════════════
+// Group 10: ReadLore section gating with real lore files
+// ══════════════════════════════════════════
+group('Group 10: ReadLore 真实文件 section gating', () => {
+  const store = new LoreStore(join(projectRoot, 'lore'))
+
+  // ch1 读格雷格:不应包含深层秘密
+  const gregCh1 = store.read({ query: 'greg', currentChapter: 1 })
+  assert('ch1 读 greg 有内容', gregCh1 !== null)
+  assert('ch1 读 greg 无"移动的符号"', !gregCh1.body.includes('移动的符号'))
+  assert('ch1 读 greg 无"蚀目者符号"', !gregCh1.body.includes('蚀目者符号'))
+  assert('ch1 读 greg 有基础信息', gregCh1.body.includes('47 岁') || gregCh1.body.includes('铁拳头'))
+
+  // ch3 读格雷格:应该包含深层秘密
+  const gregCh3 = store.read({ query: 'greg', currentChapter: 3 })
+  assert('ch3 读 greg 有深层秘密', gregCh3.body.includes('移动的符号') || gregCh3.body.includes('蚀目者'))
+
+  // ch1 grep "蚀目者" 不应命中 greg 的秘密部分
+  const grepCh1 = store.grep({ query: '蚀目者', currentChapter: 1 })
+  const gregInGrep = grepCh1.find(h => h.id === 'greg')
+  assert('ch1 grep "蚀目者" 不命中 greg', !gregInGrep)
+
+  // ch3 grep "蚀目者" 应该命中
+  const grepCh3 = store.grep({ query: '蚀目者', currentChapter: 3 })
+  const gregInGrep3 = grepCh3.find(h => h.id === 'greg')
+  assert('ch3 grep "蚀目者" 命中 greg', !!gregInGrep3)
 })
 
 // ══════════════════════════════════════════
