@@ -87,6 +87,36 @@ export const UseItemTool: Tool = {
             break
           }
 
+          // 防火药膏：fire 抗性
+          if (potionName.includes('防火')) {
+            applyEffect(player, {
+              name: '防火药膏',
+              type: 'resistance',
+              value: 0.5,
+              turns: 30,
+              source: 'potion',
+              damageType: 'fire',
+            })
+            facts.addEvent(`使用防火药膏，获得火焰抗性`)
+            result = { output: `使用防火药膏：接下来的战斗中火焰伤害减半。物品已消耗。` }
+            break
+          }
+
+          // 抗麻痹药剂：免疫麻痹
+          if (potionName.includes('抗麻痹')) {
+            applyEffect(player, {
+              name: '抗麻痹',
+              type: 'poison_immunity', // 复用现有类型，语义扩展为"状态免疫"
+              value: 1,
+              turns: 30,
+              source: 'potion',
+              damageType: 'paralysis', // 用这个标记区分毒素免疫和麻痹免疫
+            })
+            facts.addEvent(`使用抗麻痹药剂，获得麻痹免疫`)
+            result = { output: `使用抗麻痹药剂：接下来的战斗中免疫麻痹状态。对付食尸鬼和鸡蛇兽极为有效！物品已消耗。` }
+            break
+          }
+
           // 其他药水：通用消耗（描述效果）
           facts.addEvent(`使用${potionName}`)
           result = { output: `使用${potionName}：${item!.description}。物品已消耗。` }
@@ -95,6 +125,32 @@ export const UseItemTool: Tool = {
         if (item!.type === 'quest') {
           facts.addEvent(`使用任务物品${item!.name}`, 'critical')
           result = { output: `使用任务物品${item!.name}：${item!.description}。` }
+          break
+        }
+
+        // 涂层道具：武器附加伤害类型
+        if (item!.type === 'misc' && (item as any).damageType) {
+          const coating = item as any
+          const coatingType = coating.damageType as string
+          player.inventory.splice(itemIdx, 1)
+
+          // 添加 ActiveEffect：damage_bonus 类型，带 damageType
+          applyEffect(player, {
+            name: coating.name,
+            type: 'damage_bonus',
+            value: 0,  // 不增加数值伤害，只添加伤害类型
+            turns: 30, // 持续足够长（一场战斗通常不超过20回合）
+            source: 'potion',
+            damageType: coatingType,
+          })
+
+          const typeNames: Record<string, string> = {
+            fire: '火焰', cold: '冰冻', lightning: '雷电', radiant: '光辉',
+          }
+          const typeName = typeNames[coatingType] || coatingType
+
+          facts.addEvent(`使用${coating.name}，武器附加${typeName}伤害`)
+          result = { output: `使用${coating.name}：武器在接下来的战斗中附加${typeName}伤害类型。对该类型有弱点的怪物将受到双倍伤害！物品已消耗。` }
           break
         }
 

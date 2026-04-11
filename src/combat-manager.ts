@@ -13,6 +13,7 @@ import {
 import { getFacts } from './game-state.js'
 import { getEffectBonus, hasEffect, tickEffects, applyEffect } from './effect-manager.js'
 import { changeTrust } from './trust-system.js'
+import { markEncountered, discoverImmunity } from './bestiary.js'
 
 const PROFICIENCY = 2
 
@@ -97,14 +98,17 @@ export function startCombat(
   const player = session.player
   const log: string[] = []
 
-  // 玩家先攻
+  // 玩家先攻（Lv8 ranger_quick_reflexes: +3）
+  const initBonus = session.worldState.flags['passive_ranger_quick_reflexes'] ? 3 : 0
   const playerInit = rollInitiative(player.abilityModifiers.DEX)
-  log.push(`${player.name} 先攻: d20(${playerInit.roll})+${player.abilityModifiers.DEX}=${playerInit.total}`)
+  const playerInitTotal = playerInit.total + initBonus
+  const initBonusStr = initBonus > 0 ? `+${initBonus}(快速反应)` : ''
+  log.push(`${player.name} 先攻: d20(${playerInit.roll})+${player.abilityModifiers.DEX}${initBonusStr}=${playerInitTotal}`)
 
   const initiativeOrder: InitiativeEntry[] = [{
     id: 'player',
     name: player.name,
-    initiative: playerInit.total,
+    initiative: playerInitTotal,
     isPlayer: true,
   }]
 
@@ -141,6 +145,9 @@ export function startCombat(
       resistance: template.resistance,
       immunity: template.immunity,
     })
+
+    // 图鉴：标记遭遇此怪物
+    markEncountered(session, template.name)
 
     initiativeOrder.push({
       id,
@@ -305,7 +312,13 @@ export function executePlayerAttack(
     const atkMod = player.abilityModifiers.INT + PROFICIENCY
     const atk = attackRoll(atkMod, monster.ac)
 
-    if (!atk.hits) {
+    // Lv8 fighter_crit_range: 暴击范围扩展到 19-20
+    const spellCritRange = session.worldState.flags['passive_fighter_crit_range'] ? 19 : 20
+    const spellIsCritical = atk.roll >= spellCritRange
+    // 扩展暴击范围也让 19 命中（即使 total < AC）
+    const spellHits = atk.hits || spellIsCritical
+
+    if (!spellHits) {
       log.push(`${player.name} 施放${spellId}: d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
       return { log, killed: false, hit: false, isCritical: false }
     }
@@ -313,20 +326,30 @@ export function executePlayerAttack(
     const dmgMatch = spell.effect.match(/(\d+d\d+(?:[+-]\d+)?)/i)
     const dmgDice = dmgMatch ? dmgMatch[1] : '1d6'
     let damage = rollDamage(dmgDice)
-    if (atk.isCritical) damage += rollDamage(dmgDice)
+    if (spellIsCritical) damage += rollDamage(dmgDice)
+
+    // Lv8 mage_spell_power: 法术伤害+2
+    if (session.worldState.flags['passive_mage_spell_power']) {
+      damage += 2
+      log.push('📖 奥术增幅：法术伤害+2')
+    }
 
     // 弱点/抗性/免疫乘数（法术）
     const spellDmgTypes = inferSpellDamageType(spellId)
     const spellWeakness = getWeaknessMultiplier(spellDmgTypes, monster)
     damage = Math.max(1, Math.floor(damage * spellWeakness.multiplier))
-    if (spellWeakness.effectType === 'immune') damage = 0
+    if (spellWeakness.effectType === 'immune') {
+      damage = 0
+      // 图鉴：战斗试错自动发现免疫
+      discoverImmunity(session, monster.name, '战斗试错')
+    }
 
     monster.hp = Math.max(0, monster.hp - damage)
     const killed = monster.hp <= 0
 
     log.push(
-      `${player.name} 施放${spellId}: d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → ${atk.isCritical ? '暴击！' : '命中'}`,
-      `伤害: ${dmgDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
+      `${player.name} 施放${spellId}: d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → ${spellIsCritical ? '暴击！' : '命中'}`,
+      `伤害: ${dmgDice}=${damage}${spellIsCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
     )
     if (spellWeakness.effectType === 'vulnerable') {
       log.push(`💥 弱点命中！伤害翻倍！`)
@@ -342,7 +365,7 @@ export function executePlayerAttack(
       const killKey = `kills_${monster.name}`
       session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
     }
-    return { log, killed, hit: true, isCritical: atk.isCritical }
+    return { log, killed, hit: true, isCritical: spellIsCritical }
   }
 
   // 武器攻击
@@ -353,7 +376,13 @@ export function executePlayerAttack(
   const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus
   const atk = attackRoll(atkMod, monster.ac)
 
-  if (!atk.hits) {
+  // Lv8 fighter_crit_range: 暴击范围扩展到 19-20
+  const weaponCritRange = session.worldState.flags['passive_fighter_crit_range'] ? 19 : 20
+  const weaponIsCritical = atk.roll >= weaponCritRange
+  // 扩展暴击范围也让 19 命中（即使 total < AC）
+  const weaponHits = atk.hits || weaponIsCritical
+
+  if (!weaponHits) {
     log.push(`${player.name} 攻击(${weapon.name}): d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
     return { log, killed: false, hit: false, isCritical: false }
   }
@@ -364,21 +393,25 @@ export function executePlayerAttack(
   // damage_bonus 效果（如 Hunter's Mark）
   const effectDmgBonus = getEffectBonus(player, 'damage_bonus')
   if (effectDmgBonus > 0) damage += rollDamage(`${effectDmgBonus}d6`)
-  if (atk.isCritical) damage += rollDamage(dmgDice)
+  if (weaponIsCritical) damage += rollDamage(dmgDice)
   damage = Math.max(1, damage)
 
   // 弱点/抗性/免疫乘数（武器）
   const attackTypes = resolveAttackDamageType(player.equipped.weapon as any, player.activeEffects)
   const weakness = getWeaknessMultiplier(attackTypes, monster)
   damage = Math.max(1, Math.floor(damage * weakness.multiplier))
-  if (weakness.effectType === 'immune') damage = 0
+  if (weakness.effectType === 'immune') {
+    damage = 0
+    // 图鉴：战斗试错自动发现免疫
+    discoverImmunity(session, monster.name, '战斗试错')
+  }
 
   monster.hp = Math.max(0, monster.hp - damage)
   const killed = monster.hp <= 0
 
   log.push(
-    `${player.name} 攻击(${weapon.name}): d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → ${atk.isCritical ? '暴击！' : '命中'}`,
-    `伤害: ${dmgDice}+${player.abilityModifiers.STR}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
+    `${player.name} 攻击(${weapon.name}): d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → ${weaponIsCritical ? '暴击！' : '命中'}`,
+    `伤害: ${dmgDice}+${player.abilityModifiers.STR}=${damage}${weaponIsCritical ? '(暴击翻倍)' : ''} → ${monster.id} HP: ${monster.hp}/${monster.maxHp}`,
   )
   if (weakness.effectType === 'vulnerable') {
     log.push(`💥 弱点命中！伤害翻倍！`)
@@ -394,7 +427,7 @@ export function executePlayerAttack(
     const killKey = `kills_${monster.name}`
     session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
   }
-  return { log, killed, hit: true, isCritical: atk.isCritical }
+  return { log, killed, hit: true, isCritical: weaponIsCritical }
 }
 
 // ─── 怪物回合 ───────────────────────────────────
@@ -594,7 +627,11 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     const allyAttackTypes: DamageType[] = ally.damageType ? [ally.damageType] : ['slashing']
     const allyWeakness = getWeaknessMultiplier(allyAttackTypes, target)
     damage = Math.max(1, Math.floor(damage * allyWeakness.multiplier))
-    if (allyWeakness.effectType === 'immune') damage = 0
+    if (allyWeakness.effectType === 'immune') {
+      damage = 0
+      // 图鉴：同伴攻击也能发现免疫
+      discoverImmunity(session, target.name, '战斗试错')
+    }
 
     target.hp = Math.max(0, target.hp - damage)
     const targetKilled = target.hp <= 0
