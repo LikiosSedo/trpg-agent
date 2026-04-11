@@ -216,8 +216,8 @@
     "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage. Void Pulse: every 3 rounds, deals 2d6 necrotic damage to all non-monster targets. Phase 2 (HP≤40%): Void Frenzy — damage becomes 2d10+5 but AC drops to 13",
     "description": "虚空棱镜的守护者，蚀目者教团的最终'成果'。它不是自然生物，而是虚空能量的具象化产物。三千年前晨光精灵文明的封印曾压制虚空，但教团的仪式正在让封印崩塌。蚀日兽是封印崩塌的最终征兆——如果不击败它，虚空将彻底突破。",
     "loot": ["虚空碎片", "暗影水晶", "50 gold"],
-    "vulnerability": ["radiant"],
-    "resistance": ["slashing", "piercing", "cold"],
+    "vulnerability": ["radiant", "cold"],
+    "resistance": ["slashing", "piercing"],
     "immunity": ["necrotic"],
     "discoveryHints": {
       "npc": "艾琳娜",

@@ -138,6 +138,15 @@ export const UseItemTool: Tool = {
           const coatingType = coating.damageType as string
           player.inventory.splice(itemIdx, 1)
 
+          // 涂层互斥：检查并移除已有的涂层效果
+          const existingCoating = (player.activeEffects || []).find(e =>
+            e.type === 'damage_bonus' && e.source === 'potion' && e.value === 0
+          )
+          const hadOldCoating = !!existingCoating
+          if (player.activeEffects && existingCoating) {
+            player.activeEffects = player.activeEffects.filter(e => e !== existingCoating)
+          }
+
           // 添加 ActiveEffect：damage_bonus 类型，带 damageType
           applyEffect(player, {
             name: coating.name,
@@ -154,7 +163,11 @@ export const UseItemTool: Tool = {
           const typeName = typeNames[coatingType] || coatingType
 
           facts.addEvent(`使用${coating.name}，武器附加${typeName}伤害`)
-          result = { output: `使用${coating.name}：武器在接下来的战斗中附加${typeName}伤害类型。对该类型有弱点的怪物将受到双倍伤害！物品已消耗。` }
+          if (hadOldCoating) {
+            result = { output: `使用${coating.name}：替换了之前的涂层。武器现在附加${typeName}伤害类型。物品已消耗。` }
+          } else {
+            result = { output: `使用${coating.name}：武器附加${typeName}伤害类型。对该类型有弱点的怪物将受到双倍伤害！物品已消耗。` }
+          }
           break
         }
 

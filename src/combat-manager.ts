@@ -384,9 +384,10 @@ export function executePlayerAttack(
     )
     if (spellWeakness.effectType === 'vulnerable') {
       log.push(`💥 弱点命中！伤害翻倍！`)
-      // 标记 radiant 命中（用于中断暗影编织者自愈）
+      // 累计 radiant 伤害（用于中断暗影编织者自愈，需 ≥10）
       if (spellWeakness.matchedType === 'radiant') {
-        session.worldState.flags['boss_radiant_hit_this_round'] = true
+        const prevRadiant = (session.worldState.flags['boss_radiant_dmg_this_round'] as number) || 0
+        session.worldState.flags['boss_radiant_dmg_this_round'] = prevRadiant + damage
       }
     } else if (spellWeakness.effectType === 'resistant') {
       log.push(`🛡️ 目标对该伤害类型有抗性，伤害减半`)
@@ -462,9 +463,10 @@ export function executePlayerAttack(
   )
   if (weakness.effectType === 'vulnerable') {
     log.push(`💥 弱点命中！伤害翻倍！`)
-    // 标记 radiant 命中（用于中断暗影编织者自愈）
+    // 累计 radiant 伤害（用于中断暗影编织者自愈，需 ≥10）
     if (weakness.matchedType === 'radiant') {
-      session.worldState.flags['boss_radiant_hit_this_round'] = true
+      const prevRadiant = (session.worldState.flags['boss_radiant_dmg_this_round'] as number) || 0
+      session.worldState.flags['boss_radiant_dmg_this_round'] = prevRadiant + damage
     }
   } else if (weakness.effectType === 'resistant') {
     log.push(`🛡️ 目标对该伤害类型有抗性，伤害减半`)
@@ -553,17 +555,21 @@ function executeBossAbility(
 
   // ─── 暗影编织者 ───
   if (monster.name === 'Shadow Weaver') {
-    // 暗影治愈：每回合恢复 3 HP（除非本回合被 radiant 命中）
-    if (!session.worldState.flags['boss_radiant_hit_this_round']) {
+    // 暗影治愈：每回合恢复 3 HP（除非本回合累计 radiant 伤害 ≥ 10）
+    const radiantDmgThisRound = (session.worldState.flags['boss_radiant_dmg_this_round'] as number) || 0
+    if (radiantDmgThisRound < 10) {
       const healed = Math.min(3, monster.maxHp - monster.hp)
       if (healed > 0) {
         monster.hp += healed
         log.push(`💀 暗影编织者吸收周围的黑暗修复自身(+${healed}HP → ${monster.hp}/${monster.maxHp})`)
       }
+      if (radiantDmgThisRound > 0) {
+        log.push(`✨ 光辉伤害不足以中断自愈（${radiantDmgThisRound}/10）`)
+      }
     } else {
-      log.push(`✨ 光辉之力中断了暗影编织者的自愈！`)
-      delete session.worldState.flags['boss_radiant_hit_this_round']
+      log.push(`✨ 强烈的光辉之力中断了暗影编织者的自愈！(本回合光辉伤害: ${radiantDmgThisRound})`)
     }
+    delete session.worldState.flags['boss_radiant_dmg_this_round']
 
     // 暗影幕布：每 3 回合，全体命中 -2（持续 1 回合）
     if (round % 3 === 0) {
@@ -632,7 +638,13 @@ function executeBossAbility(
       monster.conditions.push('phase2')
       monster.damageDice = '2d10+5'
       monster.ac = 13  // AC 从 15 降到 13（暴露弱点）
-      log.push(`⚠️ 蚀日兽发出震耳欲聋的嘶吼！它的暗影护甲破碎，虚空能量失控！(伤害增强但防御降低)`)
+      // Phase 2: 暗影护甲碎裂，暴露虚空本体
+      // 虚空本体对光辉有适应性（radiant 从弱点变为抗性）
+      // 但对极寒脆弱（cold 成为唯一弱点）
+      monster.vulnerability = ['cold']       // cold 变成唯一弱点
+      monster.resistance = ['radiant']       // radiant 从弱点变成抗性！
+      monster.immunity = ['necrotic']        // 保持不变
+      log.push(`⚠️ 蚀日兽的暗影护甲碎裂，暴露出虚空本体！它对光辉的反应似乎变了……而周围的温度骤然下降。`)
     }
   }
 
@@ -760,6 +772,27 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${victimHpStr}`,
     )
     hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: true, isCritical: atk.isCritical, damage, playerKilled, allyKilled })
+
+    // 蛛母 Phase 2 毒牙：额外 1d4 poison 伤害
+    if (monster.name === 'Spider Matriarch' && monster.conditions.includes('phase2')) {
+      const poisonDmg = rollDamage('1d4')
+      if (target.isPlayer) {
+        if (!hasEffect(player, 'poison_immunity', 'poison')) {
+          player.hp = Math.max(0, player.hp - poisonDmg)
+          playerKilled = player.hp <= 0
+          log.push(`🕷️ 蛛母的毒牙注入毒液！额外 ${poisonDmg} 点毒素伤害 (HP: ${player.hp}/${player.maxHp})`)
+        } else {
+          log.push(`🛡️ 毒素免疫抵消了蛛母的毒液！`)
+        }
+      } else {
+        const allyTarget = aliveAllies.find(a => a.id === target.id)
+        if (allyTarget) {
+          allyTarget.hp = Math.max(0, allyTarget.hp - poisonDmg)
+          if (allyTarget.hp <= 0 && !allyKilled) allyKilled = true
+          log.push(`🕷️ 蛛母的毒牙注入毒液！${target.name}受到额外 ${poisonDmg} 点毒素伤害 (HP: ${allyTarget.hp}/${allyTarget.maxHp})`)
+        }
+      }
+    }
 
     // Boss 特殊技能
     const bossLog = executeBossAbility(session, monster, combat)
@@ -893,9 +926,10 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     )
     if (allyWeakness.effectType === 'vulnerable') {
       log.push(`💥 ${ally.name}击中了弱点！`)
-      // 标记 radiant 命中（用于中断暗影编织者自愈）
+      // 累计 radiant 伤害（用于中断暗影编织者自愈，需 ≥10）
       if (allyWeakness.matchedType === 'radiant') {
-        session.worldState.flags['boss_radiant_hit_this_round'] = true
+        const prevRadiant = (session.worldState.flags['boss_radiant_dmg_this_round'] as number) || 0
+        session.worldState.flags['boss_radiant_dmg_this_round'] = prevRadiant + damage
       }
     } else if (allyWeakness.effectType === 'resistant') {
       log.push(`🛡️ 目标对${ally.name}的攻击有抗性`)

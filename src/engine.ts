@@ -46,6 +46,7 @@ import { localize, StreamingLocalizer } from './i18n-terms.js'
 import { SetActionsStreamFilter, parseSetActionsBlock } from './setactions-stream-filter.js'
 import { injectPendingActions } from './tools/set-actions.js'
 import { readFileSync } from 'fs'
+import { checkAvailableHints, markHintShown } from './bestiary.js'
 
 // ─── <think> 标签流式解析器 ─────────────────────────
 // DM 用 <think>...</think> 包裹内部推理，引擎分离为 dm_thinking 事件
@@ -2613,6 +2614,14 @@ export class GameEngine {
       pendingMonster: !!session.combat?.pendingMonsterTurn,
       actions: dmEndActions,
       hasPendingTrade: dmEndHasPendingTrade,
+    }
+
+    // ─── 怪物图鉴暗示（每回合最多 1 条） ───
+    const bestiaryHints = checkAvailableHints(session)
+    if (bestiaryHints.length > 0) {
+      const hint = bestiaryHints[0]
+      markHintShown(session, hint.id)
+      yield { type: 'system_message', text: hint.hintText }
     }
 
     // 同步
