@@ -256,17 +256,16 @@ wss.on('connection', (ws: WebSocket, req) => {
   function send(type: string, data: any) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type, ...stripAnsiDeep(data) }))
-      // 日志:WS 出站消息
-      // 对高频流式事件(dm, dm_thinking)只记录长度 + 前 120 字预览,避免
-      // 日志被字符级 delta 淹没; 其它事件全量记录(通常体积小)
+      // 日志:WS 出站消息 — 全量记录结构化数据,按需 grep 查看
       try {
-        if (type === 'dm' || type === 'dm_thinking') {
+        if (type === 'dm') {
+          // dm text delta: 高频小 chunk,只记累积长度(完整文本可从前端回放)
           const text = (data as any)?.text ?? ''
-          logEvent('ws.send', {
-            type,
-            len: text.length,
-            preview: text.slice(0, 120),
-          })
+          logEvent('ws.send', { type, len: text.length, text })
+        } else if (type === 'dm_thinking') {
+          // 思考链: 全量保存,排查 DM 决策必需
+          const text = (data as any)?.text ?? ''
+          logEvent('ws.send', { type, len: text.length, text })
         } else {
           logEvent('ws.send', { type, data: summarize(data) })
         }
