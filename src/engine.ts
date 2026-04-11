@@ -358,6 +358,7 @@ export type TurnEvent =
   | { type: 'combat_narrative_actions'; actions: SceneActions }
   | { type: 'dm_thinking'; text: string }
   | { type: 'system_message'; text: string }
+  | { type: 'bestiary_hint'; text: string; npc: string; monster: string }
   /**
    * 统一的"发现"弹窗事件，承载 POI 发现、物品获取（系统发放）或两者兼有的场景。
    * - Search 同时找到 POI + 物品 → 单条事件包含 poi + items + gold（前端单一弹窗）
@@ -2621,7 +2622,7 @@ export class GameEngine {
     if (bestiaryHints.length > 0) {
       const hint = bestiaryHints[0]
       markHintShown(session, hint.id)
-      yield { type: 'system_message', text: hint.hintText }
+      yield { type: 'bestiary_hint', text: hint.hintText, npc: hint.npc, monster: hint.monster }
     }
 
     // 同步
