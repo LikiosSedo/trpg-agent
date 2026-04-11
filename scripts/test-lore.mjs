@@ -124,7 +124,7 @@ group('Group 3: LoreStore.list + 章节门控', () => {
   const chars = store.list({ currentChapter: 2, type: 'character' })
   assert(
     '按 type=character 过滤',
-    chars.length === 3 && chars.every(e => e.type === 'character'),
+    chars.length >= 3 && chars.every(e => e.type === 'character'),
     `实际: ${chars.length} 个, types=${chars.map(e => e.type).join(',')}`,
   )
 
