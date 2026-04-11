@@ -164,92 +164,105 @@ export function checkNPCCanReveal(
 // ─── 沉浸式暗示系统 ──────────────────────────────
 
 export interface BestiaryHint {
-  id: string            // 唯一标识（用于追踪是否已显示）
-  npc: string           // NPC 名
-  monster: string       // 怪物名
-  minTrust: number      // 信任度阈值
-  minChapter: number    // 章节门控
-  hintText: string      // 氛围暗示文本（玩家看到的）
+  id: string
+  npc: string
+  monster: string
+  minTrust: number
+  minChapter: number
+  triggerLocation: string   // 进入哪个区域时触发
+  hintText: string          // 回忆体文案
 }
 
-/** 暗示定义——每条都是一段沉浸式的环境观察，暗示某个 NPC 了解某种怪物 */
+/**
+ * 暗示定义 —— 回忆体：当玩家踏入相关区域时，回想起 NPC 说过的话。
+ * 叙事逻辑：冒险者进入危险地带，自然会回忆之前收集到的情报。
+ */
 export const BESTIARY_HINTS: BestiaryHint[] = [
-  // ─── Ch2 蛛母 ───
-  {
-    id: 'hint_yelu_spider',
-    npc: '叶绿', monster: 'Spider Matriarch', minTrust: 2, minChapter: 2,
-    hintText: '你注意到叶绿在调配药剂时，手边多了几瓶橙红色的油脂。她低头自语："蛛丝的颜色不对……完全不对……"',
-  },
+  // ─── 踏入暮色森林 → 回忆关于蛛母的警告 ───
   {
     id: 'hint_greg_spider',
     npc: '格雷格', monster: 'Spider Matriarch', minTrust: 1, minChapter: 2,
-    hintText: '格雷格把一把旧战锤放在吧台上擦拭，看着窗外暮色森林的方向叹了口气。"那些蜘蛛越来越不对劲了，"他嘟囔着。',
+    triggerLocation: 'twilight-woods',
+    hintText: '格雷格的话在耳边回响：「那些蜘蛛越来越不对劲了。」他擦拭旧战锤时望向森林的叹息，此刻有了分量。',
+  },
+  {
+    id: 'hint_yelu_spider',
+    npc: '叶绿', monster: 'Spider Matriarch', minTrust: 2, minChapter: 2,
+    triggerLocation: 'twilight-woods',
+    hintText: '你想起叶绿药架上那几瓶橙红色的油脂，和她低头时的自语——「蛛丝的颜色不对……完全不对……」也许该回去问问她。',
   },
   {
     id: 'hint_hanmeng_spider',
     npc: '韩猛', monster: 'Spider Matriarch', minTrust: 2, minChapter: 2,
-    hintText: '韩猛在公会任务板前皱着眉，独臂在一份报告上重重画了个圈。"这个月去暮色森林的三支队伍都折了人，不正常。"',
+    triggerLocation: 'twilight-woods',
+    hintText: '韩猛的警告浮上心头：「这个月去暮色森林的三支队伍都折了人。」他在任务板上画圈时的铁青脸色，你至今记得。',
   },
   {
     id: 'hint_xiaoli_spider',
     npc: '小莉', monster: 'Spider Matriarch', minTrust: 0, minChapter: 2,
-    hintText: '小莉突然抓住你的衣角，眼神空洞地望向远方："紫色的丝线……好多好多……连着地底下什么很可怕的东西……"',
+    triggerLocation: 'twilight-woods',
+    hintText: '脑海中闪过小莉空洞的眼神——「紫色的丝线……好多好多……连着地底下什么很可怕的东西……」她看到了什么？',
   },
 
-  // ─── Ch3 暗影编织者 ───
+  // ─── 踏入灰脊矿道 → 回忆关于暗影编织者的线索 ───
   {
     id: 'hint_grom_shadow',
     npc: '格罗姆', monster: 'Shadow Weaver', minTrust: 3, minChapter: 3,
-    hintText: '格罗姆在工作台上反复打磨一块泛着银光的矿石，神色凝重。"矿道下面有些东西……"他低声自语，"不是铁能对付的。"',
+    triggerLocation: 'greyspine-mines',
+    hintText: '踏入矿道时，格罗姆的话浮上心头：「矿道下面有些东西……不是铁能对付的。」他打磨灵银矿石时的凝重神色，此刻格外清晰。',
   },
   {
     id: 'hint_elena_shadow',
     npc: '艾琳娜', monster: 'Shadow Weaver', minTrust: 4, minChapter: 3,
-    hintText: '你经过公会书房时，看到艾琳娜在翻阅一本古旧的典籍，书页上绘有光芒刺穿黑暗的图案。她翻页的手微微颤抖。',
+    triggerLocation: 'greyspine-mines',
+    hintText: '艾琳娜翻阅古籍时颤抖的手指浮现在眼前——书页上光芒刺穿黑暗的图案。她似乎知道矿道下面潜伏着什么。',
   },
   {
     id: 'hint_xiaoli_shadow',
     npc: '小莉', monster: 'Shadow Weaver', minTrust: 0, minChapter: 3,
-    hintText: '小莉蹲在墙角画着什么，走近看是一团漆黑中浮着两个微弱的光点。"它在矿道下面等着呢，"她平静地说，"吃了好多人的灵魂。"',
+    triggerLocation: 'greyspine-mines',
+    hintText: '脑海中闪过小莉画的那幅画——漆黑中浮着两个微弱的光点。「它在矿道下面等着呢，吃了好多人的灵魂。」',
   },
 
-  // ─── Ch4 蚀日兽 ───
+  // ─── 踏入碎石荒原 → 回忆关于蚀日兽的预警 ───
   {
     id: 'hint_elena_eclipsed',
     npc: '艾琳娜', monster: 'Eclipsed Beast', minTrust: 6, minChapter: 4,
-    hintText: '艾琳娜独自站在公会大厅的窗前，望向碎石荒原的方向。你从未见过她眼中有这样的神色——像是三百年前某段记忆被唤醒的痛楚。"它醒了，"她轻声说，"那个不该存在的东西。"',
+    triggerLocation: 'shatterstone-wastes',
+    hintText: '艾琳娜站在窗前望向荒原的身影浮现在眼前。「它醒了，那个不该存在的东西。」三百年前的记忆被唤醒时的神色，让你不寒而栗。',
   },
   {
     id: 'hint_xiaoli_eclipsed',
     npc: '小莉', monster: 'Eclipsed Beast', minTrust: 4, minChapter: 4,
-    hintText: '小莉面色苍白地望着远方，紧紧抱着自己。"那个东西……不是活的……是虚空在呼吸……但我看到了光……一把发光的锤子……"',
+    triggerLocation: 'shatterstone-wastes',
+    hintText: '小莉苍白的面容在脑海中闪过——「那个东西……不是活的……是虚空在呼吸……但我看到了光……一把发光的锤子……」',
   },
   {
     id: 'hint_hanmeng_eclipsed',
     npc: '韩猛', monster: 'Eclipsed Beast', minTrust: 3, minChapter: 4,
-    hintText: '韩猛把一份侦察报告拍在桌上，脸色铁青。"碎石荒原的最后一支侦察队——五个人去，两个回来。那两个到现在还不敢开口说话。"',
+    triggerLocation: 'shatterstone-wastes',
+    hintText: '韩猛拍桌时的铁青脸色浮上心头：「五个人去，两个回来。那两个到现在还不敢开口说话。」',
   },
 ]
 
 /**
  * 检查当前回合是否有新的暗示可以触发
- * 返回本回合应该显示的暗示列表（已过滤掉已显示的）
+ * 核心逻辑：只在玩家**当前所在区域**匹配暗示的 triggerLocation 时才触发
  */
 export function checkAvailableHints(session: GameSession): BestiaryHint[] {
   const currentChapter = parseInt(session.chapter?.currentChapter?.replace('ch', '') ?? '1')
+  const currentLocation = session.worldState.currentLocation
   const shownHints: string[] = (session.worldState.flags['shown_bestiary_hints'] as string || '').split(',').filter(Boolean)
 
   const available: BestiaryHint[] = []
 
   for (const hint of BESTIARY_HINTS) {
-    // 已显示过
     if (shownHints.includes(hint.id)) continue
-    // 章节门控
+    // 区域匹配：只在相关区域触发
+    if (hint.triggerLocation !== currentLocation) continue
     if (currentChapter < hint.minChapter) continue
-    // 信任度门控
     const npc = session.npcs.find(n => n.name === hint.npc)
     if (!npc || npc.trust < hint.minTrust) continue
-    // 如果这个怪物的弱点已经完全已知，不再暗示
     const bestiary = session.player.bestiary?.[hint.monster]
     if (bestiary?.weaknessKnown && bestiary?.resistanceKnown && bestiary?.immunityKnown) continue
 
