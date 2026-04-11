@@ -3147,6 +3147,11 @@
     .combat-log-bestiary { color: #f0c060; }
     .combat-log-grapple { color: #a9e34b; }
     .combat-log-break { color: #ffa94d; }
+
+    /* ─── 叙事实体高亮 ─── */
+    .hl-npc { color: #e8d4a0; }       /* 金色 - NPC名 */
+    .hl-location { color: #5fb3b3; }  /* 青色 - 地点 */
+    .hl-item { color: #98c379; }      /* 绿色 - 物品 */
   </style>
 </head>
 
@@ -5193,7 +5198,9 @@
               .replace(/^---+$/gm, '')               // --- 分隔线
               .replace(/^#{1,3}\s/gm, '')            // ### headers
               .replace(/\n{3,}/g, '\n\n')            // 多余空行
-            currentDmDiv.textContent = cleanText
+            // 实体高亮：NPC名/地点/物品着色
+            var highlightedHtml = highlightNarrativeEntities(esc(cleanText))
+            currentDmDiv.innerHTML = highlightedHtml
             currentDmDiv._fullText = cleanText
             saveMessage('dm', cleanText)
           }
@@ -5615,6 +5622,9 @@
         safeText = safeText.replace(/💪[^<\n]*/g, '<span class="combat-log-grapple">$&</span>')
         safeText = safeText.replace(/🔨[^<\n]*/g, '<span class="combat-log-break">$&</span>')
         div.innerHTML = safeText
+      } else if (cls === 'dm' || cls === 'prologue' || cls === 'system' || cls === 'combat-narrative') {
+        // 叙事类消息应用实体高亮
+        div.innerHTML = highlightNarrativeEntities(esc(text))
       } else {
         div.textContent = text
       }
@@ -5624,6 +5634,86 @@
       const container = document.getElementById('messages')
       container.appendChild(div)
       smartScrollToBottom()
+    }
+
+    /**
+     * 叙事实体高亮 — 在 DM 文本中着色 NPC名/地点/物品
+     * 输入是已 esc() 转义的安全文本，输出是带 span 的 HTML
+     */
+    function highlightNarrativeEntities(safeText) {
+      var session = getSavedSession()
+      if (!session) return safeText
+
+      // ─── NPC 名（金色）───
+      var npcNames = (session.npcs || []).map(function(n) { return n.name })
+      // 追加常用别名
+      npcNames.push('格雷格', '艾琳娜', '韩猛', '格罗姆', '卡恩', '维克多', '陈妈', '叶绿', '小莉')
+      // 去重
+      npcNames = npcNames.filter(function(v, i, a) { return a.indexOf(v) === i && v.length > 1 })
+
+      // ─── 地点名（青色）───
+      var locationNames = [
+        '破晓镇', '暮色森林', '灰脊矿道', '碎石荒原',
+        '镇中广场', '晨光石碑', '破晓旅店', '铁砧铺', '草药堂',
+        '冒险者公会', '公会', '镇长府', '银鳞商会', '碎盾亭',
+        '旧伐木场', '猎人石屋', '月光池', '森林入口',
+        '矿道上层', '废弃营房', '深渊祭坛', '虚空棱镜',
+        '荒原入口', '兽人营地', '古代墓冢', '废弃瞭望塔',
+      ]
+
+      // ─── 物品名（绿色）───
+      var itemNames = []
+      if (session.player) {
+        if (session.player.inventory) {
+          session.player.inventory.forEach(function(item) {
+            if (item.name && item.name.length > 1) itemNames.push(item.name)
+          })
+        }
+        if (session.player.equipped) {
+          if (session.player.equipped.weapon) itemNames.push(session.player.equipped.weapon.name)
+          if (session.player.equipped.armor) itemNames.push(session.player.equipped.armor.name)
+        }
+      }
+      // 追加常见重要物品（不在背包也应高亮）
+      var knownItems = [
+        '灵银长剑', '破晓战锤', '晨光护胸甲', '强化皮甲', '锁子甲',
+        '火焰油', '银油', '冰霜油', '雷击粉',
+        '治疗药水', '强效治疗药水', '暗影防护药水', '解毒剂', '防火药膏', '抗麻痹药剂',
+        '草药绷带', '火把', '矿道钥匙', '达里安的日志',
+        '蛛母毒腺', '暗影核心', '虚空碎片', '暗影水晶', '暗影精华',
+      ]
+      knownItems.forEach(function(name) {
+        if (itemNames.indexOf(name) === -1) itemNames.push(name)
+      })
+      itemNames = itemNames.filter(function(v, i, a) { return a.indexOf(v) === i && v.length > 1 })
+
+      // 按长度降序排序（防止短名被先匹配：如"公会"不应覆盖"冒险者公会"）
+      function sortByLenDesc(arr) { return arr.sort(function(a, b) { return b.length - a.length }) }
+
+      // 构建替换函数（避免重复高亮：已在 span 标签内的不再匹配）
+      function highlightGroup(text, names, cssClass) {
+        if (names.length === 0) return text
+        sortByLenDesc(names)
+        var pattern = new RegExp('(' + names.map(function(n) {
+          return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        }).join('|') + ')', 'g')
+        // 分段处理：只替换不在 HTML 标签内的文本
+        var parts = text.split(/(<[^>]+>)/)
+        for (var i = 0; i < parts.length; i++) {
+          // 奇数索引是 HTML 标签，跳过
+          if (i % 2 === 1) continue
+          parts[i] = parts[i].replace(pattern, '<span class="' + cssClass + '">$1</span>')
+        }
+        return parts.join('')
+      }
+
+      // 按优先级应用：物品 → 地点 → NPC（先标记的不会被后续覆盖，因为已在 span 内）
+      var result = safeText
+      result = highlightGroup(result, itemNames, 'hl-item')
+      result = highlightGroup(result, locationNames, 'hl-location')
+      result = highlightGroup(result, npcNames, 'hl-npc')
+
+      return result
     }
 
     // ─── 战斗面板 ───
