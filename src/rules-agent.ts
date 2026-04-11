@@ -275,12 +275,12 @@ export function formatActionResult(result: ActionResult): string {
 
   const desc = descMap[result.action.type]?.(result.action) ?? result.action.type
   return [
-    `[规则系统执行结果]`,
+    `[规则系统执行结果]（代码已执行完毕，以下是事实，直接编织成叙事）`,
     `玩家意图：${desc}`,
     `执行${result.success ? '成功' : '失败'}：`,
     result.output,
     '',
-    '请基于以上结果进行叙事描写。不要修改任何数值，不要重复调用已执行的工具。',
+    '基于以上结果编织叙事。不要重新执行动作，不要修改数值，不要重复调用已执行的工具。',
   ].join('\n')
 }
 

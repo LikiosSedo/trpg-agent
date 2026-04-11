@@ -172,7 +172,7 @@ export async function* dmRespond(playerInput: string): AsyncGenerator<any> {
   const chapterCtx = getChapterContext()
   const message = [
     `[游戏状态]\n${context}`,
-    chapterCtx ? `\n[章节剧本]\n${chapterCtx}` : '',
+    chapterCtx ? `\n[章节剧本]（本章要传达的叙事素材，请自然融入，不要跳过）\n${chapterCtx}` : '',
     `\n[玩家输入]\n${playerInput}`,
   ].filter(Boolean).join('\n')
   yield* dm.run(message)
