@@ -89,7 +89,11 @@ export function initDMAgent(): void {
       RecordJournalTool,
     ],
     systemPrompt: buildDMPrompt(),
-    maxTurns: 20,
+    // 每次 run() 最多 5 轮 tool-call 循环。
+    // 以前是 20 —— 导致 DM 一轮里调 Move→Talk→Move→Talk 跑完整章。
+    // 5 足够处理: ReadLore → Talk → ChangeTrust → SetActions + 余量,
+    // 但不够连续 Move 到多个地点开启多个场景。
+    maxTurns: 5,
     apiThrottleMs: 1500,
     // Phase 4: 上下文压缩 —— token >= 60% 阈值时把早期对话压成"归档快照"
     // 消息(从 session 代码生成,零 LLM 调用)。最近 12 turn 完整保留。
