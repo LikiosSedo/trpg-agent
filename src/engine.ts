@@ -5,7 +5,7 @@
  * 所有命令处理、回合管道、存档管理都在这里。
  */
 
-import type { GameSession } from './types.js'
+import type { GameSession, Monster } from './types.js'
 import { initGameState, getSession, setSession, getFacts, initItemRegistry, advanceTime } from './game-state.js'
 import { CLASS_TEMPLATES, createGameSession, createInitialNPCs } from './game-data.js'
 import { GameFactStore } from './game-facts.js'
@@ -1569,7 +1569,7 @@ export class GameEngine {
 
         const monstersJson = await import('../data/monsters.json', { with: { type: 'json' } })
         const npcCombatJson = await import('../data/npc-combatants.json', { with: { type: 'json' } })
-        const allDb = [...monstersJson.default, ...npcCombatJson.default]
+        const allDb = [...monstersJson.default, ...npcCombatJson.default] as Monster[]
 
         try {
           const combat = startCombat(session, [hostileNPC], allDb)

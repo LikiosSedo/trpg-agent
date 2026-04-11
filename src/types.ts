@@ -11,6 +11,11 @@ export interface AbilityScores {
 
 export type Ability = keyof AbilityScores
 
+export type DamageType =
+  | 'slashing' | 'piercing' | 'bludgeoning'  // 物理
+  | 'fire' | 'cold' | 'lightning'             // 元素
+  | 'radiant' | 'necrotic'                    // 特殊
+
 export type Skill =
   | 'athletics' | 'acrobatics' | 'sleight_of_hand' | 'stealth'
   | 'investigation' | 'arcana'
@@ -26,6 +31,8 @@ export interface Item {
   type: ItemType
   description: string
   bonus?: number // 武器攻击加值 / 护甲AC加值 / 药水恢复量
+  damageType?: DamageType       // 武器伤害类型 / 涂层附加类型
+  bonusDamageType?: DamageType  // 次要伤害类型（如灵银长剑的 radiant）
 }
 
 // ─── 效果系统 ───────────────────────────────────
@@ -71,6 +78,24 @@ export interface Monster {
   specialAbility: string
   description: string
   loot: string[]
+  vulnerability?: DamageType[]  // 弱点：受到该类型伤害 ×2
+  resistance?: DamageType[]     // 抗性：受到该类型伤害 ×0.5
+  immunity?: DamageType[]       // 免疫：该类型伤害无效
+  discoveryHints?: {
+    npc?: string                // 哪个 NPC 知道弱点信息
+    npcMinTrust?: number        // 需要多少信任度才告知
+    location?: string           // 哪个位置可搜索到情报
+    skillCheck?: { skill: string; dc: number }
+  }
+}
+
+/** 怪物图鉴条目 —— 记录玩家对每种怪物的了解程度 */
+export interface BestiaryEntry {
+  encountered: boolean          // 是否遭遇过
+  weaknessKnown: boolean        // 是否知道弱点
+  resistanceKnown: boolean      // 是否知道抗性
+  immunityKnown: boolean        // 是否知道免疫
+  notes: string[]               // 从 NPC/探索/战斗中获取的情报
 }
 
 // ─── 战斗状态 ─────────────────────────────────
@@ -90,6 +115,9 @@ export interface MonsterInstance {
   loot: string[]
   conditions: string[]  // 状态效果，如 'paralyzed'
   nonlethal?: boolean   // 是否为无辜NPC（击败后会恢复）
+  vulnerability?: DamageType[]
+  resistance?: DamageType[]
+  immunity?: DamageType[]
 }
 
 /** 战斗中的 NPC 同伴运行时实例 */
@@ -103,6 +131,14 @@ export interface AllyInstance {
   damageDice: string
   specialAbility: string
   combatBehavior: string  // 'subdue' | 'kill' | etc.
+  allyRole?: 'tank' | 'dps' | 'support' | 'control'
+  allyAbility?: {
+    name: string        // 技能名（如"铁壁守护"）
+    effect: string      // 效果类型标识（如"taunt"）
+    description: string
+    cooldown?: number   // 冷却回合数
+  }
+  damageType?: DamageType  // 同伴攻击的默认伤害类型
 }
 
 /** 先攻序列中的一个条目 */
@@ -211,6 +247,7 @@ export interface PlayerCharacter {
     armor?: Item
   }
   activeEffects?: ActiveEffect[]
+  bestiary?: Record<string, BestiaryEntry>  // 怪物图鉴
 }
 
 // ─── 事件 ──────────────────────────────────────

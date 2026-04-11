@@ -3,19 +3,22 @@
     "name": "短剑",
     "type": "weapon",
     "description": "轻便的刺击武器，深受盗贼喜爱。造成1d6穿刺伤害。",
-    "bonus": 0
+    "bonus": 0,
+    "damageType": "piercing"
   },
   {
     "name": "长剑",
     "type": "weapon",
     "description": "多用途格斗武器。造成1d8劈砍伤害。",
-    "bonus": 0
+    "bonus": 0,
+    "damageType": "slashing"
   },
   {
     "name": "短弓",
     "type": "weapon",
     "description": "简易远程武器，射程80尺。造成1d6穿刺伤害。",
-    "bonus": 0
+    "bonus": 0,
+    "damageType": "piercing"
   },
   {
     "name": "皮甲",
@@ -27,7 +30,8 @@
     "name": "短剑 +1",
     "type": "weapon",
     "description": "精良短剑，轻便趁手。造成1d6+1穿刺伤害。",
-    "bonus": 1
+    "bonus": 1,
+    "damageType": "piercing"
   },
   {
     "name": "锁子甲",
@@ -39,7 +43,9 @@
     "name": "灵银长剑",
     "type": "weapon",
     "description": "矿道深处开采的灵银锻造，剑身泛着微光。造成1d8+1劈砍伤害，对亡灵额外有效。",
-    "bonus": 1
+    "bonus": 1,
+    "damageType": "slashing",
+    "bonusDamageType": "radiant"
   },
   {
     "name": "强化皮甲",
@@ -51,7 +57,9 @@
     "name": "破晓战锤",
     "type": "weapon",
     "description": "古代晨光骑士的遗物，锤头刻有驱散黑暗的符文。造成1d10+2钝击伤害。",
-    "bonus": 2
+    "bonus": 2,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "radiant"
   },
   {
     "name": "晨光护胸甲",
@@ -107,5 +115,45 @@
     "name": "火把",
     "type": "misc",
     "description": "普通火把，燃烧1小时，在20尺半径内提供明亮光照。"
+  },
+  {
+    "name": "火焰油",
+    "type": "misc",
+    "description": "由炎石粉和油脂混合而成的涂层。涂抹在武器上，下一场战斗中武器附加火焰伤害类型。",
+    "damageType": "fire",
+    "basePrice": 20
+  },
+  {
+    "name": "银油",
+    "type": "misc",
+    "description": "叶绿用灵银粉末和月光草调制的涂层。涂抹在武器上，下一场战斗中武器附加光辉伤害类型。克制不死和暗影。",
+    "damageType": "radiant",
+    "basePrice": 30
+  },
+  {
+    "name": "冰霜油",
+    "type": "misc",
+    "description": "寒铁粉与冰泉水调制的涂层。涂抹在武器上，下一场战斗中武器附加冰冻伤害类型。",
+    "damageType": "cold",
+    "basePrice": 20
+  },
+  {
+    "name": "雷击粉",
+    "type": "misc",
+    "description": "雷石研磨的粉末，附着于武器表面。下一场战斗中武器附加雷电伤害类型。",
+    "damageType": "lightning",
+    "basePrice": 25
+  },
+  {
+    "name": "防火药膏",
+    "type": "potion",
+    "description": "涂抹在皮肤上的防护药膏，一场战斗内对火焰伤害有抗性（伤害减半）。",
+    "basePrice": 30
+  },
+  {
+    "name": "抗麻痹药剂",
+    "type": "potion",
+    "description": "苦涩的神经强化剂，饮用后一场战斗内免疫麻痹状态。对付食尸鬼和鸡蛇兽极为有效。",
+    "basePrice": 35
   }
 ]

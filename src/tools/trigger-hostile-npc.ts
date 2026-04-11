@@ -125,7 +125,7 @@ export const TriggerHostileNPCTool: Tool = {
         // 加载战斗数据
         const monstersJson = await import('../../data/monsters.json', { with: { type: 'json' } })
         const npcCombatJson = await import('../../data/npc-combatants.json', { with: { type: 'json' } })
-        const allDb: Monster[] = [...monstersJson.default, ...npcCombatJson.default]
+        const allDb = [...monstersJson.default, ...npcCombatJson.default] as Monster[]
 
         // 触发战斗
         try {

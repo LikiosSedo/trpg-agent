@@ -7,7 +7,12 @@
     "damageDice": "1d6+2",
     "specialAbility": "Nimble Escape: can Disengage or Hide as a bonus action",
     "description": "A small, cunning humanoid that fights dirty and flees when outmatched.",
-    "loot": ["锈蚀匕首", "3 gold"]
+    "loot": ["锈蚀匕首", "3 gold"],
+    "discoveryHints": {
+      "npc": "格雷格",
+      "npcMinTrust": 1,
+      "skillCheck": { "skill": "perception", "dc": 8 }
+    }
   },
   {
     "name": "Hobgoblin",
@@ -17,7 +22,12 @@
     "damageDice": "1d8+3",
     "specialAbility": "Martial Advantage: deals +2d6 damage once per turn if an ally is within 5ft of target",
     "description": "A disciplined, militaristic goblinoid that commands lesser goblins with iron authority.",
-    "loot": ["铁制弯刀", "8 gold"]
+    "loot": ["铁制弯刀", "8 gold"],
+    "discoveryHints": {
+      "npc": "韩猛",
+      "npcMinTrust": 2,
+      "skillCheck": { "skill": "investigation", "dc": 10 }
+    }
   },
   {
     "name": "Wolf",
@@ -27,7 +37,14 @@
     "damageDice": "1d8+2",
     "specialAbility": "Pack Tactics: advantage on attack if an ally is adjacent to the target",
     "description": "A large grey wolf with gleaming yellow eyes, hunting in packs through the Twilight Woods.",
-    "loot": ["狼皮", "2 gold"]
+    "loot": ["狼皮", "2 gold"],
+    "vulnerability": ["fire"],
+    "resistance": ["cold"],
+    "discoveryHints": {
+      "npc": "格雷格",
+      "npcMinTrust": 1,
+      "location": "twilight-woods"
+    }
   },
   {
     "name": "Cockatrice",
@@ -37,7 +54,14 @@
     "damageDice": "1d8+2",
     "specialAbility": "Petrifying Bite: target must pass DC 11 CON save or be restrained for 1 turn",
     "description": "A bizarre creature with the body of a rooster and the tail of a lizard. Its bite can turn flesh to stone.",
-    "loot": ["鸡蛇羽毛", "7 gold"]
+    "loot": ["鸡蛇羽毛", "7 gold"],
+    "vulnerability": ["bludgeoning"],
+    "discoveryHints": {
+      "npc": "叶绿",
+      "npcMinTrust": 3,
+      "location": "twilight-woods",
+      "skillCheck": { "skill": "arcana", "dc": 12 }
+    }
   },
   {
     "name": "Skeleton",
@@ -47,7 +71,16 @@
     "damageDice": "1d8+2",
     "specialAbility": "Undead Fortitude: drops to 1 HP instead of 0 once",
     "description": "An animated pile of bones held together by dark magic, armed with a rusty shortsword.",
-    "loot": ["骨骼碎片", "5 gold"]
+    "loot": ["骨骼碎片", "5 gold"],
+    "vulnerability": ["bludgeoning"],
+    "resistance": ["piercing"],
+    "immunity": ["necrotic"],
+    "discoveryHints": {
+      "npc": "格罗姆",
+      "npcMinTrust": 3,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "arcana", "dc": 10 }
+    }
   },
   {
     "name": "Shadow",
@@ -57,7 +90,16 @@
     "damageDice": "1d8+3",
     "specialAbility": "Strength Drain: on hit, target's STR is reduced by 1 until rest",
     "description": "A wraith of living darkness that drains the life force of the living.",
-    "loot": ["暗影精华"]
+    "loot": ["暗影精华"],
+    "vulnerability": ["radiant"],
+    "resistance": ["cold"],
+    "immunity": ["necrotic"],
+    "discoveryHints": {
+      "npc": "艾琳娜",
+      "npcMinTrust": 4,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "arcana", "dc": 13 }
+    }
   },
   {
     "name": "Giant Spider",
@@ -67,7 +109,14 @@
     "damageDice": "1d10+3",
     "specialAbility": "Web: target must pass DC 11 STR check or be restrained",
     "description": "A horse-sized spider lurking in dark corners, spinning webs to trap prey.",
-    "loot": ["蜘蛛丝", "毒腺囊"]
+    "loot": ["蜘蛛丝", "毒腺囊"],
+    "vulnerability": ["fire"],
+    "discoveryHints": {
+      "npc": "叶绿",
+      "npcMinTrust": 2,
+      "location": "twilight-woods",
+      "skillCheck": { "skill": "perception", "dc": 10 }
+    }
   },
   {
     "name": "Ghoul",
@@ -77,7 +126,15 @@
     "damageDice": "1d10+3",
     "specialAbility": "Paralyzing Touch: target must pass DC 10 CON save or be paralyzed for 1 turn",
     "description": "An undead creature that feeds on corpses, its claws carry a paralyzing toxin.",
-    "loot": ["食尸鬼爪", "8 gold"]
+    "loot": ["食尸鬼爪", "8 gold"],
+    "vulnerability": ["radiant", "fire"],
+    "immunity": ["necrotic"],
+    "discoveryHints": {
+      "npc": "格罗姆",
+      "npcMinTrust": 3,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "arcana", "dc": 12 }
+    }
   },
   {
     "name": "Orc Warrior",
@@ -87,7 +144,13 @@
     "damageDice": "1d10+4",
     "specialAbility": "Aggressive: can move its full speed toward a hostile target as a bonus action",
     "description": "A brutal fighter from the Shatterstone Wastes, wielding a massive greataxe.",
-    "loot": ["粗制巨斧", "6 gold"]
+    "loot": ["粗制巨斧", "6 gold"],
+    "discoveryHints": {
+      "npc": "韩猛",
+      "npcMinTrust": 2,
+      "location": "shatterstone-wastes",
+      "skillCheck": { "skill": "investigation", "dc": 10 }
+    }
   },
   {
     "name": "Mimic",
@@ -97,7 +160,14 @@
     "damageDice": "1d10+4",
     "specialAbility": "Shapechanger: disguised as a treasure chest; first attack has advantage",
     "description": "A creature that perfectly imitates a mining crate, striking when someone reaches inside.",
-    "loot": ["拟形怪黏液", "15 gold"]
+    "loot": ["拟形怪黏液", "15 gold"],
+    "vulnerability": ["fire"],
+    "discoveryHints": {
+      "npc": "格罗姆",
+      "npcMinTrust": 4,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "investigation", "dc": 14 }
+    }
   },
   {
     "name": "Eclipsed Beast",
@@ -107,6 +177,15 @@
     "damageDice": "2d8+4",
     "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage",
     "description": "A monstrous entity of pure shadow, herald of the Eclipsed Eye. The final threat in the Greyspine depths.",
-    "loot": ["虚空碎片", "暗影水晶", "50 gold"]
+    "loot": ["虚空碎片", "暗影水晶", "50 gold"],
+    "vulnerability": ["radiant"],
+    "resistance": ["slashing", "piercing", "cold"],
+    "immunity": ["necrotic"],
+    "discoveryHints": {
+      "npc": "艾琳娜",
+      "npcMinTrust": 6,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "arcana", "dc": 16 }
+    }
   }
 ]

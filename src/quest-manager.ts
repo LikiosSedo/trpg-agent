@@ -4,9 +4,10 @@
  * 管理任务生命周期：接取 → 追踪目标 → 完成/失败 → 发放奖励 → 升级。
  */
 
-import type { GameSession, Quest, PlayerCharacter } from './types.js'
+import type { GameSession, Quest, PlayerCharacter, Spell, Ability } from './types.js'
 import { getFacts, getSession } from './game-state.js'
 import { changeTrust } from './trust-system.js'
+import { computeModifiers } from './game-data.js'
 
 // ─── 怪物中英名映射（用于击杀目标匹配）──────────
 
@@ -55,8 +56,9 @@ export const QUEST_TEMPLATES: Record<string, QuestTemplate> = {
 // ─── 等级阈值 ──────────────────────────────────
 
 const LEVEL_THRESHOLDS: { level: number; xp: number }[] = [
-  { level: 2, xp: 100 },
-  { level: 3, xp: 300 },
+  { level: 6, xp: 100 },
+  { level: 7, xp: 300 },
+  { level: 8, xp: 600 },
 ]
 
 // ─── QuestManager ──────────────────────────────
@@ -146,22 +148,41 @@ export class QuestManager {
     for (const { level, xp } of LEVEL_THRESHOLDS) {
       if (player.level < level && player.xp >= xp) {
         player.level = level
+
+        // ── 所有等级：HP +5 ──
         player.maxHp += 5
         player.hp = Math.min(player.hp + 5, player.maxHp)
 
-        // Lv3 法师解锁 Fireball
-        if (level === 3 && player.spells.length > 0) {
-          player.spells.push({
-            name: 'Fireball',
-            description: '爆裂火球，范围伤害',
-            effect: 'Deal 8d6 fire damage in a 20-foot radius (DEX save for half).',
-            usesPerRest: 1,
-            remaining: 1,
-          })
+        const log: string[] = ['生命上限+5']
+
+        // ── Level 6：主属性 +1 ──
+        if (level === 6) {
+          const primary = detectPrimaryAbility(player)
+          player.abilities[primary] += 1
+          player.abilityModifiers = computeModifiers(player.abilities)
+          log.push(`${primary} 提升至 ${player.abilities[primary]}`)
         }
 
-        const flavor = this.getLevelUpFlavor(player, level)
-        getFacts().addEvent(`升级！达到 Lv${level}（HP+5${level === 3 && player.spells.length > 0 ? ', 解锁Fireball' : ''}）`, 'critical')
+        // ── Level 7：职业新技能 ──
+        if (level === 7) {
+          const newSpell = getLevel7Spell(player)
+          if (newSpell && !player.spells.some(s => s.name === newSpell.name)) {
+            player.spells.push(newSpell)
+            log.push(`习得新技能: ${newSpell.name}`)
+          }
+        }
+
+        // ── Level 8：被动特技（存入 worldState.flags）──
+        if (level === 8) {
+          const passive = getLevel8Passive(player)
+          if (passive) {
+            this.session.worldState.flags[`passive_${passive.id}`] = 'true'
+            log.push(`获得被动特技: ${passive.name} — ${passive.description}`)
+          }
+        }
+
+        const flavor = this.getLevelUpFlavor(player, level, log)
+        getFacts().addEvent(`升级！达到 Lv${level}（${log.join(', ')}）`, 'critical')
         return { level, flavor }
       }
     }
@@ -169,29 +190,37 @@ export class QuestManager {
   }
 
   /** 升级时的职业特色描述 */
-  private getLevelUpFlavor(player: PlayerCharacter, level: number): string {
-    const hasSpells = player.spells.length > 0
-    const isHealer = player.spells.some(s => s.name === 'Cure Wounds')
+  private getLevelUpFlavor(player: PlayerCharacter, level: number, log: string[]): string {
+    const rewards = log.join('，')
 
-    if (isHealer) {
-      // 牧师
-      return level === 2
-        ? '神圣之光在你掌心凝聚，信仰的力量更加坚定。生命上限+5。'
-        : '你感到与神祇的联系愈发紧密，治愈之力涌遍全身。生命上限+5。'
+    // 按职业和等级生成不同的叙事
+    const isCleric = player.spells.some(s => s.name === 'Cure Wounds') && player.skills.includes('medicine')
+    const isMage = player.skills.includes('arcana')
+    const isRanger = player.skills.includes('stealth') && player.skills.includes('perception')
+    // Fighter: fallback
+
+    if (level === 6) {
+      if (isCleric) return `神圣之光在你掌心凝聚，信仰的力量更加坚定。你感到神祇的恩赐流入身体的每一寸。${rewards}。`
+      if (isMage) return `魔力在血管中奔涌，奥术符文在脑海中更加清晰。你的智慧达到了新的境界。${rewards}。`
+      if (isRanger) return `你的感官变得更加敏锐，风中最细微的气息也逃不过你的觉察。${rewards}。`
+      return `力量涌上手臂，肌肉在战斗的磨砺中变得更加坚韧。每一次挥剑都比昨天更有力。${rewards}。`
     }
-    if (hasSpells) {
-      // 法师
-      if (level === 3) {
-        return '奥术领悟加深——你的手指间跳动着新的火焰。习得 Fireball！生命上限+5。'
-      }
-      return '魔力在血管中奔涌，奥术符文在脑海中更加清晰。生命上限+5。'
+
+    if (level === 7) {
+      if (isCleric) return `你与神祇的联结愈发紧密——一股神圣的怒意在指尖凝聚，足以斥退亡灵。${rewards}。`
+      if (isMage) return `奥术领悟加深——你的手指间跳动着新的火焰，更强大的法术已在掌握之中。${rewards}。`
+      if (isRanger) return `你的眼睛适应了黑暗与距离——箭矢将比以往任何时候都更加精准致命。${rewards}。`
+      return `无数次战斗的磨砺赋予了你超越常人的战斗直觉——你学会了如何让每一击都命中要害。${rewards}。`
     }
-    // 战士/游侠等物理职业
-    const highDex = player.abilityModifiers.DEX > player.abilityModifiers.STR
-    if (highDex) {
-      return '你的身体变得更加敏捷，直觉在战斗中愈发锐利。生命上限+5。'
+
+    if (level === 8) {
+      if (isCleric) return `神恩如潮水般涌来，你的治愈之力获得了质的飞跃。伤者在你手下将恢复得更快。${rewards}。`
+      if (isMage) return `奥术之力在你体内共鸣——每一个法术都被增幅，威力远超从前。${rewards}。`
+      if (isRanger) return `你的反射速度已经超越了凡人的极限——在敌人反应过来之前，你就已经完成了动作。${rewards}。`
+      return `你对战斗的理解已臻化境——致命一击的时机，你比任何人都看得更准。${rewards}。`
     }
-    return '力量涌上手臂，肌肉在战斗的磨砺中变得更加坚韧。生命上限+5。'
+
+    return `你变得更加强大了。${rewards}。`
   }
 
   /** 根据击杀数按怪物名检查所有活跃任务的击杀目标。
@@ -228,4 +257,84 @@ export class QuestManager {
 
     return { completed, progress }
   }
+}
+
+// ─── 升级辅助函数 ─────────────────────────────
+
+/** 根据职业推断主属性 */
+function detectPrimaryAbility(player: PlayerCharacter): Ability {
+  // 按职业技能推断，比盲目取最高值更准确
+  if (player.skills.includes('arcana')) return 'INT'        // Mage
+  if (player.skills.includes('medicine')) return 'WIS'      // Cleric
+  if (player.skills.includes('stealth') && player.skills.includes('perception')) return 'DEX'  // Ranger
+  if (player.skills.includes('athletics')) return 'STR'     // Fighter
+  // fallback: 取最高属性
+  let best: Ability = 'STR'
+  let bestVal = 0
+  for (const key of ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as Ability[]) {
+    if (player.abilities[key] > bestVal) { bestVal = player.abilities[key]; best = key }
+  }
+  return best
+}
+
+/** Level 7 职业技能。法师已在 game-data 模板中自带 Fireball，此处为其他职业补充新技能。 */
+function getLevel7Spell(player: PlayerCharacter): Spell | null {
+  if (player.skills.includes('arcana')) {
+    // 法师：已有 Fireball，解锁 Ice Storm
+    return {
+      name: 'Ice Storm',
+      description: '冰风暴',
+      effect: 'Deal 2d8 bludgeoning + 4d6 cold damage in a 20ft radius. DEX save DC 14 for half.',
+      usesPerRest: 1,
+      remaining: 1,
+    }
+  }
+  if (player.skills.includes('athletics')) {
+    // Fighter: 战术打击
+    return {
+      name: 'Tactical Strike',
+      description: '战术打击——精准一击，自动命中并额外造成1d6伤害',
+      effect: 'Next attack auto-hits. Deal extra 1d6 damage.',
+      usesPerRest: 2,
+      remaining: 2,
+    }
+  }
+  if (player.skills.includes('stealth') && player.skills.includes('perception')) {
+    // Ranger: 精准射击
+    return {
+      name: 'Precise Shot',
+      description: '精准射击——瞄准要害，攻击+4命中，额外造成2d6伤害',
+      effect: '+4 to hit. Deal extra 2d6 damage.',
+      usesPerRest: 2,
+      remaining: 2,
+    }
+  }
+  if (player.skills.includes('medicine')) {
+    // Cleric: 神圣斥责
+    return {
+      name: 'Turn Undead',
+      description: '神圣斥责——释放神圣之力，对所有不死系怪物造成3d6光辉伤害',
+      effect: 'Deal 3d6 radiant damage to all undead enemies.',
+      usesPerRest: 2,
+      remaining: 2,
+    }
+  }
+  return null
+}
+
+/** Level 8 被动特技定义 */
+function getLevel8Passive(player: PlayerCharacter): { id: string; name: string; description: string } | null {
+  if (player.skills.includes('athletics')) {
+    return { id: 'fighter_crit_range', name: '致命精准', description: '暴击范围扩展至19-20' }
+  }
+  if (player.skills.includes('arcana')) {
+    return { id: 'mage_spell_power', name: '奥术增幅', description: '所有法术伤害+2' }
+  }
+  if (player.skills.includes('stealth') && player.skills.includes('perception')) {
+    return { id: 'ranger_quick_reflexes', name: '超凡反射', description: '先攻永久+3' }
+  }
+  if (player.skills.includes('medicine')) {
+    return { id: 'cleric_divine_grace', name: '神恩', description: '治疗法术恢复量+50%' }
+  }
+  return null
 }

@@ -11,6 +11,14 @@
     "loot": [],
     "nonlethal": true,
     "combatBehavior": "subdue",
+    "allyRole": "tank",
+    "allyAbility": {
+      "name": "铁壁守护",
+      "effect": "taunt",
+      "description": "格雷格怒吼嘲讽，迫使怪物优先攻击他（怪物选择目标时格雷格权重×3）",
+      "cooldown": 0
+    },
+    "damageType": "slashing",
     "recoveryTurns": 5
   },
   {
@@ -25,6 +33,14 @@
     "loot": [],
     "nonlethal": false,
     "combatBehavior": "fight",
+    "allyRole": "dps",
+    "allyAbility": {
+      "name": "银光箭",
+      "effect": "radiant_attack",
+      "description": "艾琳娜的攻击附带光辉伤害，对不死和暗影生物造成弱点伤害",
+      "cooldown": 0
+    },
+    "damageType": "radiant",
     "recoveryTurns": 4
   },
   {
@@ -39,6 +55,14 @@
     "loot": [],
     "nonlethal": true,
     "combatBehavior": "subdue",
+    "allyRole": "control",
+    "allyAbility": {
+      "name": "铁臂擒拿",
+      "effect": "grapple",
+      "description": "韩猛用独臂擒住一个敌人，每回合50%概率束缚目标（目标跳过该回合行动）",
+      "cooldown": 0
+    },
+    "damageType": "bludgeoning",
     "recoveryTurns": 6
   },
   {
@@ -53,6 +77,14 @@
     "loot": [],
     "nonlethal": false,
     "combatBehavior": "kill",
+    "allyRole": "dps",
+    "allyAbility": {
+      "name": "破甲重击",
+      "effect": "armor_break",
+      "description": "格罗姆的锤击能削弱敌人护甲，每次命中目标AC-1（最多叠加3次）",
+      "cooldown": 0
+    },
+    "damageType": "bludgeoning",
     "recoveryTurns": 7
   },
   {
@@ -67,6 +99,14 @@
     "loot": ["暗影水晶"],
     "nonlethal": false,
     "combatBehavior": "hidden_power",
+    "allyRole": "dps",
+    "allyAbility": {
+      "name": "虚空共鸣",
+      "effect": "void_resonance",
+      "description": "卡恩的攻击附带暗蚀伤害，命中时目标DC14感知豁免否则恐惧1回合",
+      "cooldown": 2
+    },
+    "damageType": "necrotic",
     "recoveryTurns": 5
   },
   {
@@ -137,6 +177,14 @@
     "loot": [],
     "nonlethal": true,
     "combatBehavior": "subdue",
+    "allyRole": "tank",
+    "allyAbility": {
+      "name": "守护姿态",
+      "effect": "guardian_stance",
+      "description": "卫兵进入守护姿态时，被保护目标AC+2",
+      "cooldown": 0
+    },
+    "damageType": "piercing",
     "recoveryTurns": 8
   }
 ]

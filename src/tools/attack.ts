@@ -65,8 +65,8 @@ export const AttackTool: Tool = {
     // 加载怪物 + NPC 战斗数据库（统一格式）
     const monstersJson = await import('../../data/monsters.json', { with: { type: 'json' } })
     const npcCombatJson = await import('../../data/npc-combatants.json', { with: { type: 'json' } })
-    const monstersDb: Monster[] = monstersJson.default
-    const npcDb: Monster[] = npcCombatJson.default
+    const monstersDb = monstersJson.default as Monster[]
+    const npcDb = npcCombatJson.default as Monster[]
 
     // 检查目标是否是 NPC
     const targetNpc = session.npcs.find(n => n.name === targetId)
