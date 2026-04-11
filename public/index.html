@@ -3136,6 +3136,9 @@
     .bestiary-tag.resist { background: rgba(100,150,255,0.2); color: #88aaff; }
     .bestiary-tag.immune { background: rgba(150,150,150,0.2); color: #aaa; }
     .bestiary-tag.unknown { background: rgba(255,255,255,0.05); color: #666; }
+    .bestiary-area-label { font-size: 0.82em; color: #5fb3b3; text-transform: uppercase; letter-spacing: 1px; padding: 12px 0 6px; border-bottom: 1px solid rgba(95,179,179,0.15); margin-bottom: 8px; }
+    .bestiary-card.boss { border-color: rgba(255,100,100,0.25); }
+    .bestiary-boss-badge { font-size: 0.65em; color: #ff6b6b; background: rgba(255,100,100,0.15); padding: 1px 6px; border-radius: 3px; vertical-align: middle; letter-spacing: 1px; }
     .bestiary-notes { margin-top: 6px; font-size: 0.82em; color: #999; }
     .bestiary-note { padding: 2px 0; }
     .panel-empty { text-align: center; padding: 40px 20px; color: #666; }
@@ -4717,62 +4720,153 @@
   <input type="file" id="save-upload" accept=".json" style="display:none" onchange="uploadSave(this)">`
     }
 
+    // ─── 怪物图鉴数据映射（前端静态，与 monsters.json + npc-combatants.json 同步）───
+    var BESTIARY_DB = {
+      'Goblin':           { zh: '哥布林',     area: 'twilight-woods',     vuln: [], resist: [], immune: [] },
+      'Hobgoblin':        { zh: '大哥布林',   area: 'twilight-woods',     vuln: [], resist: [], immune: [] },
+      'Wolf':             { zh: '野狼',       area: 'twilight-woods',     vuln: ['火焰'], resist: ['冰冻'], immune: [] },
+      'Cockatrice':       { zh: '鸡蛇兽',     area: 'twilight-woods',     vuln: ['钝击'], resist: [], immune: [] },
+      'Spider Matriarch': { zh: '蛛母·织暗者', area: 'twilight-woods',    vuln: ['火焰'], resist: ['穿刺'], immune: [] },
+      'Giant Spider':     { zh: '巨型蜘蛛',   area: 'twilight-woods',     vuln: ['火焰'], resist: [], immune: [] },
+      'Skeleton':         { zh: '骷髅',       area: 'greyspine-mines',    vuln: ['钝击'], resist: ['穿刺'], immune: ['暗蚀'] },
+      'Shadow':           { zh: '暗影',       area: 'greyspine-mines',    vuln: ['光辉'], resist: ['冰冻'], immune: ['暗蚀'] },
+      'Shadow Weaver':    { zh: '暗影编织者', area: 'greyspine-mines',    vuln: ['光辉'], resist: ['斩击','穿刺'], immune: ['暗蚀'] },
+      'Ghoul':            { zh: '食尸鬼',     area: 'greyspine-mines',    vuln: ['光辉','火焰'], resist: [], immune: ['暗蚀'] },
+      'Mimic':            { zh: '拟态怪',     area: 'greyspine-mines',    vuln: ['火焰'], resist: [], immune: [] },
+      'Orc Warrior':      { zh: '兽人战士',   area: 'shatterstone-wastes', vuln: [], resist: [], immune: [] },
+      'Eclipsed Beast':   { zh: '蚀日兽',     area: 'shatterstone-wastes', vuln: ['光辉','冰冻'], resist: ['斩击','穿刺'], immune: ['暗蚀'] },
+    }
+    var AREA_NAMES = {
+      'twilight-woods': '暮色森林', 'greyspine-mines': '灰脊矿道',
+      'shatterstone-wastes': '碎石荒原', 'dawnbreak-town': '破晓镇',
+    }
+
     function renderBestiaryPanel() {
       var session = getSavedSession()
       var bestiary = (session && session.player && session.player.bestiary) || {}
       var entries = Object.entries(bestiary)
+      var currentLoc = (session && session.worldState && session.worldState.currentLocation) || ''
 
-      if (entries.length === 0) {
-        return '<div class="panel-empty"><i class="ra ra-book" style="font-size:2em;opacity:0.3"></i><p>尚未遭遇任何怪物</p><p style="opacity:0.6;font-size:0.85em">探索世界、与NPC交谈、战斗时会自动记录</p></div>'
+      // 只显示已遭遇或有线索（notes 非空）的怪物
+      var visible = entries.filter(function (e) { return e[1].encountered || (e[1].notes && e[1].notes.length > 0) })
+
+      if (visible.length === 0) {
+        return '<div class="panel-empty"><i class="ra ra-book" style="font-size:2em;opacity:0.3"></i><p>尚未发现任何怪物</p><p style="opacity:0.6;font-size:0.85em">探索世界、与NPC交谈、在战斗中学习</p></div>'
       }
 
       var knownCount = entries.filter(function (e) { return e[1].weaknessKnown }).length
       var totalEncountered = entries.filter(function (e) { return e[1].encountered }).length
 
+      // 统计头部
       var bonusHtml = ''
-      if (knownCount >= 3) bonusHtml += '<span class="bestiary-bonus active">显示怪物HP%</span>'
-      if (knownCount >= 5) bonusHtml += '<span class="bestiary-bonus active">自动识别已知怪物</span>'
-      if (knownCount >= 8) bonusHtml += '<span class="bestiary-bonus active">弱点伤害×2.5</span>'
-      if (knownCount >= 11) bonusHtml += '<span class="bestiary-bonus active">先攻+3</span>'
+      var bonusList = [
+        { threshold: 3, label: '显示怪物HP%' },
+        { threshold: 5, label: '自动识别已知怪物' },
+        { threshold: 8, label: '弱点伤害×2.5' },
+        { threshold: 11, label: '先攻+3' },
+      ]
+      for (var b = 0; b < bonusList.length; b++) {
+        var active = knownCount >= bonusList[b].threshold
+        bonusHtml += '<span class="bestiary-bonus ' + (active ? 'active' : '') + '">'
+        bonusHtml += (active ? '✓ ' : '') + bonusList[b].label + ' (' + bonusList[b].threshold + ')'
+        bonusHtml += '</span>'
+      }
 
       var html = '<div class="bestiary-header">'
       html += '<div class="bestiary-stats">遭遇 <b>' + totalEncountered + '</b> 种 | 弱点已知 <b>' + knownCount + '</b> 种</div>'
-      if (bonusHtml) html += '<div class="bestiary-bonuses">' + bonusHtml + '</div>'
-      html += '</div><div class="bestiary-grid">'
+      html += '<div class="bestiary-bonuses">' + bonusHtml + '</div>'
+      html += '</div>'
 
-      for (var i = 0; i < entries.length; i++) {
-        var name = entries[i][0]
-        var entry = entries[i][1]
-        if (!entry.encountered) continue
+      // 按区域分组，当前区域排第一
+      var areaOrder = ['twilight-woods', 'greyspine-mines', 'shatterstone-wastes']
+      if (currentLoc && areaOrder.indexOf(currentLoc) > 0) {
+        areaOrder.splice(areaOrder.indexOf(currentLoc), 1)
+        areaOrder.unshift(currentLoc)
+      }
 
-        html += '<div class="bestiary-card">'
-        html += '<div class="bestiary-card-name">' + esc(name) + '</div>'
+      for (var a = 0; a < areaOrder.length; a++) {
+        var areaId = areaOrder[a]
+        var areaMonsters = visible.filter(function (e) {
+          var db = BESTIARY_DB[e[0]]
+          return db && db.area === areaId
+        })
+        if (areaMonsters.length === 0) continue
 
-        if (entry.weaknessKnown && entry.notes && entry.notes.some(function (n) { return n.includes('弱点') })) {
-          html += '<div class="bestiary-tag vuln">弱点已知</div>'
-        } else {
-          html += '<div class="bestiary-tag unknown">弱点: ???</div>'
-        }
+        html += '<div class="bestiary-area-label">' + (AREA_NAMES[areaId] || areaId)
+        if (areaId === currentLoc) html += ' <span style="opacity:0.5;font-size:0.8em">← 当前</span>'
+        html += '</div><div class="bestiary-grid">'
 
-        if (entry.resistanceKnown) {
-          html += '<div class="bestiary-tag resist">抗性已知</div>'
-        }
+        for (var m = 0; m < areaMonsters.length; m++) {
+          var name = areaMonsters[m][0]
+          var entry = areaMonsters[m][1]
+          var db = BESTIARY_DB[name] || {}
+          var displayName = db.zh || name
+          var isBoss = name === 'Spider Matriarch' || name === 'Shadow Weaver' || name === 'Eclipsed Beast'
 
-        if (entry.immunityKnown) {
-          html += '<div class="bestiary-tag immune">免疫已知</div>'
-        }
+          html += '<div class="bestiary-card' + (isBoss ? ' boss' : '') + '">'
+          html += '<div class="bestiary-card-name">' + esc(displayName)
+          if (isBoss) html += ' <span class="bestiary-boss-badge">BOSS</span>'
+          html += '</div>'
 
-        if (entry.notes && entry.notes.length > 0) {
-          html += '<div class="bestiary-notes">'
-          for (var j = 0; j < entry.notes.length; j++) {
-            html += '<div class="bestiary-note">' + esc(entry.notes[j]) + '</div>'
+          // 弱点
+          if (entry.weaknessKnown && db.vuln && db.vuln.length > 0) {
+            html += '<div class="bestiary-tag vuln">弱点: ' + db.vuln.join(', ') + '</div>'
+          } else if (!entry.encountered) {
+            html += '<div class="bestiary-tag unknown">未遭遇</div>'
+          } else {
+            html += '<div class="bestiary-tag unknown">弱点: ???</div>'
           }
+
+          // 抗性
+          if (entry.resistanceKnown && db.resist && db.resist.length > 0) {
+            html += '<div class="bestiary-tag resist">抗性: ' + db.resist.join(', ') + '</div>'
+          } else if (entry.encountered && db.resist && db.resist.length > 0) {
+            html += '<div class="bestiary-tag unknown">抗性: ???</div>'
+          }
+
+          // 免疫
+          if (entry.immunityKnown && db.immune && db.immune.length > 0) {
+            html += '<div class="bestiary-tag immune">免疫: ' + db.immune.join(', ') + '</div>'
+          } else if (entry.encountered && db.immune && db.immune.length > 0) {
+            html += '<div class="bestiary-tag unknown">免疫: ???</div>'
+          }
+
+          // 情报来源（精简显示，只展示有价值的）
+          if (entry.notes && entry.notes.length > 0) {
+            html += '<div class="bestiary-notes">'
+            for (var j = 0; j < entry.notes.length; j++) {
+              var note = entry.notes[j]
+              // 简化来源显示：去掉系统性前缀
+              note = note.replace(/^弱点情报来源:\s*/, '● 弱点来源：')
+                         .replace(/^抗性情报来源:\s*/, '● 抗性来源：')
+                         .replace(/^免疫情报来源:\s*/, '● 免疫来源：')
+              html += '<div class="bestiary-note">' + esc(note) + '</div>'
+            }
+            html += '</div>'
+          }
+
           html += '</div>'
         }
-
         html += '</div>'
       }
-      html += '</div>'
+
+      // 未分类的（不在已知区域的怪物）
+      var uncategorized = visible.filter(function (e) {
+        var db = BESTIARY_DB[e[0]]
+        return !db || areaOrder.indexOf(db.area) === -1
+      })
+      if (uncategorized.length > 0) {
+        html += '<div class="bestiary-area-label">其他</div><div class="bestiary-grid">'
+        for (var u = 0; u < uncategorized.length; u++) {
+          var uname = uncategorized[u][0]
+          var uentry = uncategorized[u][1]
+          var udb = BESTIARY_DB[uname] || {}
+          html += '<div class="bestiary-card"><div class="bestiary-card-name">' + esc(udb.zh || uname) + '</div>'
+          html += '<div class="bestiary-tag unknown">' + (uentry.encountered ? '弱点: ???' : '未遭遇') + '</div></div>'
+        }
+        html += '</div>'
+      }
+
       return html
     }
 
