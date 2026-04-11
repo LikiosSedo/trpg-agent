@@ -343,7 +343,7 @@ export function createGameSession(name: string, classId: string): GameSession {
     quests: [],
     worldState: {
       currentLocation: 'dawnbreak-town',
-      currentSubLocation: 'town-square',
+      currentSubLocation: 'dawn-stele',  // 马车停在镇口石碑旁，玩家从这里开始
       timeOfDay: 'night',
       flags: {},
     },
