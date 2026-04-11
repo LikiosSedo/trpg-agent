@@ -49,7 +49,11 @@ export const UseItemTool: Tool = {
 
           // 治疗药水：直接恢复 HP
           if (item!.bonus && item!.bonus > 0) {
-            const healAmount = rollDice(`${item!.bonus}d4+2`).total
+            let healAmount = rollDice(`${item!.bonus}d4+2`).total
+            // 牧师 Lv8 被动：治疗 +50%
+            if (session.worldState.flags['passive_cleric_divine_grace']) {
+              healAmount = Math.floor(healAmount * 1.5)
+            }
             const oldHp = player.hp
             player.hp = Math.min(player.maxHp, player.hp + healAmount)
             facts.addEvent(`使用${potionName}，恢复${player.hp - oldHp}HP`)

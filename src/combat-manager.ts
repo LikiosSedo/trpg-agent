@@ -13,7 +13,7 @@ import {
 import { getFacts } from './game-state.js'
 import { getEffectBonus, hasEffect, tickEffects, applyEffect } from './effect-manager.js'
 import { changeTrust } from './trust-system.js'
-import { markEncountered, discoverImmunity } from './bestiary.js'
+import { markEncountered, discoverImmunity, discoverWeakness, discoverResistance, getBestiaryBonuses } from './bestiary.js'
 
 const PROFICIENCY = 2
 
@@ -98,11 +98,16 @@ export function startCombat(
   const player = session.player
   const log: string[] = []
 
-  // 玩家先攻（Lv8 ranger_quick_reflexes: +3）
+  // 玩家先攻（Lv8 ranger_quick_reflexes: +3 / 图鉴先攻加值）
   const initBonus = session.worldState.flags['passive_ranger_quick_reflexes'] ? 3 : 0
+  const bestiaryInitBonus = getBestiaryBonuses(session).initiativeBonus
+  const totalInitBonus = initBonus + bestiaryInitBonus
   const playerInit = rollInitiative(player.abilityModifiers.DEX)
-  const playerInitTotal = playerInit.total + initBonus
-  const initBonusStr = initBonus > 0 ? `+${initBonus}(快速反应)` : ''
+  const playerInitTotal = playerInit.total + totalInitBonus
+  const initBonusParts: string[] = []
+  if (initBonus > 0) initBonusParts.push(`+${initBonus}(快速反应)`)
+  if (bestiaryInitBonus > 0) initBonusParts.push(`+${bestiaryInitBonus}(怪物图鉴)`)
+  const initBonusStr = initBonusParts.join('')
   log.push(`${player.name} 先攻: d20(${playerInit.roll})+${player.abilityModifiers.DEX}${initBonusStr}=${playerInitTotal}`)
 
   const initiativeOrder: InitiativeEntry[] = [{
@@ -161,6 +166,20 @@ export function startCombat(
 
   if (monsters.length === 0) {
     throw new Error('没有有效的怪物加入战斗')
+  }
+
+  // 图鉴被动：autoIdentify — 自动识别已知怪物的弱点/抗性/免疫
+  const bestiaryBonuses = getBestiaryBonuses(session)
+  if (bestiaryBonuses.autoIdentify) {
+    for (const m of monsters) {
+      const template = monstersDb.find(t => t.name === m.name)
+      if (template) {
+        if (template.vulnerability?.length) discoverWeakness(session, m.name, '怪物猎人的知识')
+        if (template.resistance?.length) discoverResistance(session, m.name, '怪物猎人的知识')
+        if (template.immunity?.length) discoverImmunity(session, m.name, '怪物猎人的知识')
+      }
+    }
+    log.push('📖 怪物猎人的知识自动识别了敌人的特性')
   }
 
   // 创建同伴实例��从 session.party 读取）
@@ -344,6 +363,15 @@ export function executePlayerAttack(
       discoverImmunity(session, monster.name, '战斗试错')
     }
 
+    // 图鉴增强弱点：×2 → ×2.5
+    if (spellWeakness.effectType === 'vulnerable') {
+      const bonuses = getBestiaryBonuses(session)
+      if (bonuses.enhancedVulnerability) {
+        damage = Math.floor(damage * 1.25)
+        log.push('📖 怪物图鉴精通：弱点伤害增强至×2.5')
+      }
+    }
+
     monster.hp = Math.max(0, monster.hp - damage)
     const killed = monster.hp <= 0
 
@@ -406,6 +434,15 @@ export function executePlayerAttack(
     discoverImmunity(session, monster.name, '战斗试错')
   }
 
+  // 图鉴增强弱点：×2 → ×2.5
+  if (weakness.effectType === 'vulnerable') {
+    const bonuses = getBestiaryBonuses(session)
+    if (bonuses.enhancedVulnerability) {
+      damage = Math.floor(damage * 1.25)
+      log.push('📖 怪物图鉴精通：弱点伤害增强至×2.5')
+    }
+  }
+
   monster.hp = Math.max(0, monster.hp - damage)
   const killed = monster.hp <= 0
 
@@ -463,6 +500,14 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     const monster = combat.monsters.find(m => m.id === entry.id)
     if (!monster || monster.hp <= 0) continue
 
+    // 被擒拿的怪物跳过行动，并在回合结束后解除
+    if (monster.conditions.includes('grappled')) {
+      log.push(`${monster.id} 被擒拿，无法行动！`)
+      monster.conditions = monster.conditions.filter(c => c !== 'grappled')
+      hits.push({ monsterName: monster.name, targetName: '', targetIsAlly: false, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
+      continue
+    }
+
     // 选择攻击目标：玩家(权重2) vs 存活同伴(各权重1)（每次重新过滤，同伴可能在本轮被击倒）
     const aliveAllies = (combat.allies ?? []).filter(a => a.hp > 0)
     type Target = { id: string; name: string; ac: number; isPlayer: boolean; isAlly: boolean }
@@ -470,7 +515,13 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       { id: 'player', name: player.name, ac: playerAC, isPlayer: true, isAlly: false },
       ...aliveAllies.map(a => ({ id: a.id, name: a.name, ac: a.ac, isPlayer: false, isAlly: true })),
     ]
-    const weights = targets.map(t => t.isPlayer ? 2 : 1)
+    const weights = targets.map(t => {
+      if (t.isPlayer) return 2
+      // 嘲讽：格雷格在场时权重 ×3
+      const allyObj = aliveAllies.find(a => a.id === t.id)
+      if (allyObj?.allyAbility?.effect === 'taunt') return 3
+      return 1
+    })
     const totalWeight = weights.reduce((a, b) => a + b, 0)
     let roll = Math.random() * totalWeight
     let target = targets[0]
@@ -633,8 +684,27 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
       discoverImmunity(session, target.name, '战斗试错')
     }
 
+    // 图鉴增强弱点：×2 → ×2.5
+    if (allyWeakness.effectType === 'vulnerable') {
+      const bonuses = getBestiaryBonuses(session)
+      if (bonuses.enhancedVulnerability) {
+        damage = Math.floor(damage * 1.25)
+        log.push('📖 怪物图鉴精通：弱点伤害增强至×2.5')
+      }
+    }
+
     target.hp = Math.max(0, target.hp - damage)
     const targetKilled = target.hp <= 0
+
+    // 破甲重击：命中后目标 AC-1，最多叠加 3 次
+    if (ally.allyAbility?.effect === 'armor_break' && atk.hits) {
+      const currentStacks = (target as any).__armorBreak ?? 0
+      if (currentStacks < 3) {
+        target.ac = Math.max(5, target.ac - 1)
+        ;(target as any).__armorBreak = currentStacks + 1
+        log.push(`🔨 ${ally.name}的破甲重击削弱了${target.id}的护甲！(AC${target.ac + 1}→${target.ac}，叠加${currentStacks + 1}/3)`)
+      }
+    }
 
     log.push(
       `${ally.name} 攻击${target.id}: d20(${atk.roll})+${ally.attackMod}=${atk.total} vs AC${target.ac} → ${atk.isCritical ? '暴击！' : '命中'}`,
@@ -651,6 +721,20 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
 
     if (targetKilled) {
       log.push(`${target.id} 被${ally.name}击杀！`)
+    }
+
+    // 铁臂擒拿：50% 概率束缚一个未被束缚的目标
+    if (ally.allyAbility?.effect === 'grapple') {
+      const ungrappled = aliveMonsters.filter(m => m.hp > 0 && !m.conditions.includes('grappled'))
+      if (ungrappled.length > 0) {
+        const grappleTarget = ungrappled[Math.floor(Math.random() * ungrappled.length)]
+        if (Math.random() < 0.5) {
+          grappleTarget.conditions.push('grappled')
+          log.push(`💪 ${ally.name}用铁臂擒住了${grappleTarget.id}！(下回合无法行动)`)
+        } else {
+          log.push(`💪 ${ally.name}试图擒拿${grappleTarget.id}，但没抓住`)
+        }
+      }
     }
   }
 

@@ -7,12 +7,14 @@
 
 import { z } from 'zod'
 import type { Tool } from '../agent/types.js'
+import type { Monster } from '../types.js'
 import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
 import { locations } from '../data/maps.js'
 import { ChapterManager } from '../chapter-manager.js'
 import { LOOT_TABLES, rollLootTable } from '../loot-tables.js'
 import { getEffectBonus } from '../effect-manager.js'
+import { discoverWeakness, discoverResistance, discoverImmunity } from '../bestiary.js'
 
 export const SearchTool: Tool = {
   name: 'Search',
@@ -110,6 +112,31 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
 
     // ── area：区域搜索 ───────────────────────────────
     if (type === 'area') {
+      // ── 怪物图鉴：检查当前位置是否有可发现的怪物情报 ──
+      const monstersData = ((await import('../../data/monsters.json', { with: { type: 'json' } })).default) as Monster[]
+      const bestiaryFinds: string[] = []
+      for (const monster of monstersData) {
+        if (!monster.discoveryHints?.location) continue
+        if (monster.discoveryHints.location !== locId) continue
+
+        const monsterZh = monster.nameZh || monster.name
+        if (monster.vulnerability?.length) {
+          const r = discoverWeakness(session, monster.name, `在${locId}搜索发现`)
+          if (r) bestiaryFinds.push(`📖 你发现了关于${monsterZh}的线索：弱点是 ${monster.vulnerability.join('/')} 类型伤害`)
+        }
+        if (monster.resistance?.length) {
+          const r = discoverResistance(session, monster.name, `在${locId}搜索发现`)
+          if (r) bestiaryFinds.push(`📖 你发现了关于${monsterZh}的线索：对 ${monster.resistance.join('/')} 类型伤害有抗性`)
+        }
+        if (monster.immunity?.length) {
+          const r = discoverImmunity(session, monster.name, `在${locId}搜索发现`)
+          if (r) bestiaryFinds.push(`📖 你发现了关于${monsterZh}的线索：完全免疫 ${monster.immunity.join('/')} 类型伤害`)
+        }
+      }
+      const bestiaryAppend = bestiaryFinds.length > 0
+        ? '\n\n[怪物图鉴更新]\n' + bestiaryFinds.join('\n')
+        : ''
+
       // 光源效果：矿道等黑暗区域，火把提供搜索加值
       const darkLocations = ['greyspine-mines']
       const lightBonus = darkLocations.includes(locId) ? getEffectBonus(player, 'light') : 0
@@ -169,7 +196,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
         const failedWithWatcher = hasWatcher
           ? `\n[被发现] 玩家试图在${activeNpcs.map(n => n.name).join('、')}面前拿取物品被发现。请根据 NPC 性格叙事反应（警告、驱逐、报警、甚至攻击）。`
           : ''
-        return { output: checkLine + failedWithWatcher }
+        return { output: checkLine + failedWithWatcher + bestiaryAppend }
       }
 
       // 成功：查找产出表
@@ -188,7 +215,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
             checkLine,
             poiLine,
             '仔细搜索后……如果发现物品，必须调用 TransferItem(transferType="found", sourceId="environment") 来给予玩家。',
-          ].filter(Boolean).join('\n'),
+          ].filter(Boolean).join('\n') + bestiaryAppend,
           discoveredPoi,
         }
       }
@@ -199,7 +226,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
 
       if (loot.alreadySearched) {
         return {
-          output: [checkLine, poiLine, '这里已经被仔细搜过了，没有新的发现。'].filter(Boolean).join('\n'),
+          output: [checkLine, poiLine, '这里已经被仔细搜过了，没有新的发现。'].filter(Boolean).join('\n') + bestiaryAppend,
           discoveredPoi,
         }
       }
@@ -238,7 +265,7 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
         : undefined
 
       return {
-        output: [checkLine, poiLine, lootStr].filter(Boolean).join('\n'),
+        output: [checkLine, poiLine, lootStr].filter(Boolean).join('\n') + bestiaryAppend,
         discoveredPoi,
         lootGranted,
       }

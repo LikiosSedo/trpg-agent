@@ -238,6 +238,8 @@ export function createInitialNPCs(): NPC[] {
         { name: '火把', type: 'misc', description: '普通火把，燃烧1小时，在20尺半径内提供明亮光照。' },
         { name: '火把', type: 'misc', description: '普通火把，燃烧1小时，在20尺半径内提供明亮光照。' },
         { name: '火把', type: 'misc', description: '普通火把，燃烧1小时，在20尺半径内提供明亮光照。' },
+        { name: '雷击粉', type: 'misc' as const, description: '雷石研磨的粉末，附着于武器表面。武器附加雷电伤害类型。', damageType: 'lightning' },
+        { name: '雷击粉', type: 'misc' as const, description: '雷石研磨的粉末，附着于武器表面。武器附加雷电伤害类型。', damageType: 'lightning' },
       ],
       shopPricing: {
         '长剑': 30,
@@ -278,6 +280,13 @@ export function createInitialNPCs(): NPC[] {
         { name: '草药绷带', type: 'potion', description: '叶绿手工浸泡过草药的亚麻绷带，包扎伤口可恢复1d4+2生命值。', bonus: 1 },
         { name: '草药绷带', type: 'potion', description: '叶绿手工浸泡过草药的亚麻绷带，包扎伤口可恢复1d4+2生命值。', bonus: 1 },
         { name: '草药绷带', type: 'potion', description: '叶绿手工浸泡过草药的亚麻绷带，包扎伤口可恢复1d4+2生命值。', bonus: 1 },
+        { name: '火焰油', type: 'misc' as const, description: '炎石粉和油脂混合的涂层。涂抹在武器上附加火焰伤害类型。', damageType: 'fire' },
+        { name: '火焰油', type: 'misc' as const, description: '炎石粉和油脂混合的涂层。涂抹在武器上附加火焰伤害类型。', damageType: 'fire' },
+        { name: '银油', type: 'misc' as const, description: '灵银粉末和月光草调制的涂层。武器附加光辉伤害类型。', damageType: 'radiant' },
+        { name: '银油', type: 'misc' as const, description: '灵银粉末和月光草调制的涂层。武器附加光辉伤害类型。', damageType: 'radiant' },
+        { name: '冰霜油', type: 'misc' as const, description: '寒铁粉与冰泉水调制的涂层。武器附加冰冻伤害类型。', damageType: 'cold' },
+        { name: '防火药膏', type: 'potion' as const, description: '防护药膏，一场战斗内对火焰伤害有抗性。' },
+        { name: '抗麻痹药剂', type: 'potion' as const, description: '神经强化剂，一场战斗内免疫麻痹状态。' },
       ],
       shopPricing: {
         '治疗药水': 25,

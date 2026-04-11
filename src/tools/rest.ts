@@ -34,6 +34,12 @@ export const RestTool: Tool = {
 
     if (input.type === 'short') {
       shortRest(player)
+      // 牧师 Lv8 被动：短休息治疗 +50%
+      if (session.worldState.flags['passive_cleric_divine_grace']) {
+        const baseHeal = player.hp - oldHp
+        const bonus = Math.floor(baseHeal * 0.5)
+        player.hp = Math.min(player.maxHp, player.hp + bonus)
+      }
       const healed = player.hp - oldHp
       const newTime = advanceTime()
       session.timeAccum = 0
