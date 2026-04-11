@@ -33,6 +33,9 @@ export interface Item {
   bonus?: number // 武器攻击加值 / 护甲AC加值 / 药水恢复量
   damageType?: DamageType       // 武器伤害类型 / 涂层附加类型
   bonusDamageType?: DamageType  // 次要伤害类型（如灵银长剑的 radiant）
+  weaponType?: 'melee' | 'ranged'  // 近战用 STR，远程用 DEX
+  armorWeight?: 'light' | 'medium' | 'heavy'  // 甲种
+  maxDex?: number                  // 重甲/中甲限制 DEX 加值上限
 }
 
 // ─── 效果系统 ───────────────────────────────────

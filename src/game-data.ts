@@ -239,11 +239,11 @@ export function createInitialNPCs(): NPC[] {
       mood: '暴躁',
       role: 'blacksmith',
       inventory: [
-        { name: '长剑', type: 'weapon', description: '锋利的长剑。造成1d8劈砍伤害。', bonus: 1 },
-        { name: '短剑', type: 'weapon', description: '轻便的短剑。造成1d6穿刺伤害。', bonus: 0 },
-        { name: '短弓', type: 'weapon', description: '猎用短弓。射程80尺，造成1d6穿刺伤害。', bonus: 0 },
-        { name: '皮甲', type: 'armor', description: '柔韧的皮甲。AC+1。', bonus: 1 },
-        { name: '锁子甲', type: 'armor', description: '铁链编织的锁子甲。AC+2，略微沉重。', bonus: 2 },
+        { name: '长剑', type: 'weapon', weaponType: 'melee', description: '锋利的长剑。造成1d8劈砍伤害。', bonus: 1 },
+        { name: '短剑', type: 'weapon', weaponType: 'melee', description: '轻便的短剑。造成1d6穿刺伤害。', bonus: 0 },
+        { name: '短弓', type: 'weapon', weaponType: 'ranged', description: '猎用短弓。射程80尺，造成1d6穿刺伤害。', bonus: 0 },
+        { name: '皮甲', type: 'armor', armorWeight: 'light', description: '柔韧的皮甲。AC+1。', bonus: 1 },
+        { name: '锁子甲', type: 'armor', armorWeight: 'heavy', maxDex: 0, description: '铁链编织的锁子甲。AC+4，沉重。', bonus: 4 },
         { name: '麻绳', type: 'misc', description: '50尺结实的麻绳。', bonus: 0 },
         { name: '火把', type: 'misc', description: '普通火把，燃烧1小时，在20尺半径内提供明亮光照。' },
         { name: '火把', type: 'misc', description: '普通火把，燃烧1小时，在20尺半径内提供明亮光照。' },
@@ -361,9 +361,29 @@ export function createGameSession(name: string, classId: string): GameSession {
     ],
     spells: template.spells.map(s => ({ ...s })),
     clues: [],
-    equipped: {
-      weapon: { name: '短剑 +1', type: 'weapon', description: '一把短剑，轻便趁手。造成1d6+1穿刺伤害。', bonus: 1 },
-    },
+    equipped: (() => {
+      // 职业专属初始装备：武器匹配核心属性，护甲匹配定位
+      const STARTING_GEAR: Record<string, { weapon: any; armor?: any }> = {
+        fighter: {
+          weapon: { name: '长剑 +1', type: 'weapon', weaponType: 'melee', description: '精锻长剑，剑身泛寒光。造成1d8+1劈砍伤害。', bonus: 1, damageType: 'slashing' },
+          armor: { name: '锁子甲', type: 'armor', armorWeight: 'heavy', maxDex: 0, description: '铁链编织的锁子甲。AC+4，沉重。', bonus: 4 },
+        },
+        mage: {
+          weapon: { name: '短剑', type: 'weapon', weaponType: 'melee', description: '轻便的短剑。造成1d6穿刺伤害。', bonus: 0, damageType: 'piercing' },
+          // 法师无甲，靠 Shield 法术防御
+        },
+        ranger: {
+          weapon: { name: '短弓 +1', type: 'weapon', weaponType: 'ranged', description: '工艺精良的猎弓。射程80尺，造成1d6+1穿刺伤害。', bonus: 1, damageType: 'piercing' },
+          armor: { name: '皮甲', type: 'armor', armorWeight: 'light', description: '柔韧的皮甲。AC+1。', bonus: 1 },
+        },
+        cleric: {
+          weapon: { name: '战锤 +1', type: 'weapon', weaponType: 'melee', description: '沉重的战锤，刻有祈祷铭文。造成1d8+1钝击伤害。', bonus: 1, damageType: 'bludgeoning' },
+          armor: { name: '皮甲', type: 'armor', armorWeight: 'light', description: '柔韧的皮甲。AC+1。', bonus: 1 },
+        },
+      }
+      const gear = STARTING_GEAR[classId] ?? STARTING_GEAR.fighter
+      return { weapon: gear.weapon, armor: gear.armor }
+    })(),
   }
 
   return {

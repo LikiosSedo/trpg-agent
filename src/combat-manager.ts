@@ -411,7 +411,10 @@ export function executePlayerAttack(
   const effectAtkBonus = getEffectBonus(player, 'attack_bonus')
   // 暗影幕布效果：命中-2
   const weaponShadowVeilPenalty = session.worldState.flags['boss_shadow_veil'] ? -2 : 0
-  const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus + weaponShadowVeilPenalty
+  // 远程武器用 DEX，近战武器用 STR
+  const isRanged = (weapon as any).weaponType === 'ranged'
+  const weaponAbilityMod = isRanged ? player.abilityModifiers.DEX : player.abilityModifiers.STR
+  const atkMod = weaponAbilityMod + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus + weaponShadowVeilPenalty
   if (weaponShadowVeilPenalty) log.push(`🌑 暗影幕布笼罩战场，命中-2`)
   const atk = attackRoll(atkMod, monster.ac)
 
@@ -428,7 +431,7 @@ export function executePlayerAttack(
 
   const dmgMatch = weapon.description.match(/(\d+d\d+)/i)
   const dmgDice = dmgMatch ? dmgMatch[1] : '1d6'
-  let damage = rollDamage(dmgDice) + player.abilityModifiers.STR
+  let damage = rollDamage(dmgDice) + weaponAbilityMod
   // damage_bonus 效果（如 Hunter's Mark）
   const effectDmgBonus = getEffectBonus(player, 'damage_bonus')
   if (effectDmgBonus > 0) damage += rollDamage(`${effectDmgBonus}d6`)

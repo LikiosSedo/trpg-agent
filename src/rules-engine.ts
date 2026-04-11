@@ -76,8 +76,11 @@ export function rollInitiative(dexMod: number): { roll: number; total: number } 
 }
 
 export function calculatePlayerAC(player: PlayerCharacter): number {
-  const dexMod = player.abilityModifiers.DEX
-  const armorBonus = player.equipped.armor?.bonus ?? 0
+  const armor = player.equipped.armor
+  const armorBonus = armor?.bonus ?? 0
+  // 重甲/中甲限制 DEX 加值（maxDex 字段），轻甲/无甲不限
+  const maxDex = (armor as any)?.maxDex
+  const dexMod = maxDex != null ? Math.min(player.abilityModifiers.DEX, maxDex) : player.abilityModifiers.DEX
   const effectAC = getEffectBonus(player, 'ac_bonus')
   return 10 + dexMod + armorBonus + effectAC
 }

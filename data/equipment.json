@@ -2,6 +2,7 @@
   {
     "name": "短剑",
     "type": "weapon",
+    "weaponType": "melee",
     "description": "轻便的刺击武器，深受盗贼喜爱。造成1d6穿刺伤害。",
     "bonus": 0,
     "damageType": "piercing"
@@ -9,6 +10,7 @@
   {
     "name": "长剑",
     "type": "weapon",
+    "weaponType": "melee",
     "description": "多用途格斗武器。造成1d8劈砍伤害。",
     "bonus": 0,
     "damageType": "slashing"
@@ -16,6 +18,7 @@
   {
     "name": "短弓",
     "type": "weapon",
+    "weaponType": "ranged",
     "description": "简易远程武器，射程80尺。造成1d6穿刺伤害。",
     "bonus": 0,
     "damageType": "piercing"
@@ -23,25 +26,54 @@
   {
     "name": "皮甲",
     "type": "armor",
-    "description": "由鞣制皮革制成的轻甲。AC 11 + 敏捷调整值。",
+    "armorWeight": "light",
+    "description": "由鞣制皮革制成的轻甲。AC+1。",
     "bonus": 1
   },
   {
     "name": "短剑 +1",
     "type": "weapon",
+    "weaponType": "melee",
     "description": "精良短剑，轻便趁手。造成1d6+1穿刺伤害。",
     "bonus": 1,
     "damageType": "piercing"
   },
   {
+    "name": "长剑 +1",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "精锻长剑，剑身泛寒光。造成1d8+1劈砍伤害。",
+    "bonus": 1,
+    "damageType": "slashing"
+  },
+  {
+    "name": "短弓 +1",
+    "type": "weapon",
+    "weaponType": "ranged",
+    "description": "工艺精良的猎弓，弦声清脆。射程80尺，造成1d6+1穿刺伤害。",
+    "bonus": 1,
+    "damageType": "piercing"
+  },
+  {
+    "name": "战锤 +1",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "沉重的战锤，刻有祈祷铭文。造成1d8+1钝击伤害。",
+    "bonus": 1,
+    "damageType": "bludgeoning"
+  },
+  {
     "name": "锁子甲",
     "type": "armor",
-    "description": "铁链编织的锁子甲。AC+2，略微沉重。",
-    "bonus": 2
+    "armorWeight": "heavy",
+    "maxDex": 0,
+    "description": "铁链编织的锁子甲。AC+4，沉重，不适合灵巧型角色。",
+    "bonus": 4
   },
   {
     "name": "灵银长剑",
     "type": "weapon",
+    "weaponType": "melee",
     "description": "矿道深处开采的灵银锻造，剑身泛着微光。造成1d8+1劈砍伤害，对亡灵额外有效。",
     "bonus": 1,
     "damageType": "slashing",
@@ -50,12 +82,14 @@
   {
     "name": "强化皮甲",
     "type": "armor",
+    "armorWeight": "light",
     "description": "由蜘蛛丝加固的皮甲，轻便而坚韧。AC+2，不影响灵活性。",
     "bonus": 2
   },
   {
     "name": "破晓战锤",
     "type": "weapon",
+    "weaponType": "melee",
     "description": "古代晨光骑士的遗物，锤头刻有驱散黑暗的符文。造成1d10+2钝击伤害。",
     "bonus": 2,
     "damageType": "bludgeoning",
@@ -64,8 +98,10 @@
   {
     "name": "晨光护胸甲",
     "type": "armor",
-    "description": "镌刻晨光纹路的胸甲，残存着远古的守护力量。AC+3。",
-    "bonus": 3
+    "armorWeight": "medium",
+    "maxDex": 2,
+    "description": "镌刻晨光纹路的胸甲，残存着远古的守护力量。AC+4，略重。",
+    "bonus": 4
   },
   {
     "name": "强效治疗药水",

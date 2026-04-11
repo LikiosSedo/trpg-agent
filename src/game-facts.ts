@@ -124,7 +124,8 @@ export class GameFactStore {
     const equipLines: string[] = []
     if (player.equipped.weapon) {
       const w = player.equipped.weapon
-      const atkMod = m.STR + 2 + (w.bonus ?? 0) // STR + proficiency + weapon bonus
+      const isRanged = (w as any).weaponType === 'ranged'
+      const atkMod = (isRanged ? m.DEX : m.STR) + 2 + (w.bonus ?? 0)
       equipLines.push(`  武器: ${w.name} (攻击${fmt(atkMod)}, ${w.description.match(/\d+d\d+/)?.[0] ?? '?'}伤害)`)
     }
     if (player.equipped.armor) {
