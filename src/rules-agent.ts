@@ -78,9 +78,9 @@ const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, inpu
   { pattern: /^(?:和|跟|找)\s*(.{2,6})\s*(?:说话|聊聊|交谈|对话)$/,
     build: (m) => ({ type: 'TALK', npc: m[1].trim(), message: '', approach: 'normal' }) },
 
-  // 休息
-  { pattern: /^(?:休息|短休|长休|睡觉|歇息)/,
-    build: (m, input) => ({ type: 'REST', restType: /长休|睡觉/.test(input) ? 'long' : 'short' }) },
+  // 休息 — 不锚定开头,因为玩家经常说"接过钥匙去休息""回房间休息"
+  { pattern: /(?:休息|短休|长休|睡觉|歇息|歇一会|躺下|睡一觉)/,
+    build: (m, input) => ({ type: 'REST', restType: /长休|睡觉|睡一觉|到天亮/.test(input) ? 'long' : 'short' }) },
 
   // 搜索
   { pattern: /^(?:搜索|搜查|检查|调查)\s*(.*)/,
