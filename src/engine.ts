@@ -2415,7 +2415,9 @@ export class GameEngine {
         triggerAfterBeat: string; maxIdleTurns: number
         monsters?: string[]  // 指定怪物，不填则从区域池随机
       }> = [
-        { combatBeat: 'ch2_forest_combat', location: 'twilight-woods', triggerAfterBeat: 'ch2_meet_hunter', maxIdleTurns: 10, monsters: ['Wolf', 'Wolf'] },
+        { combatBeat: 'ch2_forest_combat', location: 'twilight-woods', triggerAfterBeat: 'ch2_meet_hunter', maxIdleTurns: 10, monsters: ['Spider Matriarch', 'Giant Spider', 'Giant Spider'] },
+        { combatBeat: 'ch3_shadow_boss', location: 'greyspine-mines', triggerAfterBeat: 'ch3_enter_mines', maxIdleTurns: 8, monsters: ['Shadow Weaver', 'Shadow'] },
+        { combatBeat: 'ch4_eclipsed_boss', location: 'shatterstone-wastes', triggerAfterBeat: 'ch4_tower_discovery', maxIdleTurns: 6, monsters: ['Eclipsed Beast'] },
       ]
 
       for (const se of storyEncounters) {

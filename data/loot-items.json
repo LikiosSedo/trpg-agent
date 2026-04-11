@@ -82,5 +82,19 @@
     "type": "misc",
     "description": "一块吸收周围光线的暗色水晶。散发出令人不安的寒意。",
     "basePrice": 30
+  },
+  {
+    "name": "蛛母毒腺",
+    "nameZh": "蛛母毒腺",
+    "type": "quest",
+    "description": "蛛母体内取出的巨大毒腺，散发着紫黑色的光泽。叶绿可以用它调制出特殊的暗影防护药水。",
+    "basePrice": 0
+  },
+  {
+    "name": "暗影核心",
+    "nameZh": "暗影核心",
+    "type": "quest",
+    "description": "暗影编织者消散后留下的凝实暗影结晶。这是蚀目者教团在矿道中进行虚空仪式的铁证。",
+    "basePrice": 0
   }
 ]

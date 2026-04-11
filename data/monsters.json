@@ -170,13 +170,51 @@
     }
   },
   {
+    "name": "Spider Matriarch",
+    "nameZh": "蛛母·织暗者",
+    "hp": 45,
+    "dc": 15,
+    "damageDice": "1d12+4",
+    "specialAbility": "Web Bind: every 2 rounds, webs one target (DC 12 STR or restrained 1 turn). Phase 2 (HP≤50%): summons 2 Spiderlings and gains Venomous Bite (+1d4 poison per attack)",
+    "description": "暮色森林深处的蜘蛛女王。她的巢穴弥漫着不自然的暗紫色蛛丝，这些蛛丝传导着来自地底的虚空能量。蛛母的异常成长是矿道深处虚空能量泄漏的第一个征兆——森林正在被黑暗侵蚀。",
+    "loot": ["蛛母毒腺", "蜘蛛丝", "蜘蛛丝", "15 gold"],
+    "vulnerability": ["fire"],
+    "resistance": ["piercing"],
+    "immunity": [],
+    "discoveryHints": {
+      "npc": "叶绿",
+      "npcMinTrust": 2,
+      "location": "twilight-woods",
+      "skillCheck": { "skill": "perception", "dc": 12 }
+    }
+  },
+  {
+    "name": "Shadow Weaver",
+    "nameZh": "暗影编织者",
+    "hp": 55,
+    "dc": 14,
+    "damageDice": "2d6+3",
+    "specialAbility": "Shadow Veil: every 3 rounds, all enemies get -2 to hit for 1 round. Shadow Mend: regenerates 3 HP per round unless hit by radiant damage that round. Phase 2 (HP≤40%): splits off a Shadow clone",
+    "description": "蚀目者教团在矿道深处祭坛召唤的暗影守卫。它由矿道中死去矿工的怨灵和虚空能量凝聚而成，是一团有意识的活体黑暗。它守护着教团的仪式场所，吞噬一切接近祭坛的光源。击败它，才能揭开教团的秘密。",
+    "loot": ["暗影核心", "暗影精华", "暗影精华", "20 gold"],
+    "vulnerability": ["radiant"],
+    "resistance": ["slashing", "piercing"],
+    "immunity": ["necrotic"],
+    "discoveryHints": {
+      "npc": "艾琳娜",
+      "npcMinTrust": 4,
+      "location": "greyspine-mines",
+      "skillCheck": { "skill": "arcana", "dc": 14 }
+    }
+  },
+  {
     "name": "Eclipsed Beast",
     "nameZh": "蚀日兽",
-    "hp": 65,
+    "hp": 80,
     "dc": 15,
-    "damageDice": "2d8+4",
-    "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage",
-    "description": "A monstrous entity of pure shadow, herald of the Eclipsed Eye. The final threat in the Greyspine depths.",
+    "damageDice": "2d10+5",
+    "specialAbility": "Shadow Aura: all light sources within 30ft are dimmed; attacks from darkness have advantage. Void Pulse: every 3 rounds, deals 2d6 necrotic damage to all non-monster targets. Phase 2 (HP≤40%): Void Frenzy — damage becomes 2d10+5 but AC drops to 13",
+    "description": "虚空棱镜的守护者，蚀目者教团的最终'成果'。它不是自然生物，而是虚空能量的具象化产物。三千年前晨光精灵文明的封印曾压制虚空，但教团的仪式正在让封印崩塌。蚀日兽是封印崩塌的最终征兆——如果不击败它，虚空将彻底突破。",
     "loot": ["虚空碎片", "暗影水晶", "50 gold"],
     "vulnerability": ["radiant"],
     "resistance": ["slashing", "piercing", "cold"],

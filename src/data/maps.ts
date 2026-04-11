@@ -14,7 +14,13 @@ export interface PointOfInterest {
   /** Short arrival text */
   arrivalText?: string;
   /** Combat encounter bound to this POI (triggered when player engages) */
-  encounter?: { monsters: string[] };
+  encounter?: {
+    monsters: string[];
+    /** Whether this encounter has been discovered/triggered */
+    discovered: boolean;
+    /** Flavour text shown when the encounter is revealed */
+    description: string;
+  };
 }
 
 export interface Location {
@@ -202,7 +208,11 @@ export const twilightWoods: Location = {
       description: '废弃多年的伐木场，残破的木屋间散落着新鲜的篝火灰烬，似乎有什么生物在此扎营。',
       position: { x: 3, y: 3 },
       discovered: false,
-      encounter: { monsters: ['Goblin', 'Goblin', 'Goblin', 'Goblin', 'Goblin', 'Goblin', 'Hobgoblin'] },
+      encounter: {
+        monsters: ['Spider Matriarch', 'Giant Spider', 'Giant Spider'],
+        discovered: false,
+        description: '旧伐木场被巨大的暗紫色蛛网覆盖，空气中弥漫着令人作呕的甜腥味。蛛网中心坐着一只比马还大的蜘蛛女王。',
+      },
     },
     {
       id: 'hunter-stone-house',
@@ -275,6 +285,11 @@ export const greyspineMines: Location = {
       description: '矿道最深处的天然溶洞，空气中弥漫着令人窒息的压迫感，深处隐约传来低沉的嗡鸣。',
       position: { x: 6, y: 14 },
       discovered: false,
+      encounter: {
+        monsters: ['Shadow Weaver', 'Shadow'],
+        discovered: false,
+        description: '祭坛前的空气扭曲变形，一团有意识的活体黑暗盘踞在虚空符文上方。暗影编织者的两只光芒暗淡的眼睛在黑暗中转向你。',
+      },
     },
     {
       id: 'void-prism',
@@ -294,7 +309,7 @@ export const shatterstoneWastes: Location = {
   description: '镇子西面的干燥荒原，遍布碎裂灰色岩石，地形崎岖，常有浓雾。',
   dangerLevel: 'medium',
   crRange: [0.5, 3],
-  monsterPool: ['Orc Warrior', 'Ghoul', 'Skeleton', 'Eclipsed Beast'],
+  monsterPool: ['Orc Warrior', 'Ghoul', 'Skeleton'],
   asciiMap: [
     '................',
     '..##..........#.',
@@ -347,6 +362,11 @@ export const shatterstoneWastes: Location = {
       description: '可俯瞰四周的石塔，顶层散落着潮湿的纸张和暗褐色的污渍。',
       position: { x: 4, y: 13 },
       discovered: false,
+      encounter: {
+        monsters: ['Eclipsed Beast'],
+        discovered: false,
+        description: '废弃瞭望塔的阴影中，一个庞大的暗影实体缓缓浮现。周围的光线被吞噬，连星光都暗淡了下来。蚀日兽——虚空棱镜的守护者——已经注意到了你。',
+      },
     },
   ],
 };

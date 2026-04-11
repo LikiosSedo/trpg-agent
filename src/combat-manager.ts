@@ -328,7 +328,10 @@ export function executePlayerAttack(
     if (!cast.success) throw new Error(`施法失败: ${cast.reason}`)
 
     const spell = player.spells.find(s => s.name === spellId)!
-    const atkMod = player.abilityModifiers.INT + PROFICIENCY
+    // 暗影幕布效果：命中-2
+    const spellShadowVeilPenalty = session.worldState.flags['boss_shadow_veil'] ? -2 : 0
+    const atkMod = player.abilityModifiers.INT + PROFICIENCY + spellShadowVeilPenalty
+    if (spellShadowVeilPenalty) log.push(`🌑 暗影幕布笼罩战场，命中-2`)
     const atk = attackRoll(atkMod, monster.ac)
 
     // Lv8 fighter_crit_range: 暴击范围扩展到 19-20
@@ -381,6 +384,10 @@ export function executePlayerAttack(
     )
     if (spellWeakness.effectType === 'vulnerable') {
       log.push(`💥 弱点命中！伤害翻倍！`)
+      // 标记 radiant 命中（用于中断暗影编织者自愈）
+      if (spellWeakness.matchedType === 'radiant') {
+        session.worldState.flags['boss_radiant_hit_this_round'] = true
+      }
     } else if (spellWeakness.effectType === 'resistant') {
       log.push(`🛡️ 目标对该伤害类型有抗性，伤害减半`)
     } else if (spellWeakness.effectType === 'immune') {
@@ -401,7 +408,10 @@ export function executePlayerAttack(
   if (!weapon) throw new Error('未装备武器，无法进行武器攻击')
 
   const effectAtkBonus = getEffectBonus(player, 'attack_bonus')
-  const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus
+  // 暗影幕布效果：命中-2
+  const weaponShadowVeilPenalty = session.worldState.flags['boss_shadow_veil'] ? -2 : 0
+  const atkMod = player.abilityModifiers.STR + PROFICIENCY + (weapon.bonus ?? 0) + effectAtkBonus + weaponShadowVeilPenalty
+  if (weaponShadowVeilPenalty) log.push(`🌑 暗影幕布笼罩战场，命中-2`)
   const atk = attackRoll(atkMod, monster.ac)
 
   // Lv8 fighter_crit_range: 暴击范围扩展到 19-20
@@ -452,6 +462,10 @@ export function executePlayerAttack(
   )
   if (weakness.effectType === 'vulnerable') {
     log.push(`💥 弱点命中！伤害翻倍！`)
+    // 标记 radiant 命中（用于中断暗影编织者自愈）
+    if (weakness.matchedType === 'radiant') {
+      session.worldState.flags['boss_radiant_hit_this_round'] = true
+    }
   } else if (weakness.effectType === 'resistant') {
     log.push(`🛡️ 目标对该伤害类型有抗性，伤害减半`)
   } else if (weakness.effectType === 'immune') {
@@ -465,6 +479,164 @@ export function executePlayerAttack(
     session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
   }
   return { log, killed, hit: true, isCritical: weaponIsCritical }
+}
+
+// ─── Boss 特殊技能 ──────────────────────────────
+
+/**
+ * Boss 特殊技能 — 在怪物普通攻击之后执行
+ * 返回额外日志
+ */
+function executeBossAbility(
+  session: GameSession,
+  monster: MonsterInstance,
+  combat: CombatState,
+): string[] {
+  const round = combat.round
+  const log: string[] = []
+  const player = session.player
+
+  // ─── 蛛母·织暗者 ───
+  if (monster.name === 'Spider Matriarch') {
+    // 吐丝束缚：每 2 回合，束缚一个目标
+    if (round % 2 === 0) {
+      // 选择目标：玩家或盟友
+      const aliveAllies = (combat.allies ?? []).filter(a => a.hp > 0)
+      const targets = [{ id: 'player', name: player.name }, ...aliveAllies.map(a => ({ id: a.id, name: a.name }))]
+      const webTarget = targets[Math.floor(Math.random() * targets.length)]
+      // DC 12 STR 检定
+      const strMod = webTarget.id === 'player' ? player.abilityModifiers.STR : 0
+      const roll = Math.floor(Math.random() * 20) + 1
+      const total = roll + strMod
+      if (total < 12) {
+        log.push(`🕸️ 蛛母吐出暗紫色蛛丝缠住了${webTarget.name}！(STR检定 d20(${roll})+${strMod}=${total} < DC12，束缚1回合)`)
+        // 束缚效果：下回合命中-2（简化处理，不用 condition 系统）
+        if (webTarget.id === 'player') {
+          combat.playerDefending = false // 取消防御
+          // 用 flag 标记被缠
+          session.worldState.flags['boss_web_player'] = 1
+        }
+      } else {
+        log.push(`🕸️ 蛛母吐出蛛丝，但${webTarget.name}挣脱了！(STR检定 d20(${roll})+${strMod}=${total} ≥ DC12)`)
+      }
+    }
+
+    // Phase 2：HP ≤ 50% 时召唤小蜘蛛（只触发一次）
+    if (monster.hp <= monster.maxHp * 0.5 && !monster.conditions.includes('phase2')) {
+      monster.conditions.push('phase2')
+      log.push(`⚠️ 蛛母发出刺耳的尖啸！两只巨型蜘蛛从暗处冲出！`)
+      // 创建 2 只小蜘蛛（半血版 Giant Spider）
+      for (let i = 1; i <= 2; i++) {
+        const spiderling: MonsterInstance = {
+          id: `Spiderling_${i}`,
+          name: 'Giant Spider',
+          hp: 15,  // 半血
+          maxHp: 15,
+          ac: 13,
+          attackMod: 4,
+          damageDice: '1d8+2',
+          specialAbility: 'Web',
+          loot: ['蜘蛛丝'],
+          conditions: [],
+          vulnerability: ['fire'],
+        }
+        combat.monsters.push(spiderling)
+        combat.initiativeOrder.push({
+          id: spiderling.id,
+          name: spiderling.id,
+          initiative: Math.floor(Math.random() * 20) + 1 + 2,
+          isPlayer: false,
+        })
+      }
+    }
+  }
+
+  // ─── 暗影编织者 ───
+  if (monster.name === 'Shadow Weaver') {
+    // 暗影治愈：每回合恢复 3 HP（除非本回合被 radiant 命中）
+    if (!session.worldState.flags['boss_radiant_hit_this_round']) {
+      const healed = Math.min(3, monster.maxHp - monster.hp)
+      if (healed > 0) {
+        monster.hp += healed
+        log.push(`💀 暗影编织者吸收周围的黑暗修复自身(+${healed}HP → ${monster.hp}/${monster.maxHp})`)
+      }
+    } else {
+      log.push(`✨ 光辉之力中断了暗影编织者的自愈！`)
+      delete session.worldState.flags['boss_radiant_hit_this_round']
+    }
+
+    // 暗影幕布：每 3 回合，全体命中 -2（持续 1 回合）
+    if (round % 3 === 0) {
+      log.push(`🌑 暗影编织者释放暗影幕布！浓厚的黑暗笼罩了整个战场！(全体命中-2，持续1回合)`)
+      session.worldState.flags['boss_shadow_veil'] = 1
+    }
+
+    // Phase 2：HP ≤ 40% 时分裂出暗影（只触发一次）
+    if (monster.hp <= monster.maxHp * 0.4 && !monster.conditions.includes('phase2')) {
+      monster.conditions.push('phase2')
+      log.push(`⚠️ 暗影编织者的身体撕裂，一团暗影从它体内分离出来！`)
+      const shadow: MonsterInstance = {
+        id: 'Shadow_clone',
+        name: 'Shadow',
+        hp: 24,
+        maxHp: 24,
+        ac: 13,
+        attackMod: 4,
+        damageDice: '1d8+3',
+        specialAbility: 'Strength Drain',
+        loot: ['暗影精华'],
+        conditions: [],
+        vulnerability: ['radiant'],
+        resistance: ['cold'],
+        immunity: ['necrotic'],
+      }
+      combat.monsters.push(shadow)
+      combat.initiativeOrder.push({
+        id: shadow.id,
+        name: shadow.id,
+        initiative: Math.floor(Math.random() * 20) + 1 + 2,
+        isPlayer: false,
+      })
+    }
+  }
+
+  // ─── 蚀日兽 ───
+  if (monster.name === 'Eclipsed Beast') {
+    // 虚空脉冲：每 3 回合，对所有非怪物目标造成 2d6 necrotic
+    if (round % 3 === 0) {
+      const pulseDmg1 = rollDamage('2d6')
+      log.push(`💜 蚀日兽释放虚空脉冲！一波暗蚀能量冲击所有人！`)
+
+      // 对玩家造成伤害
+      let playerDmg = pulseDmg1
+      if (hasEffect(player, 'resistance', 'necrotic')) {
+        playerDmg = Math.floor(playerDmg * 0.5)
+        log.push(`🛡️ 暗影防护减免了部分伤害`)
+      }
+      player.hp = Math.max(0, player.hp - playerDmg)
+      log.push(`${player.name} 受到 ${playerDmg} 点暗蚀伤害 (HP: ${player.hp}/${player.maxHp})`)
+
+      // 对盟友造成伤害
+      for (const ally of (combat.allies ?? []).filter(a => a.hp > 0)) {
+        const allyDmg = rollDamage('2d6')
+        ally.hp = Math.max(0, ally.hp - allyDmg)
+        log.push(`${ally.name} 受到 ${allyDmg} 点暗蚀伤害 (HP: ${ally.hp}/${ally.maxHp})`)
+        if (ally.hp <= 0) {
+          log.push(`${ally.name} 倒下了！`)
+        }
+      }
+    }
+
+    // Phase 2：HP ≤ 40% 虚空狂暴（只触发一次）
+    if (monster.hp <= monster.maxHp * 0.4 && !monster.conditions.includes('phase2')) {
+      monster.conditions.push('phase2')
+      monster.damageDice = '2d10+5'
+      monster.ac = 13  // AC 从 15 降到 13（暴露弱点）
+      log.push(`⚠️ 蚀日兽发出震耳欲聋的嘶吼！它的暗影护甲破碎，虚空能量失控！(伤害增强但防御降低)`)
+    }
+  }
+
+  return log
 }
 
 // ─── 怪物回合 ───────────────────────────────────
@@ -536,6 +708,9 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     if (!atk.hits) {
       log.push(`${monster.id} 攻击${target.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${targetAC} → 未命中`)
       hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
+      // Boss 特殊技能（即使普通攻击未命中也执行）
+      const bossMissLog = executeBossAbility(session, monster, combat)
+      if (bossMissLog.length > 0) log.push(...bossMissLog)
       continue
     }
 
@@ -585,6 +760,12 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       `伤害: ${monster.damageDice}=${damage}${atk.isCritical ? '(暴击翻倍)' : ''} → ${victimHpStr}`,
     )
     hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: true, isCritical: atk.isCritical, damage, playerKilled, allyKilled })
+
+    // Boss 特殊技能
+    const bossLog = executeBossAbility(session, monster, combat)
+    if (bossLog.length > 0) {
+      log.push(...bossLog)
+    }
 
     if (allyKilled) {
       log.push(`${target.name} 倒下了！`)
@@ -712,6 +893,10 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     )
     if (allyWeakness.effectType === 'vulnerable') {
       log.push(`💥 ${ally.name}击中了弱点！`)
+      // 标记 radiant 命中（用于中断暗影编织者自愈）
+      if (allyWeakness.matchedType === 'radiant') {
+        session.worldState.flags['boss_radiant_hit_this_round'] = true
+      }
     } else if (allyWeakness.effectType === 'resistant') {
       log.push(`🛡️ 目标对${ally.name}的攻击有抗性`)
     } else if (allyWeakness.effectType === 'immune') {
@@ -967,6 +1152,9 @@ export function executeMonsterPhase(
     }
     // 清除防御姿态
     combat.playerDefending = false
+    // 清除 Boss 回合效果 flag
+    delete session.worldState.flags['boss_shadow_veil']
+    delete session.worldState.flags['boss_web_player']
     // 准备下一轮
     combat.round++
   }
