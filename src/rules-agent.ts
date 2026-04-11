@@ -274,13 +274,20 @@ export function formatActionResult(result: ActionResult): string {
   }
 
   const desc = descMap[result.action.type]?.(result.action) ?? result.action.type
+
+  // 根据动作类型生成具体的"不要重复"提示
+  const toolsUsed = result.toolsCalled
+  const noRepeatHint = toolsUsed.length > 0
+    ? `已调用的工具: ${toolsUsed.join('、')}。不要再次调用这些工具——结果已在上方。`
+    : '不要重复执行此动作。'
+
   return [
     `[规则系统执行结果]（代码已执行完毕，以下是事实，直接编织成叙事）`,
     `玩家意图：${desc}`,
     `执行${result.success ? '成功' : '失败'}：`,
     result.output,
     '',
-    '基于以上结果编织叙事。不要重新执行动作，不要修改数值，不要重复调用已执行的工具。',
+    `${noRepeatHint} 基于以上结果编织叙事，不要修改数值。`,
   ].join('\n')
 }
 
