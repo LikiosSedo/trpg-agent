@@ -50,6 +50,12 @@ const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, inpu
   // 战斗意图（无具体目标 → ATTACK target=''，由 engine 解析为 POI 遭遇）
   { pattern: /^(?:突袭|偷袭|袭击|发动攻击|先下手|冲上去|发动突袭|进攻|开打)/,
     build: () => ({ type: 'ATTACK', target: '', method: 'weapon' as const }) },
+  // 战斗意图（含具体目标：猎杀狼群/攻击蜘蛛/打怪物）
+  { pattern: /^(?:猎杀|攻击|打|干掉|消灭|击杀|讨伐|对付)\s*(.+)/,
+    build: (m) => ({ type: 'ATTACK', target: m[1].trim(), method: 'weapon' as const }) },
+  // "去打X/去猎杀X" 不应被 MOVE 捕获
+  { pattern: /^(?:去(?:打|猎杀|攻击|消灭|讨伐|干掉))\s*(.+)/,
+    build: (m) => ({ type: 'ATTACK', target: m[1].trim(), method: 'weapon' as const }) },
 
   // 移动（含标点或超过最长地名长度 → 可能有附加意图，交给 LLM）
   { pattern: /^(?:去|前往|走到|移动到|回到)\s*(.+)/,

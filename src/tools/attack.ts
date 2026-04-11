@@ -171,22 +171,74 @@ export const AttackTool: Tool = {
       }
     }
 
-    // 位置检查：怪物战斗只能在对应区域
+    // 位置检查 + 中文名解析：怪物战斗只能在对应区域
     const locationMonsters: Record<string, string[]> = {
-      'twilight-woods': ['Wolf', 'Giant Spider', 'Goblin', 'Cockatrice'],
-      'greyspine-mines': ['Skeleton', 'Shadow', 'Ghoul', 'Mimic'],
-      'shatterstone-wastes': ['Orc Warrior', 'Ghoul', 'Eclipsed Beast'],
+      'twilight-woods': ['Wolf', 'Giant Spider', 'Goblin', 'Cockatrice', 'Hobgoblin', 'Spider Matriarch'],
+      'greyspine-mines': ['Skeleton', 'Shadow', 'Ghoul', 'Mimic', 'Giant Spider', 'Shadow Weaver'],
+      'shatterstone-wastes': ['Orc Warrior', 'Ghoul', 'Skeleton', 'Eclipsed Beast'],
       'dawnbreak-town': [],
     }
+    // 中文名 → 英文名映射（用于玩家用中文指定目标）
+    const zhToEn: Record<string, string> = {}
+    for (const m of monstersDb) {
+      if (m.nameZh) zhToEn[m.nameZh] = m.name
+      // 也映射简称：野狼→Wolf, 蜘蛛→Giant Spider, 狼→Wolf
+      const zh = m.nameZh || ''
+      if (zh.includes('狼')) zhToEn['狼'] = m.name
+      if (zh.includes('蜘蛛')) { zhToEn['蜘蛛'] = m.name; zhToEn['大蜘蛛'] = m.name }
+      if (zh.includes('骷髅')) zhToEn['骷髅'] = m.name
+      if (zh.includes('暗影') && m.name === 'Shadow') zhToEn['暗影'] = m.name
+      if (zh.includes('食尸鬼')) zhToEn['食尸鬼'] = m.name
+      if (zh.includes('兽人')) zhToEn['兽人'] = m.name
+    }
+    // Boss 简称
+    zhToEn['蛛母'] = 'Spider Matriarch'
+    zhToEn['暗影编织者'] = 'Shadow Weaver'
+    zhToEn['蚀日兽'] = 'Eclipsed Beast'
+    zhToEn['狼群'] = 'Wolf'  // 狼群 → 生成多只狼
+
+    // 解析目标：先尝试中文映射，再尝试英文匹配
+    let resolvedTarget = targetId
+    if (zhToEn[targetId]) {
+      resolvedTarget = zhToEn[targetId]
+    } else {
+      // 模糊匹配：遍历中文映射看是否包含
+      for (const [zh, en] of Object.entries(zhToEn)) {
+        if (targetId.includes(zh) || zh.includes(targetId)) {
+          resolvedTarget = en; break
+        }
+      }
+    }
+
     const allowedHere = locationMonsters[session.worldState.currentLocation] ?? []
-    const targetName = targetId.toLowerCase()
-    if (!session.combat?.active && !allowedHere.some(m => m.toLowerCase().includes(targetName))) {
-      return { output: `这里没有${targetId}。当前位置不太可能遇到这种敌人。`, isError: true }
+
+    if (!session.combat?.active) {
+      // 检查解析后的目标是否在当前区域允许
+      const isAllowed = allowedHere.some(m => m.toLowerCase() === resolvedTarget.toLowerCase())
+
+      if (!isAllowed) {
+        // 兜底：如果玩家想打架但目标不明确，从当前区域随机生成遭遇
+        if (allowedHere.length > 0 && (targetId === '' || targetId === '怪物' || targetId === '敌人')) {
+          const randomMonster = allowedHere[Math.floor(Math.random() * allowedHere.length)]
+          resolvedTarget = randomMonster
+        } else if (allowedHere.length === 0) {
+          return { output: `这里是安全区域，没有可战斗的敌人。`, isError: true }
+        } else {
+          return { output: `这里没有${targetId}。当前区域可能遇到：${allowedHere.map(m => {
+            const template = monstersDb.find(t => t.name === m)
+            return template?.nameZh || m
+          }).join('、')}`, isError: true }
+        }
+      }
     }
 
     // 如果没有进行中的战斗，进入战斗状态（不执行第一击）
     if (!session.combat?.active) {
-      const monsterNames: string[] = encounterMonsters ?? [targetId]
+      // "狼群" 特殊处理：生成多只狼
+      let monsterNames: string[] = encounterMonsters ?? [resolvedTarget]
+      if (targetId.includes('群') || targetId.includes('们')) {
+        monsterNames = [resolvedTarget, resolvedTarget] // 2 只
+      }
       try {
         const allDb = [...monstersDb, ...npcDb]
         const combat = startCombat(session, monsterNames, allDb)
