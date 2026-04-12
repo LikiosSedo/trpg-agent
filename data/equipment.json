@@ -191,5 +191,140 @@
     "type": "potion",
     "description": "苦涩的神经强化剂，饮用后一场战斗内免疫麻痹状态。对付食尸鬼和鸡蛇兽极为有效。",
     "basePrice": 35
+  },
+  {
+    "name": "蛛毒刺剑",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "格罗姆用蛛母毒腺淬炼的刺剑，剑身泛着紫黑色的光泽。每次命中有概率注入毒素。造成1d8+1穿刺伤害。",
+    "bonus": 1,
+    "damageType": "piercing",
+    "bonusDamageType": "fire",
+    "forgeFrom": "蛛母毒腺",
+    "forgeClass": "fighter"
+  },
+  {
+    "name": "蛛丝长弓",
+    "type": "weapon",
+    "weaponType": "ranged",
+    "description": "以蛛母的暗紫色蛛丝为弦的长弓，箭矢射出时带着灼热的气息。造成1d8+1穿刺伤害，附带火焰伤害。",
+    "bonus": 1,
+    "damageType": "piercing",
+    "bonusDamageType": "fire",
+    "forgeFrom": "蛛母毒腺",
+    "forgeClass": "ranger"
+  },
+  {
+    "name": "蛛丝法杖",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "缠绕蛛母暗紫丝线的法杖，杖端凝聚着灼热的魔力。提升法术伤害+1。造成1d6穿刺伤害。",
+    "bonus": 1,
+    "damageType": "piercing",
+    "bonusDamageType": "fire",
+    "forgeFrom": "蛛母毒腺",
+    "forgeClass": "mage",
+    "spellBonus": 1
+  },
+  {
+    "name": "蛛骨圣锤",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "以蛛母甲壳加固的战锤，锤头散发微弱的火光。造成1d8+1钝击伤害，附带火焰伤害。",
+    "bonus": 1,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "fire",
+    "forgeFrom": "蛛母毒腺",
+    "forgeClass": "cleric"
+  },
+  {
+    "name": "暗影斩",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "格罗姆将暗影核心镶嵌在灵银剑身中，光与暗的力量在剑刃上交织。造成1d10+2劈砍伤害，附带光辉伤害。",
+    "bonus": 2,
+    "damageType": "slashing",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "暗影核心",
+    "forgeClass": "fighter"
+  },
+  {
+    "name": "暗影猎弓",
+    "type": "weapon",
+    "weaponType": "ranged",
+    "description": "弓身嵌入暗影核心碎片，每支箭矢射出时都裹着银白色的光辉。造成1d8+2穿刺伤害，附带光辉伤害。",
+    "bonus": 2,
+    "damageType": "piercing",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "暗影核心",
+    "forgeClass": "ranger"
+  },
+  {
+    "name": "暗影法杖",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "以暗影核心为杖芯，灵银丝缠绕的法杖。暗影的力量被光辉驯化，提升法术伤害+2。造成1d6钝击伤害。",
+    "bonus": 1,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "暗影核心",
+    "forgeClass": "mage",
+    "spellBonus": 2
+  },
+  {
+    "name": "光铸战锤",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "暗影核心被净化后嵌入锤头，每次挥击都释放出圣洁的光芒。造成1d10+2钝击伤害，附带光辉伤害。",
+    "bonus": 2,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "暗影核心",
+    "forgeClass": "cleric"
+  },
+  {
+    "name": "破虚之刃",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "格罗姆的毕生杰作。虚空碎片被锻入灵银剑身，剑刃在光暗之间闪烁。能同时造成光辉和冰冻伤害。造成1d12+3劈砍伤害。",
+    "bonus": 3,
+    "damageType": "slashing",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "虚空碎片",
+    "forgeClass": "fighter"
+  },
+  {
+    "name": "虚空长弓",
+    "type": "weapon",
+    "weaponType": "ranged",
+    "description": "弓臂由虚空碎片与灵银合金铸成，箭矢命中时在目标身上绽放光辉裂痕。造成1d10+3穿刺伤害，附带光辉伤害。",
+    "bonus": 3,
+    "damageType": "piercing",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "虚空碎片",
+    "forgeClass": "ranger"
+  },
+  {
+    "name": "虚空法杖",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "虚空碎片悬浮在杖端的灵银笼中，散发着令人敬畏的光芒。法术伤害+3，施法时虚空能量与法术交融。造成1d6钝击伤害。",
+    "bonus": 1,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "虚空碎片",
+    "forgeClass": "mage",
+    "spellBonus": 3
+  },
+  {
+    "name": "曙光圣锤",
+    "type": "weapon",
+    "weaponType": "melee",
+    "description": "虚空碎片被神圣之力彻底净化，化为锤头的核心。这是破晓镇三千年来最强的圣器。造成1d12+3钝击伤害，附带光辉伤害。",
+    "bonus": 3,
+    "damageType": "bludgeoning",
+    "bonusDamageType": "radiant",
+    "forgeFrom": "虚空碎片",
+    "forgeClass": "cleric"
   }
 ]

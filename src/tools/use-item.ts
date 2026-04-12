@@ -10,6 +10,7 @@ import { getSession, getFacts } from '../game-state.js'
 import { rollDice } from '../rules-engine.js'
 import { executeMonsterTurns, checkCombatEnd, endCombat, getCombatSummary } from '../combat-manager.js'
 import { applyEffect } from '../effect-manager.js'
+import { findRecipeByMaterial, executeCraft } from '../crafting.js'
 
 export const UseItemTool: Tool = {
   name: 'UseItem',
@@ -231,6 +232,37 @@ export const UseItemTool: Tool = {
         if (npc.location !== session.worldState.currentLocation) {
           return { output: `${npc.name}不在这里，无法给予物品。`, isError: true }
         }
+
+        // ─── 铸造检查：Boss 材料 + 格罗姆 = 铸造 ───
+        if (targetId === '格罗姆') {
+          const recipe = findRecipeByMaterial(item!.name)
+          if (recipe) {
+            const craftResult = executeCraft(session, recipe)
+            if (craftResult.success) {
+              facts.addEvent(`格罗姆用${item!.name}铸造了${craftResult.weapon!.name}`, 'critical')
+              result = {
+                output: [
+                  craftResult.description,
+                  '',
+                  `⚒️ 铸造完成！`,
+                  `获得：${craftResult.weapon!.name}`,
+                  `${craftResult.weapon!.description}`,
+                  `消耗：${item!.name} + ${recipe.goldCost} 金币`,
+                  `剩余金币：${session.player.gold}`,
+                ].join('\n'),
+              }
+              break
+            } else {
+              // 铸造失败（金币不足或信任不够）—— 不消耗物品，给出提示
+              result = {
+                output: `格罗姆看了看${item!.name}，摇了摇头。"${craftResult.error}"`,
+              }
+              break
+            }
+          }
+        }
+
+        // 正常 give 逻辑（非铸造材料）
         const givenItem = player.inventory.splice(itemIdx, 1)[0]
         if (!npc.inventory) npc.inventory = []
         npc.inventory.push(givenItem)  // 物品守恒：加入 NPC 背包
