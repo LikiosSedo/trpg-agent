@@ -111,6 +111,25 @@ export function getMemoryForPrompt(session: GameSession, npcName: string): strin
   return `[${npcName}对你的记忆] ${parts.join('。')}`
 }
 
+/**
+ * 时间感知提示：根据上次互动距今的轮数生成 NPC 的时间感知台词线索。
+ * 注入到 getNPCContext()，让 DM 写出"好久不见"/"你刚才说的那个"等自然反应。
+ * 纯代码，零 API 成本。
+ */
+export function getTimeSenseHint(session: GameSession, npcName: string): string {
+  const store = session.npcMemories?.[npcName]
+  if (!store || store.interactions.length === 0) {
+    // 从未互动过
+    return `（${npcName}从未和玩家正式交流过——第一次互动）`
+  }
+  const lastInteraction = store.interactions[store.interactions.length - 1]
+  const gap = session.turnCount - lastInteraction.turn
+  if (gap <= 1) return '' // 刚刚聊过，不需要时间提示
+  if (gap <= 3) return `（上次和${npcName}交流是${gap}轮前，记忆犹新）`
+  if (gap <= 8) return `（距上次和${npcName}交流过了一段时间——${gap}轮前）`
+  return `（很久没和${npcName}交流了——上次是${gap}轮前，${npcName}可能会提到这段时间的变化）`
+}
+
 /** 生成用于归档快照的 NPC 记忆摘要 */
 export function formatMemoriesForSnapshot(session: GameSession): string {
   if (!session.npcMemories) return ''

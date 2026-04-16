@@ -3,7 +3,8 @@ import type { GameSession, GameEvent, NPC } from './types.js'
 import { getCombatSummary } from './combat-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
 import { getGatedFacts } from './trust-system.js'
-import { getMemoryForPrompt } from './npc-memory.js'
+import { getMemoryForPrompt, getTimeSenseHint } from './npc-memory.js'
+import { getIdleEvent } from './npc-idle-events.js'
 import { getRecentJournal, formatJournalForPrompt, CONTEXT_INJECT_COUNT } from './dm-journal.js'
 import { getLoreStore, parseChapterNumber } from './lore/index.js'
 
@@ -118,6 +119,8 @@ export class GameFactStore {
       formatJournalForPrompt(
         getRecentJournal(this.session, CONTEXT_INJECT_COUNT),
       ),
+      // NPC 闲置微事件 —— 6% 概率，让世界有呼吸感
+      getIdleEvent(this.session),
     ].filter(Boolean).join('\n')
   }
 
@@ -176,9 +179,11 @@ export class GameFactStore {
       ? `最近交互: ${(npc.interactionLog ?? []).slice(-3).join('；')}`
       : ''
     const memoryCtx = getMemoryForPrompt(this.session, npc.name)
+    const timeSense = getTimeSenseHint(this.session, npc.name)
     return [
       `${npc.name}（信任:${npc.trust}, 情绪:${npc.mood}, 位于:${npc.location}）`,
       facts, promises, log,
+      timeSense,
       memoryCtx,
     ].filter(Boolean).join('。')
   }
