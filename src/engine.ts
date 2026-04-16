@@ -24,7 +24,8 @@ import { consumeSpeakingNPCs, consumePendingTalkData } from './tools/talk.js'
 import { classifyIntent, formatActionResult, shouldPreExecute, quickMatch, type ActionResult } from './rules-agent.js'
 import { executeAction } from './action-executor.js'
 import { getActiveEffectsSummary } from './effect-manager.js'
-import { isBuffSpell } from './combat-manager.js'
+import { isBuffSpell, type GridMoveRecord } from './combat-manager.js'
+import { manhattan, posEqual, type GridPos } from './combat-grid.js'
 import {
   executeMonsterPhase, getCombatSummary, executePlayerTurn,
   attemptFlee, checkCombatEnd, awardLoot, endCombat, startCombat,
@@ -409,6 +410,19 @@ export type TurnEvent =
       encounterDescription: string;
       image?: string;
     }
+  // ── 战棋网格事件 ──
+  /** 战斗开始时发送完整棋盘状态 */
+  | { type: 'combat_grid_init'; grid: any }
+  /** 单位移动（前端播放逐格滑动动画） */
+  | { type: 'combat_grid_move'; unitId: string; path: Array<{ x: number; y: number }> }
+  /** 单位出生（召唤/分裂） */
+  | { type: 'combat_grid_spawn'; unit: any }
+  /** 单位死亡 */
+  | { type: 'combat_grid_death'; unitId: string }
+  /** 战棋攻击结果 */
+  | { type: 'combat_grid_attack'; attackerId: string; targetId: string; damage: number; hit: boolean; isCritical: boolean; narrative: string }
+  /** 战棋战斗结束 */
+  | { type: 'combat_grid_end'; result: 'victory' | 'defeat'; loot?: any }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -3218,6 +3232,28 @@ export class GameEngine {
       initiative: combat.initiativeOrder,
       narrative,
     }
+
+    // ── 战棋网格初始化事件 ──
+    if (combat.grid) {
+      const gridData = combat.grid.toJSON()
+      // 补充名称和立绘到 grid units
+      for (const gu of gridData.units) {
+        if (gu.side === 'player') {
+          (gu as any).name = this.session.player.name;
+          (gu as any).portrait = ''
+          const pgs = combat.playerGridStats
+          if (pgs) { (gu as any).hp = this.session.player.hp; (gu as any).maxHp = this.session.player.maxHp }
+        } else if (gu.side === 'enemy') {
+          const m = combat.monsters.find(mon => mon.id === gu.id)
+          if (m) { (gu as any).name = m.name; (gu as any).portrait = MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? ''; (gu as any).hp = m.hp; (gu as any).maxHp = m.maxHp }
+        } else {
+          const a = combat.allies.find(al => al.id === gu.id)
+          if (a) { (gu as any).name = a.name; (gu as any).portrait = NPC_PORTRAITS[a.name] ?? ''; (gu as any).hp = a.hp; (gu as any).maxHp = a.maxHp }
+        }
+      }
+      yield { type: 'combat_grid_init', grid: gridData }
+    }
+
     if (!deferActionReq) {
       yield* this.emitCombatActionReq()
     }
@@ -3760,6 +3796,193 @@ export class GameEngine {
 
   getWorldGuide(): string {
     return renderWorldGuide()
+  }
+
+  // ─── 战棋网格动作处理 ────────────────────────────
+
+  async *processGridAction(msg: {
+    action: 'grid_move' | 'grid_attack' | 'grid_spell' | 'grid_defend' | 'grid_flee' | 'grid_item'
+    target?: { x: number; y: number }
+    targetId?: string
+    spellName?: string
+    itemName?: string
+  }): AsyncGenerator<TurnEvent> {
+    this.activate()
+    const session = this.session
+    const combat = session.combat
+    if (!combat?.active || !combat.grid) {
+      yield { type: 'dm_error', message: '当前没有战棋战斗。' }
+      return
+    }
+
+    const grid = combat.grid
+    const player = session.player
+    const playerUnit = grid.getUnit('player')
+    if (!playerUnit) {
+      yield { type: 'dm_error', message: '玩家单位丢失。' }
+      return
+    }
+
+    const { pickNarrative } = await import('./combat-narrative.js')
+    const { executePlayerTurn, executeMonsterPhase, checkCombatEnd, endCombat, awardLoot } = await import('./combat-manager.js')
+
+    // ── A. 纯移动 ──
+    if (msg.action === 'grid_move' && msg.target) {
+      const reachable = grid.getReachable('player')
+      const key = `${msg.target.x},${msg.target.y}`
+      if (!reachable.has(key)) {
+        yield { type: 'dm_error', message: '无法到达该位置。' }
+        return
+      }
+      const path = grid.moveUnit('player', msg.target)
+      if (combat.playerGridStats) combat.playerGridStats.pos = { ...msg.target }
+      yield { type: 'combat_grid_move', unitId: 'player', path }
+      yield { type: 'system_message', text: '你移动到了新的位置。' }
+    }
+
+    // ── B. 移动+攻击（火纹式） ──
+    else if (msg.action === 'grid_attack' && msg.targetId) {
+      const targets = grid.getAttackableTargets('player')
+      const opt = targets.find(t => t.targetId === msg.targetId)
+      if (!opt) {
+        yield { type: 'dm_error', message: '目标不在攻击范围内。' }
+        return
+      }
+      // 先移动到攻击位
+      if (!posEqual(playerUnit.pos, opt.attackFrom)) {
+        const path = grid.moveUnit('player', opt.attackFrom)
+        if (combat.playerGridStats) combat.playerGridStats.pos = { ...opt.attackFrom }
+        yield { type: 'combat_grid_move', unitId: 'player', path }
+      }
+      // 执行攻击（复用现有伤害逻辑）
+      const turnResult = executePlayerTurn(session, msg.targetId, 'weapon')
+      // 发送攻击结果
+      for (const line of turnResult.roundLog) {
+        yield { type: 'combat_status', text: line, ended: false }
+      }
+      // 目标死亡 → 移除网格单位
+      const targetMonster = combat.monsters.find(m => m.id === msg.targetId)
+      if (targetMonster && targetMonster.hp <= 0) {
+        grid.removeUnit(msg.targetId)
+        yield { type: 'combat_grid_death', unitId: msg.targetId }
+      }
+    }
+
+    // ── C. 防御 ──
+    else if (msg.action === 'grid_defend') {
+      combat.playerDefending = true
+      yield { type: 'system_message', text: '你举起武器防御。（AC+2 本轮）' }
+    }
+
+    // ── D. 逃跑 ──
+    else if (msg.action === 'grid_flee') {
+      const { attemptFlee } = await import('./combat-manager.js')
+      const fleeResult = await attemptFlee(session)
+      for (const line of fleeResult.log) {
+        yield { type: 'combat_status', text: line, ended: false }
+      }
+      if (fleeResult.success) {
+        endCombat(session)
+        const fleeAudio = resolveAudio(session.worldState.currentLocation, session.worldState.currentSubLocation, session.worldState.timeOfDay, false)
+        yield { type: 'audio', bgm: fleeAudio.bgm, ambient: fleeAudio.ambient }
+        yield { type: 'combat_grid_end', result: 'defeat' }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+        return
+      }
+    }
+
+    // ── E. 施法（原地） ──
+    else if (msg.action === 'grid_spell' && msg.spellName) {
+      // 施法走现有 processCombatAction 逻辑（不移动）
+      yield* this.processCombatAction({ action: 'spell', spellId: msg.spellName, targetId: msg.targetId })
+      // 目标死亡 → 移除网格
+      if (msg.targetId) {
+        const tm = combat.monsters.find(m => m.id === msg.targetId)
+        if (tm && tm.hp <= 0) {
+          grid.removeUnit(msg.targetId)
+          yield { type: 'combat_grid_death', unitId: msg.targetId }
+        }
+      }
+      return // processCombatAction 已经处理了怪物回合
+    }
+
+    // ── E2. 使用物品（原地） ──
+    else if (msg.action === 'grid_item' && msg.itemName) {
+      yield* this.processCombatAction({ action: 'item', itemId: msg.itemName })
+      return
+    }
+
+    // ── 检查战斗结束 ──
+    const endCheck = checkCombatEnd(session)
+    if (endCheck.ended) {
+      const lootInfo = endCheck.result === 'victory' ? awardLoot(session) : undefined
+      yield { type: 'combat_grid_end', result: endCheck.result as any, loot: lootInfo }
+      endCombat(session)
+      // 恢复探索BGM
+      const audio = resolveAudio(
+        session.worldState.currentLocation,
+        session.worldState.currentSubLocation,
+        session.worldState.timeOfDay,
+        false,
+      )
+      yield { type: 'audio', bgm: audio.bgm, ambient: audio.ambient }
+      yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+      return
+    }
+
+    // ── 怪物回合 ──
+    combat.pendingMonsterTurn = true
+    const monsterResult = executeMonsterPhase(session)
+    if (monsterResult.log.length > 0) {
+      // 发送怪物移动动画
+      if ((monsterResult as any).gridMoves) {
+        for (const gm of (monsterResult as any).gridMoves as GridMoveRecord[]) {
+          yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
+        }
+      }
+      yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: player.hp, playerMaxHp: player.maxHp, allies: (combat.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
+    }
+
+    // 怪物击杀检查
+    for (const m of combat.monsters) {
+      if (m.hp <= 0 && grid.getUnit(m.id)) {
+        grid.removeUnit(m.id)
+        yield { type: 'combat_grid_death', unitId: m.id }
+      }
+    }
+    // 盟友倒下检查
+    for (const a of combat.allies) {
+      if (a.hp <= 0 && grid.getUnit(a.id)) {
+        grid.removeUnit(a.id)
+        yield { type: 'combat_grid_death', unitId: a.id }
+      }
+    }
+
+    // 再次检查战斗结束（怪物回合后）
+    const endCheck2 = checkCombatEnd(session)
+    if (endCheck2.ended) {
+      const lootInfo2 = endCheck2.result === 'victory' ? awardLoot(session) : undefined
+      yield { type: 'combat_grid_end', result: endCheck2.result as any, loot: lootInfo2 }
+      endCombat(session)
+      const audio2 = resolveAudio(
+        session.worldState.currentLocation,
+        session.worldState.currentSubLocation,
+        session.worldState.timeOfDay,
+        false,
+      )
+      yield { type: 'audio', bgm: audio2.bgm, ambient: audio2.ambient }
+    }
+
+    // 发送 combat_action_req（解锁下一轮玩家输入）+ 更新立绘血量
+    if (combat.active) {
+      yield* this.emitCombatActionReq()
+    }
+    yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+
+    // 死亡检查
+    if (player.hp <= 0) {
+      yield* this.handleDeath()
+    }
   }
 
   /** 恢复时的完整视觉状态快照 */

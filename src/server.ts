@@ -335,6 +335,19 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('npc_speaking', { npcName: ev.npcName, portrait: ev.portrait }); break
         case 'combat_portraits':
           send('combat_portraits', { monsters: ev.monsters }); break
+        // 战棋网格事件
+        case 'combat_grid_init':
+          send('combat_grid_init', { grid: (ev as any).grid }); break
+        case 'combat_grid_move':
+          send('combat_grid_move', { unitId: (ev as any).unitId, path: (ev as any).path }); break
+        case 'combat_grid_spawn':
+          send('combat_grid_spawn', { unit: (ev as any).unit }); break
+        case 'combat_grid_death':
+          send('combat_grid_death', { unitId: (ev as any).unitId }); break
+        case 'combat_grid_attack':
+          send('combat_grid_attack', ev); break
+        case 'combat_grid_end':
+          send('combat_grid_end', { result: (ev as any).result, loot: (ev as any).loot }); break
         case 'game_over':
           send('game_over', { reason: localize(ev.reason), canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
@@ -471,6 +484,19 @@ wss.on('connection', (ws: WebSocket, req) => {
       processing = true
       try {
         await streamEvents(engine.processCombatAction(msg))
+      } finally {
+        processing = false
+      }
+      return
+    }
+
+    // ── 战棋网格动作 ──
+    if (msg.type === 'grid_action') {
+      if (!gameStarted || !engine) return
+      if (processing) { send('error', { text: '处理中...' }); return }
+      processing = true
+      try {
+        await streamEvents(engine.processGridAction(msg))
       } finally {
         processing = false
       }
