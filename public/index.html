@@ -841,6 +841,128 @@
       color: #ccc;
     }
 
+    /* ─── 战棋网格 ─── */
+    .combat-grid-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 8px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .combat-grid-container.active { display: flex; }
+    .combat-grid {
+      display: grid;
+      gap: 2px;
+      justify-content: center;
+    }
+    .grid-cell {
+      position: relative;
+      width: 48px; height: 48px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .grid-cell.floor { background: rgba(20, 20, 40, 0.7); border: 1px solid rgba(80, 80, 120, 0.3); }
+    .grid-cell.wall  { background: rgba(40, 30, 20, 0.9); border: 1px solid rgba(60, 50, 40, 0.5); }
+    .grid-cell.wall::after { content: '█'; color: rgba(80, 60, 40, 0.6); font-size: 20px; }
+    .grid-cell.difficult { background: rgba(30, 30, 20, 0.7); border: 1px dashed rgba(100, 90, 50, 0.4); }
+    .grid-cell.difficult::after { content: '▒'; color: rgba(120, 100, 50, 0.4); font-size: 16px; position: absolute; }
+    /* 高亮 */
+    .grid-cell.reachable { background: rgba(60, 120, 255, 0.2) !important; box-shadow: inset 0 0 8px rgba(60, 120, 255, 0.3); }
+    .grid-cell.attackable { background: rgba(255, 60, 60, 0.25) !important; box-shadow: inset 0 0 8px rgba(255, 60, 60, 0.4); }
+    .grid-cell.selected  { box-shadow: 0 0 0 2px #ffd700 !important; }
+
+    /* 单位 */
+    .grid-unit {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      position: relative;
+      z-index: 2;
+      background-size: cover;
+      background-position: center;
+      transition: transform 0.3s ease;
+    }
+    .grid-unit.player { border: 2px solid #ffd700; background-color: rgba(40, 35, 15, 0.9); }
+    .grid-unit.ally   { border: 2px solid #4a9eff; background-color: rgba(15, 25, 45, 0.9); }
+    .grid-unit.enemy  { border: 2px solid #ff4444; background-color: rgba(45, 15, 15, 0.9); }
+    .grid-unit.enemy.boss { box-shadow: 0 0 10px rgba(255, 50, 50, 0.5); animation: bossPulse 2s ease-in-out infinite; }
+    @keyframes bossPulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 50, 50, 0.3); }
+      50% { box-shadow: 0 0 16px rgba(255, 50, 50, 0.7); }
+    }
+    /* 单位血条 */
+    .grid-hp {
+      position: absolute;
+      bottom: -4px; left: 2px; right: 2px;
+      height: 3px;
+      background: #22cc22;
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+    .grid-hp.low { background: #cc8822; }
+    .grid-hp.critical { background: #cc2222; }
+    /* 单位名字 */
+    .grid-name {
+      position: absolute;
+      top: -14px; left: 50%; transform: translateX(-50%);
+      font-size: 9px; color: #aaa;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    /* 死亡动画 */
+    .grid-unit.dying {
+      animation: unitDeath 0.5s ease forwards;
+    }
+    @keyframes unitDeath {
+      to { opacity: 0; transform: scale(0.3); }
+    }
+
+    /* 战斗日志（网格下方2-3行） */
+    .combat-grid-log {
+      width: 90%;
+      max-width: 380px;
+      max-height: 60px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #b0a080;
+      padding: 4px 8px;
+      background: rgba(15, 10, 5, 0.5);
+      border-radius: 6px;
+      border: 1px solid rgba(80, 60, 30, 0.3);
+    }
+    .combat-grid-log p { margin: 2px 0; }
+
+    /* 网格动作按钮栏 */
+    .grid-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 4px 8px;
+    }
+    .grid-action-btn {
+      padding: 8px 16px;
+      background: rgba(30, 25, 40, 0.8);
+      border: 1px solid #555;
+      color: #ddd;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .grid-action-btn:hover { background: rgba(50, 45, 70, 0.9); border-color: #888; }
+    .grid-action-btn.active { border-color: #ffd700; color: #ffd700; }
+    .grid-action-btn.attack { border-color: #ff4444; color: #ff6666; }
+    .grid-action-btn.attack:hover { background: rgba(60, 20, 20, 0.8); }
+    .grid-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .msg.reconnect {
       color: #666 !important;
       font-size: 11px;
@@ -3479,6 +3601,19 @@
     </div>
     <div id="messages"></div>
 
+    <!-- 战棋网格容器（战斗时替代 messages） -->
+    <div class="combat-grid-container" id="combat-grid-container">
+      <div class="combat-grid" id="combat-grid"></div>
+      <div class="combat-grid-log" id="combat-grid-log"></div>
+      <div class="grid-actions" id="grid-actions">
+        <button class="grid-action-btn attack" id="grid-btn-attack" onclick="gridAttackMode()">⚔ 攻击</button>
+        <button class="grid-action-btn" id="grid-btn-move" onclick="gridMoveMode()">🏃 移动</button>
+        <button class="grid-action-btn" id="grid-btn-spell" onclick="gridSpellMode()">✨ 法术</button>
+        <button class="grid-action-btn" id="grid-btn-defend" onclick="gridDefend()">🛡 防御</button>
+        <button class="grid-action-btn" id="grid-btn-flee" onclick="gridFlee()">💨 逃跑</button>
+      </div>
+    </div>
+
     <!-- 战斗操作面板 -->
     <div id="combat-panel">
       <div class="combat-round" id="combat-round-label"></div>
@@ -5580,6 +5715,23 @@
           setCombatButtonsEnabled(true)
           hideCombatSelector()
           updateCombatPanel()
+          // 战棋模式：同步 HP 并解锁网格按钮
+          if (gridState) {
+            // 更新 gridState 中的 HP
+            for (const t of (msg.targets || [])) {
+              const u = gridState.units.find(u => u.id === t.id)
+              if (u) { u.hp = t.hp; u.maxHp = t.maxHp }
+            }
+            for (const a of (msg.allies || [])) {
+              const u = gridState.units.find(u => u.id === a.id)
+              if (u) { u.hp = a.hp; u.maxHp = a.maxHp }
+            }
+            // 更新玩家 HP
+            const pu = gridState.units.find(u => u.id === 'player')
+            if (pu) { pu.hp = msg.playerHp; pu.maxHp = msg.playerMaxHp }
+            renderCombatGrid()
+            enableGridButtons()
+          }
           break
 
         case 'combat_narrative':
@@ -5612,6 +5764,7 @@
           break
 
         case 'combat_status':
+          if (gridState) gridLog(msg.text)
           // 玩家回合也延迟显示 + 分隔线
           appendMsg('── 你的回合 ──', 'combat-divider')
           setTimeout(() => {
@@ -5777,6 +5930,20 @@
         case 'lair_entrance':
           playSfx('draw_weapon', 0.5)
           showLairEntrance(msg)
+          break
+
+        // ─── 战棋网格事件 ───
+        case 'combat_grid_init':
+          initCombatGrid(msg.grid)
+          break
+        case 'combat_grid_move':
+          animateGridMove(msg.unitId, msg.path)
+          break
+        case 'combat_grid_death':
+          gridUnitDeath(msg.unitId)
+          break
+        case 'combat_grid_end':
+          endCombatGrid(msg.result, msg.loot)
           break
 
         // ─── 物品获取通知 ───
@@ -6698,6 +6865,325 @@
       overlay.classList.add('lair')
       overlay.classList.add('open')
     }
+
+    // ─── 战棋网格系统 ───
+    let gridState = null  // { width, height, terrain[][], units[] }
+    let gridMode = 'idle' // idle | move | attack
+
+    function initCombatGrid(gridData) {
+      gridState = gridData
+      gridMode = 'idle'
+      // 显示网格容器，隐藏消息
+      document.getElementById('combat-grid-container').classList.add('active')
+      document.getElementById('messages').style.display = 'none'
+      renderCombatGrid()
+      gridLog('战斗开始！选择行动。')
+      playSfx('combat_start', 0.4)
+    }
+
+    function renderCombatGrid() {
+      if (!gridState) return
+      const el = document.getElementById('combat-grid')
+      el.style.gridTemplateColumns = `repeat(${gridState.width}, 48px)`
+      el.innerHTML = ''
+
+      for (let y = 0; y < gridState.height; y++) {
+        for (let x = 0; x < gridState.width; x++) {
+          const cell = document.createElement('div')
+          cell.className = 'grid-cell'
+          cell.dataset.x = x
+          cell.dataset.y = y
+
+          const t = gridState.terrain[y]?.[x] ?? 0
+          if (t === 1) cell.classList.add('wall')
+          else if (t === 2) cell.classList.add('difficult')
+          else cell.classList.add('floor')
+
+          // 单位
+          const unit = gridState.units.find(u => u.pos.x === x && u.pos.y === y)
+          if (unit && t !== 1) {
+            const icon = document.createElement('div')
+            icon.className = `grid-unit ${unit.side}`
+            icon.dataset.unitId = unit.id
+            if (unit.portrait) {
+              icon.style.backgroundImage = `url(${unit.portrait})`
+              icon.style.backgroundSize = 'cover'
+            } else {
+              icon.textContent = unit.side === 'player' ? '⚔' : unit.side === 'ally' ? '🛡' : '👹'
+            }
+            // Boss 标记
+            if (unit.side === 'enemy' && (unit.maxHp ?? 0) >= 40) icon.classList.add('boss')
+            // 血条
+            const hp = unit.hp ?? unit.maxHp ?? 1
+            const maxHp = unit.maxHp ?? 1
+            const pct = Math.max(0, hp / maxHp * 100)
+            const hpBar = document.createElement('div')
+            hpBar.className = 'grid-hp' + (pct < 25 ? ' critical' : pct < 50 ? ' low' : '')
+            hpBar.style.width = pct + '%'
+            icon.appendChild(hpBar)
+            // 名字
+            const nameEl = document.createElement('div')
+            nameEl.className = 'grid-name'
+            nameEl.textContent = unit.name || unit.id
+            icon.appendChild(nameEl)
+            cell.appendChild(icon)
+          }
+
+          cell.onclick = () => onGridCellClick(x, y)
+          el.appendChild(cell)
+        }
+      }
+    }
+
+    function onGridCellClick(x, y) {
+      if (!gridState) return
+      const cell = getGridCell(x, y)
+      if (!cell) return
+
+      if (gridMode === 'move') {
+        if (cell.classList.contains('reachable')) {
+          ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_move', target: { x, y } }))
+          clearGridHighlights()
+          gridMode = 'idle'
+          disableGridButtons()
+        }
+      } else if (gridMode === 'attack') {
+        const unit = gridState.units.find(u => u.pos.x === x && u.pos.y === y && u.side === 'enemy')
+        if (unit && cell.classList.contains('attackable')) {
+          ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_attack', targetId: unit.id }))
+          clearGridHighlights()
+          gridMode = 'idle'
+          disableGridButtons()
+        }
+      }
+    }
+
+    // ── 本地 BFS（前端高亮，不走后端） ──
+
+    function localBfsReachable(unitId) {
+      if (!gridState) return new Map()
+      const unit = gridState.units.find(u => u.id === unitId)
+      if (!unit) return new Map()
+      const { moveSpeed, pos } = unit
+      const W = gridState.width, H = gridState.height
+      const visited = new Map()
+      visited.set(`${pos.x},${pos.y}`, 0)
+      const queue = [{ x: pos.x, y: pos.y, cost: 0 }]
+      const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
+
+      while (queue.length > 0) {
+        const cur = queue.shift()
+        for (const d of dirs) {
+          const nx = cur.x + d.x, ny = cur.y + d.y
+          if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue
+          const t = gridState.terrain[ny]?.[nx] ?? 0
+          if (t === 1) continue // wall
+          const occ = gridState.units.find(u => u.pos.x === nx && u.pos.y === ny)
+          if (occ && occ.id !== unitId && occ.side === 'enemy') continue // enemy blocks
+          const mc = t === 2 ? 2 : 1
+          const nc = cur.cost + mc
+          if (nc > moveSpeed) continue
+          const key = `${nx},${ny}`
+          if (visited.has(key) && visited.get(key) <= nc) continue
+          visited.set(key, nc)
+          queue.push({ x: nx, y: ny, cost: nc })
+        }
+      }
+      // Remove cells occupied by friendlies (can pass through but not stop)
+      for (const [key] of visited) {
+        const [px, py] = key.split(',').map(Number)
+        const occ = gridState.units.find(u => u.pos.x === px && u.pos.y === py)
+        if (occ && occ.id !== unitId) visited.delete(key)
+      }
+      return visited
+    }
+
+    function localGetAttackableTargets(unitId) {
+      if (!gridState) return []
+      const unit = gridState.units.find(u => u.id === unitId)
+      if (!unit) return []
+      const reachable = localBfsReachable(unitId)
+      reachable.set(`${unit.pos.x},${unit.pos.y}`, 0)
+      const targets = new Map() // targetId → bestFrom
+
+      for (const [key] of reachable) {
+        const [fx, fy] = key.split(',').map(Number)
+        for (const t of gridState.units) {
+          if (t.side !== 'enemy') continue
+          if ((t.hp ?? 1) <= 0) continue
+          const dist = Math.abs(fx - t.pos.x) + Math.abs(fy - t.pos.y)
+          if (dist < 1 || dist > unit.attackRange) continue
+          if (!targets.has(t.id)) {
+            targets.set(t.id, { from: { x: fx, y: fy }, dist })
+          }
+        }
+      }
+      return Array.from(targets.keys())
+    }
+
+    // ── 高亮 ──
+
+    function highlightReachable(unitId) {
+      clearGridHighlights()
+      const reach = localBfsReachable(unitId)
+      for (const [key] of reach) {
+        const [x, y] = key.split(',').map(Number)
+        const cell = getGridCell(x, y)
+        if (cell) cell.classList.add('reachable')
+      }
+    }
+
+    function highlightAttackable(unitId) {
+      clearGridHighlights()
+      const targets = localGetAttackableTargets(unitId)
+      // Also show move range
+      const reach = localBfsReachable(unitId)
+      for (const [key] of reach) {
+        const [x, y] = key.split(',').map(Number)
+        const cell = getGridCell(x, y)
+        if (cell) cell.classList.add('reachable')
+      }
+      // Highlight enemy cells
+      for (const tid of targets) {
+        const t = gridState.units.find(u => u.id === tid)
+        if (t) {
+          const cell = getGridCell(t.pos.x, t.pos.y)
+          if (cell) cell.classList.add('attackable')
+        }
+      }
+    }
+
+    function clearGridHighlights() {
+      document.querySelectorAll('.grid-cell.reachable, .grid-cell.attackable, .grid-cell.selected').forEach(c => {
+        c.classList.remove('reachable', 'attackable', 'selected')
+      })
+    }
+
+    function getGridCell(x, y) {
+      return document.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`)
+    }
+
+    // ── 动作按钮 ──
+
+    function gridAttackMode() {
+      if (!gridState) return
+      gridMode = 'attack'
+      highlightAttackable('player')
+      setActiveGridBtn('grid-btn-attack')
+    }
+
+    function gridMoveMode() {
+      if (!gridState) return
+      gridMode = 'move'
+      highlightReachable('player')
+      setActiveGridBtn('grid-btn-move')
+    }
+
+    function gridSpellMode() {
+      // TODO: 法术选择 UI，暂时走旧的 processCombatAction
+      gridMode = 'idle'
+      clearGridHighlights()
+    }
+
+    function gridDefend() {
+      ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_defend' }))
+      gridMode = 'idle'
+      clearGridHighlights()
+      disableGridButtons()
+    }
+
+    function gridFlee() {
+      ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_flee' }))
+      gridMode = 'idle'
+      clearGridHighlights()
+      disableGridButtons()
+    }
+
+    function setActiveGridBtn(id) {
+      document.querySelectorAll('.grid-action-btn').forEach(b => b.classList.remove('active'))
+      const btn = document.getElementById(id)
+      if (btn) btn.classList.add('active')
+    }
+
+    function disableGridButtons() {
+      document.querySelectorAll('.grid-action-btn').forEach(b => b.disabled = true)
+    }
+
+    function enableGridButtons() {
+      document.querySelectorAll('.grid-action-btn').forEach(b => b.disabled = false)
+    }
+
+    // ── 动画 ──
+
+    function animateGridMove(unitId, path) {
+      if (!gridState || !path || path.length < 2) {
+        // 更新位置
+        if (gridState && path && path.length > 0) {
+          const u = gridState.units.find(u => u.id === unitId)
+          if (u) u.pos = { ...path[path.length - 1] }
+        }
+        renderCombatGrid()
+        return
+      }
+      const unit = gridState.units.find(u => u.id === unitId)
+      if (!unit) return
+      // 直接更新位置并重渲染（简化版动画，后续可加逐格滑动）
+      unit.pos = { ...path[path.length - 1] }
+      renderCombatGrid()
+    }
+
+    function gridUnitDeath(unitId) {
+      if (!gridState) return
+      // 播放死亡动画
+      const el = document.querySelector(`[data-unit-id="${unitId}"]`)
+      if (el) {
+        el.classList.add('dying')
+        playSfx('creature_die', 0.4)
+      }
+      // 从 gridState 移除
+      setTimeout(() => {
+        if (gridState) {
+          gridState.units = gridState.units.filter(u => u.id !== unitId)
+          renderCombatGrid()
+        }
+      }, 500)
+    }
+
+    function endCombatGrid(result, loot) {
+      gridState = null
+      gridMode = 'idle'
+      document.getElementById('combat-grid-container').classList.remove('active')
+      document.getElementById('messages').style.display = ''
+      clearGridHighlights()
+
+      if (result === 'victory') {
+        playSfx('victory', 0.5)
+        let msg = '⚔️ 战斗胜利！'
+        if (loot) {
+          if (loot.items?.length) msg += ` 获得: ${loot.items.join(', ')}`
+          if (loot.gold) msg += ` +${loot.gold}金币`
+        }
+        appendMsg(msg, 'system')
+      } else {
+        appendMsg('⚔️ 战斗结束。', 'system')
+      }
+    }
+
+    function gridLog(text) {
+      const log = document.getElementById('combat-grid-log')
+      if (!log) return
+      const p = document.createElement('p')
+      p.textContent = text
+      log.appendChild(p)
+      log.scrollTop = log.scrollHeight
+      // 只保留最近8条
+      while (log.children.length > 8) log.removeChild(log.firstChild)
+    }
+
+    // 当收到 combat_action_req 时，如果在网格模式，解锁网格按钮
+    const _origCombatActionReq = window._handleCombatActionReq
+    // 我们在 combat_action_req handler 中也要解锁 grid buttons
+    // 通过在现有 handler 旁边加钩子
 
     // ─── NPC 角色卡弹窗（支持排队） ───
     // 当一次 Move/叙事触发多个 NPC 解锁时（如同时进入有艾琳娜+韩猛的公会分部），
