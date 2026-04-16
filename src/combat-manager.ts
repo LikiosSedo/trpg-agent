@@ -6,7 +6,7 @@
  */
 
 import type { GameSession, Monster, MonsterInstance, AllyInstance, CombatState, InitiativeEntry, DamageType } from './types.js'
-import { initCombatGrid } from './combat-grid.js'
+import { initCombatGrid, manhattan, posEqual, parseKey } from './combat-grid.js'
 import { COMBAT_TERRAINS } from './data/maps.js'
 import {
   rollInitiative, attackRoll, rollDamage, rollDice,
@@ -708,18 +708,27 @@ export type MonsterHitRecord = {
   allyKilled: boolean
 }
 
+/** 怪物移动记录（供前端播放动画） */
+export interface GridMoveRecord {
+  unitId: string
+  path: Array<{ x: number; y: number }>
+}
+
 export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: MonsterHitRecord[]
+  gridMoves: GridMoveRecord[]
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [] }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [] }
 
   const player = session.player
   let playerAC = calculatePlayerAC(player)
   if (combat.playerDefending) playerAC += 2
   const log: string[] = []
   const hits: MonsterHitRecord[] = []
+  const gridMoves: GridMoveRecord[] = []
+  const grid = combat.grid
 
   for (const entry of combat.initiativeOrder) {
     if (entry.isPlayer || entry.isAlly) continue  // 跳过玩家和同伴
@@ -732,6 +741,67 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     if (monster.conditions.includes('grappled')) {
       log.push(`${monster.id} 被擒拿，无法行动！`)
       monster.conditions = monster.conditions.filter(c => c !== 'grappled')
+      hits.push({ monsterName: monster.name, targetName: '', targetIsAlly: false, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
+      continue
+    }
+
+    // ── 战棋移动 AI ──
+    // 当网格存在时，怪物先移动再攻击
+    let canAttackAfterMove = true
+    if (grid && monster.pos) {
+      const gridUnit = grid.getUnit(monster.id)
+      if (gridUnit) {
+        const attackable = grid.getAttackableTargets(monster.id)
+        if (attackable.length > 0) {
+          // 能打到目标 → 选权重最高的（先找玩家，再找嘲讽盟友）
+          const aliveAlliesForAI = (combat.allies ?? []).filter(a => a.hp > 0)
+          let bestTarget = attackable[0]
+          let bestWeight = 0
+          for (const opt of attackable) {
+            let w = 1
+            if (opt.targetId === 'player') w = 2
+            else {
+              const ally = aliveAlliesForAI.find(a => a.id === opt.targetId)
+              if (ally?.allyAbility?.effect === 'taunt') w = 3
+            }
+            if (w > bestWeight) { bestWeight = w; bestTarget = opt }
+          }
+          // 移动到攻击位
+          if (!posEqual(gridUnit.pos, bestTarget.attackFrom)) {
+            const path = grid.moveUnit(monster.id, bestTarget.attackFrom)
+            if (path.length > 1) {
+              monster.pos = { ...bestTarget.attackFrom }
+              gridMoves.push({ unitId: monster.id, path })
+            }
+          }
+        } else {
+          // 够不到任何目标 → 朝最近的敌方单位移动
+          canAttackAfterMove = false
+          const playerUnit = grid.getUnit('player')
+          if (playerUnit) {
+            const reachable = grid.getReachable(monster.id)
+            // 找可达格中离玩家最近的
+            let bestPos = gridUnit.pos
+            let bestDist = manhattan(gridUnit.pos, playerUnit.pos)
+            for (const [key] of reachable) {
+              const p = parseKey(key)
+              const d = manhattan(p, playerUnit.pos)
+              if (d < bestDist) { bestDist = d; bestPos = p }
+            }
+            if (!posEqual(bestPos, gridUnit.pos)) {
+              const path = grid.moveUnit(monster.id, bestPos)
+              if (path.length > 1) {
+                monster.pos = { ...bestPos }
+                gridMoves.push({ unitId: monster.id, path })
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (grid && !canAttackAfterMove) {
+      // 移动了但够不到 → 这回合只移动不攻击
       hits.push({ monsterName: monster.name, targetName: '', targetIsAlly: false, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
       continue
     }
@@ -855,7 +925,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     }
   }
 
-  return { log, hits }
+  return { log, hits, gridMoves }
 }
 
 // ─── 同伴回合（全自动）─────────────────────────────
