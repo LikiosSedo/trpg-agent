@@ -25,7 +25,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     skills: ['athletics', 'intimidation'],
     maxHp: 38,
     spells: [
-      { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 3, remaining: 3 },
+      { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 3, remaining: 3, gridRange: 0 },
     ],
   },
   mage: {
@@ -34,10 +34,10 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     skills: ['arcana', 'investigation'],
     maxHp: 26,
     spells: [
-      { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 2d10 fire damage on a ranged spell attack hit.', usesPerRest: 0, remaining: 0 },
-      { name: 'Magic Missile', description: '三枚魔法飞弹自动命中', effect: 'Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.', usesPerRest: 4, remaining: 4 },
-      { name: 'Shield', description: '魔法护盾', effect: 'Reaction: +5 AC until the start of your next turn.', usesPerRest: 4, remaining: 4 },
-      { name: 'Fireball', description: '火球术', effect: 'Deal 8d6 fire damage in 20ft radius. DEX save DC 14 for half.', usesPerRest: 2, remaining: 2 },
+      { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 2d10 fire damage on a ranged spell attack hit.', usesPerRest: 0, remaining: 0, gridRange: 4 },
+      { name: 'Magic Missile', description: '三枚魔法飞弹自动命中', effect: 'Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.', usesPerRest: 4, remaining: 4, gridRange: 3 },
+      { name: 'Shield', description: '魔法护盾', effect: 'Reaction: +5 AC until the start of your next turn.', usesPerRest: 4, remaining: 4, gridRange: 0 },
+      { name: 'Fireball', description: '火球术', effect: 'Deal 8d6 fire damage in 20ft radius. DEX save DC 14 for half.', usesPerRest: 2, remaining: 2, gridRange: 3, gridRadius: 2 },
       { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 4, remaining: 4 },
     ],
   },
@@ -47,8 +47,8 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     skills: ['stealth', 'perception', 'sleight_of_hand'],
     maxHp: 34,
     spells: [
-      { name: "Hunter's Mark", description: '猎人印记', effect: '标记目标，对其攻击额外1d6伤害。持续1小时。', usesPerRest: 3, remaining: 3 },
-      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 3, remaining: 3 },
+      { name: "Hunter's Mark", description: '猎人印记', effect: '标记目标，对其攻击额外1d6伤害。持续1小时。', usesPerRest: 3, remaining: 3, gridRange: 4 },
+      { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 3, remaining: 3, gridRange: 1 },
     ],
   },
   cleric: {
@@ -57,9 +57,9 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     skills: ['medicine', 'insight', 'persuasion'],
     maxHp: 36,
     spells: [
-      { name: 'Cure Wounds', description: '触摸治疗伤口', effect: 'Restore 2d8+WIS modifier HP to a creature you touch.', usesPerRest: 4, remaining: 4 },
-      { name: 'Guiding Bolt', description: '指引之光', effect: 'Deal 4d6 radiant damage. Next attack on target has advantage.', usesPerRest: 3, remaining: 3 },
-      { name: 'Shield of Faith', description: '信仰之盾', effect: '+2 AC for 10 minutes.', usesPerRest: 2, remaining: 2 },
+      { name: 'Cure Wounds', description: '触摸治疗伤口', effect: 'Restore 2d8+WIS modifier HP to a creature you touch.', usesPerRest: 4, remaining: 4, gridRange: 1 },
+      { name: 'Guiding Bolt', description: '指引之光', effect: 'Deal 4d6 radiant damage. Next attack on target has advantage.', usesPerRest: 3, remaining: 3, gridRange: 3 },
+      { name: 'Shield of Faith', description: '信仰之盾', effect: '+2 AC for 10 minutes.', usesPerRest: 2, remaining: 2, gridRange: 0 },
       { name: 'Detect Magic', description: '侦测30尺内的魔法', effect: 'Reveal magical auras and identify the school of magic.', usesPerRest: 4, remaining: 4 },
     ],
   },

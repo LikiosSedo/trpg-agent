@@ -6,6 +6,8 @@
  */
 
 import type { GameSession, Monster, MonsterInstance, AllyInstance, CombatState, InitiativeEntry, DamageType } from './types.js'
+import { initCombatGrid } from './combat-grid.js'
+import { COMBAT_TERRAINS } from './data/maps.js'
 import {
   rollInitiative, attackRoll, rollDamage, rollDice,
   calculatePlayerAC, parseAttackMod, castSpell,
@@ -248,6 +250,45 @@ export function startCombat(
     allies,
     log,
   }
+
+  // ── 战棋网格初始化 ──
+  // 从武器推断玩家射程：ranged 武器用 gridRange，melee 默认 1
+  const playerWeapon = player.equipped?.weapon as any
+  const playerAttackRange: number = playerWeapon?.gridRange ?? (playerWeapon?.weaponType === 'ranged' ? 4 : 1)
+  // 职业默认移动力：法师 2，其他 3
+  const playerMoveSpeed = player.abilityModifiers.INT > player.abilityModifiers.STR &&
+    player.abilityModifiers.INT > player.abilityModifiers.DEX ? 2 : 3
+
+  const grid = initCombatGrid({
+    areaId: session.worldState.currentLocation,
+    terrainTemplates: COMBAT_TERRAINS,
+    monsters: monsters.map(m => {
+      const tmpl = monstersDb.find(t => t.name.toLowerCase() === m.name.toLowerCase()) as any
+      return { id: m.id, moveSpeed: tmpl?.moveSpeed ?? 3, attackRange: tmpl?.attackRange ?? 1 }
+    }),
+    allies: allies.map(a => {
+      const tmpl = monstersDb.find(t => t.name.toLowerCase() === a.name.toLowerCase()) as any
+      return { id: a.id, moveSpeed: tmpl?.moveSpeed ?? 3, attackRange: tmpl?.attackRange ?? 1 }
+    }),
+    player: { id: 'player', moveSpeed: playerMoveSpeed, attackRange: playerAttackRange },
+  })
+
+  // 同步网格位置到各单位实例
+  for (const m of monsters) {
+    const gu = grid.getUnit(m.id)
+    if (gu) { m.pos = { ...gu.pos }; m.moveSpeed = gu.moveSpeed; m.attackRange = gu.attackRange }
+  }
+  for (const a of allies) {
+    const gu = grid.getUnit(a.id)
+    if (gu) { a.pos = { ...gu.pos }; a.moveSpeed = gu.moveSpeed; a.attackRange = gu.attackRange }
+  }
+  const playerGridUnit = grid.getUnit('player')
+  combat.grid = grid
+  combat.playerGridStats = playerGridUnit
+    ? { moveSpeed: playerGridUnit.moveSpeed, attackRange: playerGridUnit.attackRange, pos: { ...playerGridUnit.pos } }
+    : undefined
+
+  log.push(`⚔ 战棋网格已就绪 (${grid.width}×${grid.height})`)
 
   session.combat = combat
   const allyInfo = allies.length > 0 ? ` | 同伴: ${allies.map(a => a.name).join(', ')}` : ''

@@ -402,6 +402,13 @@ export type TurnEvent =
       items?: Array<{ name: string; quantity: number; description?: string }>;
       gold?: number;
     }
+  /** Boss 巢穴入口确认 — 玩家到达有遭遇的 POI 时弹出，需确认"踏入"才开战 */
+  | { type: 'lair_entrance';
+      poi: { id: string; nameZh: string; areaId: string; areaName: string };
+      entranceText: string;
+      encounterDescription: string;
+      image?: string;
+    }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -1792,6 +1799,32 @@ export class GameEngine {
       }
     }
 
+    // ── 巢穴入口确认：玩家点击"踏入"按钮或输入相关关键词 ──
+    if (
+      !session.combat?.active &&
+      /^(踏入|进入|闯入|深入|走进|冲进)/.test(input.trim())
+    ) {
+      const currentLoc = locations[session.worldState.currentLocation]
+      const currentSubLoc = session.worldState.currentSubLocation
+      const lairPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
+        p.id === currentSubLoc && p.discovered && p.encounter &&
+        !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+      )
+      if (lairPoi) {
+        session.worldState.flags[`poi_encounter_triggered_${lairPoi.id}`] = true
+        session.worldState.flags['pending_encounter'] = lairPoi.encounter!.monsters.join(',')
+        console.log(`[lair] 玩家确认踏入 ${lairPoi.nameZh}，触发遭遇: ${lairPoi.encounter!.monsters.join(',')}`)
+        parts.push(
+          `[叙事引导] 玩家深吸一口气，踏入了「${lairPoi.nameZh}」。` +
+          `${lairPoi.encounter!.description} ` +
+          `用2-3句描写玩家踏入巢穴的瞬间——光线骤变、空气凝固、` +
+          `敌人察觉到入侵者的那个紧张时刻。战斗即将开始。`
+        )
+        action = { type: 'NARRATIVE' }
+        actionResult = null
+      }
+    }
+
     if (shouldPreExecute(action)) {
       actionResult = await executeAction(action, session)
       console.log(`[rules-agent] 预执行: ${action.type} → 成功:${actionResult.success} 工具:${actionResult.toolsCalled.join(',')}`)
@@ -1942,7 +1975,7 @@ export class GameEngine {
           yield { type: 'npc_unlock', npcName: npc.name, portrait: NPC_PORTRAITS[npc.name] ?? '', firstFacts: this.dossier.getFirstFacts(npc.name) }
         }
       }
-      // POI 首次到达 → 弹出发现卡片
+      // POI 首次到达 → 弹出发现卡片（有遭遇的 POI 由 lair_entrance 代替）
       const poiId = session.worldState.currentSubLocation
       const visitKey = `poi_visited_${poiId}`
       if (poiId && !session.worldState.flags[visitKey]) {
@@ -1950,7 +1983,10 @@ export class GameEngine {
         const areaId = session.worldState.currentLocation
         const area = locations[areaId]
         const poi = area?.pointsOfInterest.find((p: any) => p.id === poiId)
-        if (poi) {
+        // 有未触发遭遇的 POI → 跳过普通 discovery，下面用 lair_entrance 代替
+        const hasLairEncounter = poi?.encounter &&
+          !session.worldState.flags[`poi_encounter_triggered_${poi.id}`]
+        if (poi && !hasLairEncounter) {
           yield {
             type: 'discovery',
             source: 'arrival',
@@ -1963,6 +1999,32 @@ export class GameEngine {
             },
           }
           console.log(`[discovery] 首次到达: ${poi.nameZh} (${poiId})`)
+        }
+      }
+
+      // Boss 巢穴入口确认：到达有遭遇的 POI 时弹出确认卡片
+      {
+        const lairPoiId = session.worldState.currentSubLocation
+        const lairAreaId = session.worldState.currentLocation
+        const lairArea = locations[lairAreaId]
+        const lairPoi = lairArea?.pointsOfInterest.find((p: any) => p.id === lairPoiId)
+        if (
+          lairPoi?.encounter &&
+          lairPoi.discovered &&
+          !session.worldState.flags[`poi_encounter_triggered_${lairPoi.id}`]
+        ) {
+          yield {
+            type: 'lair_entrance',
+            poi: {
+              id: lairPoi.id,
+              nameZh: lairPoi.nameZh,
+              areaId: lairAreaId,
+              areaName: lairArea.nameZh,
+            },
+            entranceText: lairPoi.encounter.entranceText ?? lairPoi.encounter.description,
+            encounterDescription: lairPoi.encounter.description,
+          }
+          console.log(`[lair] 巢穴入口: ${lairPoi.nameZh} — 等待玩家确认踏入`)
         }
       }
     }
@@ -2505,6 +2567,16 @@ export class GameEngine {
         const shouldTrigger = action.type === 'MOVE' || turnsWaiting >= se.maxIdleTurns
 
         if (shouldTrigger && locData) {
+          // 如果玩家当前在 Boss POI 且巢穴入口未确认，让 lair_entrance 流程处理
+          const atLairPoi = (locData.pointsOfInterest ?? []).find((p: any) =>
+            p.id === session.worldState.currentSubLocation &&
+            p.discovered && p.encounter &&
+            !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+          )
+          if (atLairPoi && action.type === 'MOVE') {
+            console.log(`[combat] 剧情保底遭遇延迟: 玩家在 ${atLairPoi.nameZh} 巢穴入口，等待确认踏入`)
+            continue
+          }
           const picked = se.monsters ?? [(locData.monsterPool as string[])[0]]
           session.worldState.flags['pending_encounter'] = picked.join(',')
           delete session.worldState.flags[flagKey]

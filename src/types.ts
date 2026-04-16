@@ -68,6 +68,10 @@ export interface Spell {
   effect: string
   usesPerRest: number // 0 = 无限 (戏法)
   remaining: number
+  /** 战棋射程（曼哈顿距离格数），0=自身，1=相邻，不填=非战斗法术 */
+  gridRange?: number
+  /** 战棋 AoE 半径（曼哈顿距离），如 Fireball gridRadius=2 */
+  gridRadius?: number
 }
 
 // ─── 怪物 ─────────────────────────────────────
@@ -121,6 +125,10 @@ export interface MonsterInstance {
   vulnerability?: DamageType[]
   resistance?: DamageType[]
   immunity?: DamageType[]
+  /** 战棋网格位置（grid 模式） */
+  pos?: { x: number; y: number }
+  moveSpeed?: number
+  attackRange?: number
 }
 
 /** 战斗中的 NPC 同伴运行时实例 */
@@ -142,6 +150,10 @@ export interface AllyInstance {
     cooldown?: number   // 冷却回合数
   }
   damageType?: DamageType  // 同伴攻击的默认伤害类型
+  /** 战棋网格位置（grid 模式） */
+  pos?: { x: number; y: number }
+  moveSpeed?: number
+  attackRange?: number
 }
 
 /** 先攻序列中的一个条目 */
@@ -164,6 +176,10 @@ export interface CombatState {
   pendingMonsterTurn?: boolean  // 玩家回合结束后，等待怪物回合执行
   phase?: CombatPhase           // 当前战斗阶段
   playerDefending?: boolean     // 防御姿态时 AC+2
+  /** 战棋网格（P1 新增，null 时走旧的文字战斗流程） */
+  grid?: import('./combat-grid.js').CombatGrid
+  /** 玩家的网格属性 */
+  playerGridStats?: { moveSpeed: number; attackRange: number; pos: { x: number; y: number } }
 }
 
 // ─── 信任系统 ─────────────────────────────────

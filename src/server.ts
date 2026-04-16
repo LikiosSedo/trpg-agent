@@ -322,6 +322,13 @@ wss.on('connection', (ws: WebSocket, req) => {
             items: (ev as any).items,
             gold: (ev as any).gold,
           }); break
+        case 'lair_entrance':
+          send('lair_entrance', {
+            poi: (ev as any).poi,
+            entranceText: (ev as any).entranceText,
+            encounterDescription: (ev as any).encounterDescription,
+            image: (ev as any).image,
+          }); break
         case 'npc_update':
           send('system', { text: localize(ev.text) }); break
         case 'npc_speaking':

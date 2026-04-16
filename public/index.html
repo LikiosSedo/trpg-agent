@@ -764,6 +764,83 @@
       100% { opacity: 1; transform: scale(1) translateY(0); }
     }
 
+    /* ─── Boss 巢穴入口模式（复用 scene-detail-overlay） ─── */
+    .scene-detail-overlay.lair .sd-discovery-badge {
+      display: block;
+      color: #ff4444;
+      text-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+      animation: lairBadgePulse 1.8s ease-in-out infinite;
+    }
+    @keyframes lairBadgePulse {
+      0%, 100% { text-shadow: 0 0 8px rgba(255, 68, 68, 0.4); }
+      50%      { text-shadow: 0 0 22px rgba(255, 68, 68, 0.9), 0 0 40px rgba(255, 0, 0, 0.3); }
+    }
+    .scene-detail-overlay.lair .sd-bg {
+      background: rgba(10, 0, 0, 0.78);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .scene-detail-overlay.lair .sd-content {
+      animation: lairEntrance 0.9s cubic-bezier(0.2, 0.85, 0.3, 1.1);
+    }
+    @keyframes lairEntrance {
+      0%   { opacity: 0; transform: scale(0.9) translateY(30px); filter: brightness(0.3); }
+      50%  { opacity: 1; filter: brightness(0.7); }
+      100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+    }
+    .scene-detail-overlay.lair .sd-content img {
+      box-shadow: 0 0 40px rgba(255, 50, 50, 0.3), 0 0 80px rgba(180, 0, 0, 0.15);
+      border-color: #8b0000;
+    }
+    .scene-detail-overlay.lair .sd-go { display: none; }
+    .scene-detail-overlay.lair .sd-desc {
+      color: #d4a0a0;
+      font-style: italic;
+    }
+    .sd-lair-buttons {
+      display: none;
+      margin-top: 16px;
+      gap: 12px;
+      justify-content: center;
+    }
+    .scene-detail-overlay.lair .sd-lair-buttons { display: flex; }
+    .sd-lair-enter {
+      padding: 10px 28px;
+      background: linear-gradient(135deg, #8b0000, #b22222);
+      border: 1px solid #ff4444;
+      color: #fff;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      transition: all 0.2s;
+      animation: lairEnterGlow 2s ease-in-out infinite;
+    }
+    @keyframes lairEnterGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 68, 68, 0.3); }
+      50%      { box-shadow: 0 0 20px rgba(255, 68, 68, 0.6), 0 0 40px rgba(255, 0, 0, 0.2); }
+    }
+    .sd-lair-enter:hover {
+      background: linear-gradient(135deg, #a00000, #cc2222);
+      transform: scale(1.04);
+    }
+    .sd-lair-leave {
+      padding: 10px 24px;
+      background: rgba(60, 60, 60, 0.6);
+      border: 1px solid #666;
+      color: #aaa;
+      font-size: 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sd-lair-leave:hover {
+      background: rgba(80, 80, 80, 0.7);
+      color: #ccc;
+    }
+
     .msg.reconnect {
       color: #666 !important;
       font-size: 11px;
@@ -3461,6 +3538,10 @@
       <div class="sd-desc" id="sd-desc"></div>
       <div class="sd-loot" id="sd-loot"></div>
       <button class="sd-go" id="sd-go-btn">前往</button>
+      <div class="sd-lair-buttons" id="sd-lair-buttons">
+        <button class="sd-lair-enter" id="sd-lair-enter">⚔ 踏入</button>
+        <button class="sd-lair-leave" id="sd-lair-leave">暂时离开</button>
+      </div>
     </div>
     <div class="sd-bg" onclick="closeSceneDetail()"></div>
   </div>
@@ -4360,6 +4441,7 @@
       overlay.classList.remove('open')
       overlay.classList.remove('discovery')
       overlay.classList.remove('has-loot')
+      overlay.classList.remove('lair')
       // 还原 img 显示（发现弹窗可能隐藏过它）
       const img = document.getElementById('sd-img')
       if (img) img.style.display = ''
@@ -5691,6 +5773,12 @@
           showDiscovery(msg)
           break
 
+        // ─── Boss 巢穴入口确认（明雷） ───
+        case 'lair_entrance':
+          playSfx('draw_weapon', 0.5)
+          showLairEntrance(msg)
+          break
+
         // ─── 物品获取通知 ───
         case 'item_acquired':
           playSfx('item_acquire', 0.35)
@@ -6561,6 +6649,54 @@
 
       overlay.classList.add('open')
       overlay.classList.add('discovery')
+    }
+
+    // ─── Boss 巢穴入口弹窗（明雷确认） ───
+    function showLairEntrance(data) {
+      const overlay = document.getElementById('scene-detail-overlay')
+      const img = document.getElementById('sd-img')
+      const title = document.getElementById('sd-title')
+      const desc = document.getElementById('sd-desc')
+      const badge = document.getElementById('sd-discovery-badge')
+      const lootEl = document.getElementById('sd-loot')
+      const enterBtn = document.getElementById('sd-lair-enter')
+      const leaveBtn = document.getElementById('sd-lair-leave')
+
+      const poi = data.poi
+      const poiImg = POI_SCENE_IMAGES[poi.id] || MAP_SCENE_IMAGES[poi.areaId] || ''
+
+      if (poiImg) {
+        img.src = poiImg
+        img.style.display = ''
+        img.alt = poi.nameZh || ''
+      } else {
+        img.style.display = 'none'
+      }
+
+      const areaName = poi.areaName || MAP_AREA_ZH[poi.areaId] || ''
+      title.textContent = (poi.nameZh || '') + (areaName ? ` · ${areaName}` : '')
+      desc.textContent = data.entranceText || data.encounterDescription || ''
+      badge.textContent = '⚠ 危险区域 ⚠'
+      lootEl.innerHTML = ''
+
+      // 踏入按钮
+      const poiName = poi.nameZh || ''
+      enterBtn.textContent = '⚔ 踏入' + poiName
+      enterBtn.onclick = () => {
+        closeSceneDetail()
+        document.getElementById('input').value = '踏入' + poiName
+        sendInput()
+      }
+
+      // 离开按钮
+      leaveBtn.onclick = () => {
+        closeSceneDetail()
+      }
+
+      overlay.classList.remove('discovery')
+      overlay.classList.remove('has-loot')
+      overlay.classList.add('lair')
+      overlay.classList.add('open')
     }
 
     // ─── NPC 角色卡弹窗（支持排队） ───
