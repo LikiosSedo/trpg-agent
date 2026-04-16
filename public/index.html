@@ -2944,6 +2944,93 @@
       flex-shrink: 0;
     }
 
+    /* ─── 追击打断过渡弹窗 ─── */
+    .combat-interrupt-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 250;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .combat-interrupt-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .combat-interrupt-overlay.fading {
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .combat-interrupt-bg {
+      position: absolute;
+      inset: 0;
+      background: rgba(40, 8, 8, 0.88);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .combat-interrupt-card {
+      position: relative;
+      width: 85vw;
+      max-width: 360px;
+      text-align: center;
+      transform: scale(0.86) translateY(24px);
+      transition: transform 0.5s cubic-bezier(.2, .9, .3, 1.15);
+    }
+    .combat-interrupt-overlay.open .combat-interrupt-card {
+      transform: scale(1) translateY(0);
+    }
+    .combat-interrupt-portrait {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      border: 3px solid #8b1a1a;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(180, 40, 40, 0.5), 0 0 60px rgba(139, 26, 26, 0.25);
+      animation: interruptPortraitPulse 1.8s ease-in-out infinite;
+    }
+    .combat-interrupt-portrait img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      image-rendering: pixelated;
+    }
+    .combat-interrupt-name {
+      font-size: 22px;
+      font-weight: bold;
+      color: #e85050;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      text-shadow: 0 0 12px rgba(232, 80, 80, 0.5);
+    }
+    .combat-interrupt-text {
+      font-size: 15px;
+      color: #caa;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .combat-interrupt-badge {
+      display: inline-block;
+      font-size: 12px;
+      color: #e85050;
+      letter-spacing: 3px;
+      border: 1px solid rgba(232, 80, 80, 0.3);
+      border-radius: 4px;
+      padding: 4px 14px;
+      animation: interruptBadgeGlow 2s ease-in-out infinite;
+    }
+    @keyframes interruptPortraitPulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(180, 40, 40, 0.5), 0 0 60px rgba(139, 26, 26, 0.25); }
+      50%      { box-shadow: 0 0 40px rgba(200, 50, 50, 0.7), 0 0 80px rgba(160, 30, 30, 0.35); }
+    }
+    @keyframes interruptBadgeGlow {
+      0%, 100% { text-shadow: 0 0 6px rgba(232, 80, 80, 0.3); }
+      50%      { text-shadow: 0 0 14px rgba(232, 80, 80, 0.8); }
+    }
+
     /* ─── 攻击确认弹窗 ─── */
     .attack-confirm-overlay {
       position: fixed;
@@ -3401,6 +3488,17 @@
         <ul class="npc-card-facts" id="npc-card-facts"></ul>
         <div class="npc-card-footer">已收藏到人物档案</div>
       </div>
+    </div>
+  </div>
+
+  <!-- 追击打断过渡弹窗 -->
+  <div class="combat-interrupt-overlay" id="combat-interrupt-overlay">
+    <div class="combat-interrupt-bg"></div>
+    <div class="combat-interrupt-card">
+      <div class="combat-interrupt-portrait" id="ci-portrait"></div>
+      <div class="combat-interrupt-name" id="ci-name"></div>
+      <div class="combat-interrupt-text" id="ci-text"></div>
+      <div class="combat-interrupt-badge"><i class="ra ra-crossed-swords"></i> 战斗即将开始</div>
     </div>
   </div>
 
@@ -5309,8 +5407,9 @@
 
         case 'dm_end':
           if (currentDmDiv) {
-            // 清理 markdown 符号和重复的选项文本
-            let cleanText = currentDmDiv._fullText || currentDmDiv.textContent
+            // 优先使用后端处理后的完整文本（截断修复、本地化等），
+            // 否则回退到前端 streaming 累积的文本
+            let cleanText = msg.text || currentDmDiv._fullText || currentDmDiv.textContent
             // 截断 SDK thinking-only 响应泄漏（streaming 分片可能绕过 engine 逐 chunk 过滤）
             const emptyIdx = cleanText.indexOf('(Empty response:')
             if (emptyIdx !== -1) cleanText = cleanText.substring(0, emptyIdx)
@@ -5342,6 +5441,20 @@
             updateCombatPanel()
             showSceneActions(msg.actions)
           }
+          break
+
+        case 'actions_loading':
+          // DM 文本已结束但遗漏了选项,后台正在补充
+          // 更新输入框提示文字,让玩家知道不是卡住了
+          {
+            const inp = document.getElementById('input')
+            if (inp) inp.placeholder = 'DM 正在推荐选项...'
+            hideThinking()
+          }
+          break
+
+        case 'combat_interrupt':
+          showCombatInterrupt(msg)
           break
 
         case 'combat_init':
@@ -5773,8 +5886,14 @@
 
       // ─── NPC 名（金色）───
       var npcNames = (session.npcs || []).map(function(n) { return n.name })
-      // 追加常用别名
-      npcNames.push('格雷格', '艾琳娜', '韩猛', '格罗姆', '卡恩', '维克多', '陈妈', '叶绿', '小莉')
+      // 追加短名、全名、姓氏别名（DM 可能用任一形式）
+      var npcAliases = [
+        // 短名（后缀正则会自动贪婪匹配 ·姓，如"艾琳娜"→"艾琳娜·银叶"）
+        '格雷格', '艾琳娜', '韩猛', '格罗姆', '卡恩', '维克多', '陈妈', '叶绿', '小莉',
+        // 姓氏/别名（DM 叙事中可能单独使用）
+        '铁拳头', '银叶', '黑石', '独臂',
+      ]
+      npcAliases.forEach(function(n) { npcNames.push(n) })
       // 去重
       npcNames = npcNames.filter(function(v, i, a) { return a.indexOf(v) === i && v.length > 1 })
 
@@ -5818,11 +5937,13 @@
       function sortByLenDesc(arr) { return arr.sort(function(a, b) { return b.length - a.length }) }
 
       // 构建替换函数（避免重复高亮：已在 span 标签内的不再匹配）
-      function highlightGroup(text, names, cssClass) {
+      // suffixRe: 可选的正则后缀（NPC 名需要贪婪匹配 ·姓 全名后缀）
+      function highlightGroup(text, names, cssClass, suffixRe) {
         if (names.length === 0) return text
         sortByLenDesc(names)
+        var suffix = suffixRe || ''
         var pattern = new RegExp('(' + names.map(function(n) {
-          return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + suffix
         }).join('|') + ')', 'g')
         // 分段处理：只替换不在 HTML 标签内的文本
         var parts = text.split(/(<[^>]+>)/)
@@ -5835,10 +5956,12 @@
       }
 
       // 按优先级应用：物品 → 地点 → NPC（先标记的不会被后续覆盖，因为已在 span 内）
+      // NPC 后缀: 匹配已知姓氏（兼容各种中点变体），让"艾琳娜"也能匹配"艾琳娜·银叶"整体
+      var NPC_FULLNAME_SUFFIX = '(?:[·・．•‧](?:铁拳头|银叶|黑石))?'
       var result = safeText
       result = highlightGroup(result, itemNames, 'hl-item')
       result = highlightGroup(result, locationNames, 'hl-location')
-      result = highlightGroup(result, npcNames, 'hl-npc')
+      result = highlightGroup(result, npcNames, 'hl-npc', NPC_FULLNAME_SUFFIX)
 
       return result
     }
@@ -6249,6 +6372,49 @@
         inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length)
       }
     }
+    // ─── 追击打断过渡弹窗 ───
+    var _ciDismissTimer = null
+    function showCombatInterrupt(data) {
+      var overlay = document.getElementById('combat-interrupt-overlay')
+      var portraitEl = document.getElementById('ci-portrait')
+      var nameEl = document.getElementById('ci-name')
+      var textEl = document.getElementById('ci-text')
+
+      // 填充内容
+      if (data.portrait) {
+        portraitEl.innerHTML = '<img src="' + esc(data.portrait) + '" alt="">'
+      } else {
+        portraitEl.innerHTML = '<i class="ra ra-crossed-swords" style="font-size:48px;color:#e85050"></i>'
+      }
+      nameEl.textContent = data.responder
+      var reason = data.immediate
+        ? '因你对' + data.victim + '的暴行，当场出手！'
+        : '因你对' + data.victim + '的暴行追上了你！'
+      textEl.textContent = reason
+
+      // 隐藏 thinking indicator
+      hideThinking()
+
+      // 显示弹窗
+      overlay.classList.remove('fading')
+      overlay.classList.add('open')
+      playSfx('combat_start', 0.4)
+
+      // 3.5 秒后自动淡出（或点击提前关闭）
+      if (_ciDismissTimer) clearTimeout(_ciDismissTimer)
+      _ciDismissTimer = setTimeout(dismissCombatInterrupt, 3500)
+      overlay.onclick = dismissCombatInterrupt
+    }
+    function dismissCombatInterrupt() {
+      if (_ciDismissTimer) { clearTimeout(_ciDismissTimer); _ciDismissTimer = null }
+      var overlay = document.getElementById('combat-interrupt-overlay')
+      overlay.classList.add('fading')
+      overlay.onclick = null
+      setTimeout(function () {
+        overlay.classList.remove('open', 'fading')
+      }, 600)
+    }
+
     function showSceneActions(actions) {
       const container = document.getElementById('messages')
       const existing = container.querySelector('.actions')

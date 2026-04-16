@@ -89,7 +89,7 @@ export const MoveTool: Tool = {
       const avoidingNpcs: string[] = []
       for (const npcName of npcsHere) {
         const avoidNpc = session.npcs.find(n => n.name === npcName)
-        if (avoidNpc) {
+        if (avoidNpc && avoidNpc.condition !== 'unconscious' && avoidNpc.condition !== 'recovering') {
           const resp = evaluateResponse(avoidNpc)
           if (resp.type === 'avoidance' && resp.moveAway) {
             // 如果 homeBase 就是玩家当前位置，逃到广场
@@ -178,7 +178,7 @@ export const MoveTool: Tool = {
       const avoidingNpcs: string[] = []
       for (const npcName of npcsHere) {
         const avoidNpc = session.npcs.find(n => n.name === npcName)
-        if (avoidNpc) {
+        if (avoidNpc && avoidNpc.condition !== 'unconscious' && avoidNpc.condition !== 'recovering') {
           const resp = evaluateResponse(avoidNpc)
           if (resp.type === 'avoidance' && resp.moveAway) {
             // 如果 homeBase 就是玩家当前位置，逃到广场

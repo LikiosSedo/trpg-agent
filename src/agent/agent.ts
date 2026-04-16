@@ -72,6 +72,12 @@ export interface AgentConfig {
    * 不传 = 不启用压缩(messages 无限增长,直到撞 context window)。
    */
   contextManager?: ContextManagerConfig
+  /**
+   * 终止循环的工具名列表。当某轮 tool calls 中包含这些工具时,
+   * 执行完工具后直接 yield turn_end,不再继续 LLM continuation。
+   * 用于避免"SetActions 调用后还要多跑一轮 LLM"的无意义延迟。
+   */
+  terminatingTools?: string[]
 }
 
 // ─── 默认值 ──────────────────────────────────────────
@@ -97,6 +103,7 @@ export class TRPGAgent implements IAgent {
   private readonly temperature?: number
   private readonly toolContext?: any
   private readonly contextManager: ContextManager | null
+  private readonly terminatingTools: Set<string>
 
   public messages: any[] = []
   private lastApiCallTime = 0
@@ -112,6 +119,7 @@ export class TRPGAgent implements IAgent {
     this.temperature = config.temperature
     this.toolContext = config.toolContext
     this.contextManager = config.contextManager ? new ContextManager(config.contextManager) : null
+    this.terminatingTools = new Set(config.terminatingTools ?? [])
   }
 
   // ─── 公开 API(IAgent 接口) ──────────────────────
@@ -212,6 +220,11 @@ export class TRPGAgent implements IAgent {
             output: result.output,
             isError: !!result.isError,
           }
+        }
+        // 终止循环检查:如果本轮调用了 terminatingTools 中的工具,直接结束
+        if (this.terminatingTools.size > 0 && toolCalls.some(tc => this.terminatingTools.has(tc.name))) {
+          yield { type: 'turn_end' }
+          return
         }
         // 继续下一 turn,让 LLM 看到 tool 结果后决定下一步
         continue

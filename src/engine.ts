@@ -20,7 +20,7 @@ import { initDMAgent, dmRespond, getDMMessages, restoreDMMessages, muteDMTools, 
 import { consumeActions, type SceneActions, type ClassifiedSuggestion, type ClassifiedSceneActions } from './tools/set-actions.js'
 import { consumeTrustChanges } from './tools/change-trust.js'
 import { validateNarrative, type ToolCallRecord } from './narrative-validator.js'
-import { consumeSpeakingNPCs } from './tools/talk.js'
+import { consumeSpeakingNPCs, consumePendingTalkData } from './tools/talk.js'
 import { classifyIntent, formatActionResult, shouldPreExecute, quickMatch, type ActionResult } from './rules-agent.js'
 import { executeAction } from './action-executor.js'
 import { getActiveEffectsSummary } from './effect-manager.js'
@@ -292,6 +292,35 @@ function detectRepetition(text: string, windowSize = 80): string | null {
   return null
 }
 
+/**
+ * 截断修复：LLM 同时生成 text + tool_calls 时可能把最后一句话写到一半就停了。
+ * 如果文本末尾不是完整句子（中文句号/问号/叹号/省略号/引号），
+ * 截到最后一个完整句子并补省略号。
+ */
+function trimToLastSentence(text: string): string {
+  const trimmed = text.trimEnd()
+  if (!trimmed) return trimmed
+  // 以句终标点或引号结尾 → 完整句子，不处理
+  if (/[。！？…」』"）\n]$/.test(trimmed)) return trimmed
+  // 找最后一个句终标点的位置
+  const lastEnd = Math.max(
+    trimmed.lastIndexOf('。'),
+    trimmed.lastIndexOf('！'),
+    trimmed.lastIndexOf('？'),
+    trimmed.lastIndexOf('…'),
+    trimmed.lastIndexOf('"'),
+    trimmed.lastIndexOf('」'),
+  )
+  if (lastEnd > 0 && lastEnd > trimmed.length * 0.5) {
+    // 截到最后一个完整句子，加省略号表示自然收尾
+    const fixed = trimmed.slice(0, lastEnd + 1)
+    console.log(`[dm] 截断修复: "${trimmed.slice(-20)}" → 截到 ${lastEnd + 1}/${trimmed.length}`)
+    return fixed
+  }
+  // 没有句终标点，或只在很前面才有 → 不截（可能是极短文本），补省略号
+  return trimmed + '……'
+}
+
 // ─── NPC 立绘映射 ──────────────────────────────
 
 const NPC_PORTRAITS: Record<string, string> = {
@@ -331,7 +360,9 @@ export type TurnEvent =
   | { type: 'broken_promise'; npcName: string; reason: string }
   | { type: 'safety_block'; reason: string }
   | { type: 'dm_text_delta'; text: string }
-  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | ClassifiedSceneActions | null; hasPendingTrade?: boolean }
+  | { type: 'actions_loading' }
+  | { type: 'combat_interrupt'; responder: string; victim: string; portrait: string; immediate: boolean }
+  | { type: 'dm_end'; combat: boolean; pendingMonster: boolean; actions: SceneActions | ClassifiedSceneActions | null; hasPendingTrade?: boolean; text?: string }
   | { type: 'dm_error'; message: string }
   | { type: 'combat_monster'; text: string; playerHp?: number; playerMaxHp?: number; allies?: any[] }
   | { type: 'combat_ally'; text: string }
@@ -731,6 +762,9 @@ export function migrateSession(session: GameSession): void {
   // Phase 6: DM Journal 字段(旧存档没有)
   if (session.dmJournal === undefined) {
     session.dmJournal = []
+  }
+  if (session.npcMemories === undefined) {
+    session.npcMemories = {}
   }
 }
 
@@ -2135,6 +2169,8 @@ export class GameEngine {
       fullText = fullText.split('\n').filter(line => !line.startsWith('[DEBUG]')).join('\n')
       // 同步中文化到完整文本（记录/存档用），和流式输出保持一致
       fullText = localize(fullText)
+      // 截断修复：LLM 可能在调用 SetActions 时截断最后一句话
+      fullText = trimToLastSentence(fullText)
       // 超时兜底：DM 超时 0 字时发一段占位 narrative，避免玩家面对空白屏
       if (!fullText.trim()) {
         const fallback = timedOut
@@ -2288,22 +2324,30 @@ export class GameEngine {
     const needsActions = !dmActions && !hasPendingTrade && !session.combat?.active
     if (needsActions) {
       console.log('[dm-patch] DM 遗漏 SetActions,发送补丁请求...')
+      // 通知前端：DM 文本已结束,正在补充选项(改善等待体验)
+      yield { type: 'actions_loading' }
       try {
         muteDMTools(['SetActions'])
-        for await (const _ev of dmRespond(
-          '【系统反馈】你刚才的叙事结束后没有调用 SetActions 为玩家提供后续行动选项。\n' +
-          '请**只调用 SetActions 工具**(不要再写任何叙事、不要调用其他工具),' +
-          '为当前场景生成 2-3 个玩家此刻最自然的后续行动选项。',
-        )) {
-          // 只消费事件,不 yield 给前端 —— 补丁请求对用户透明,
-          // 玩家感知到的只是 dm_end 前多等了几秒。
-        }
-        const patched = consumeActions()
-        if (patched) {
-          dmActions = patched
-          console.log(`[dm-patch] ✓ 补丁成功,获得 ${patched.suggestions?.length ?? 0} 个选项`)
+        // 带超时的补丁请求：最多等 10 秒,超时直接走 fallback
+        const patchPromise = (async () => {
+          for await (const _ev of dmRespond(
+            '【系统反馈】你刚才的叙事结束后没有调用 SetActions 为玩家提供后续行动选项。\n' +
+            '请**只调用 SetActions 工具**(不要再写任何叙事、不要调用其他工具),' +
+            '为当前场景生成 2-3 个玩家此刻最自然的后续行动选项。',
+          )) { /* 只消费事件 */ }
+        })()
+        const timeout = new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 10_000))
+        const result = await Promise.race([patchPromise.then(() => 'done' as const), timeout])
+        if (result === 'timeout') {
+          console.warn('[dm-patch] ⚠ 补丁请求超时(10s),走 fallback')
         } else {
-          console.log('[dm-patch] ⚠ DM 在补丁请求中仍未调用 SetActions,走 fallback')
+          const patched = consumeActions()
+          if (patched) {
+            dmActions = patched
+            console.log(`[dm-patch] ✓ 补丁成功,获得 ${patched.suggestions?.length ?? 0} 个选项`)
+          } else {
+            console.log('[dm-patch] ⚠ DM 在补丁请求中仍未调用 SetActions,走 fallback')
+          }
         }
       } catch (patchErr) {
         console.warn(
@@ -2367,7 +2411,7 @@ export class GameEngine {
           startCombat(session, [pci.responderName], allDb as any)
           console.log(`[consequence] ${pci.responderName} 发起战斗！（DM 叙事后触发）`)
 
-          // 先发 dm_end 关闭上一段叙事，再触发战斗
+          // 先发 dm_end 关闭上一段叙事
           yield {
             type: 'dm_end',
             combat: true,
@@ -2375,8 +2419,24 @@ export class GameEngine {
             actions: null as any,
           }
 
-          yield* this.emitCombatStart()
-          // 用 DM 生成有上下文的战斗开场叙事
+          // 追击打断过渡弹窗：前端显示 NPC 立绘 + 追击原因，
+          // 玩家有 ~3s 理解发生了什么，同时后台 LLM 生成叙事。
+          yield {
+            type: 'combat_interrupt',
+            responder: pci.responderName,
+            victim: pci.victimName,
+            portrait: NPC_PORTRAITS[pci.responderName] ?? '',
+            immediate: pci.immediate,
+          }
+
+          // 追击打断：先显示战斗 UI（deferActionReq=true → 按钮禁用），
+          // 等 DM 叙事后再解锁——让玩家先看到追击叙事，再操作。
+          const quickNarrative = pci.immediate
+            ? `${pci.responderName}当场出手，截住了你！`
+            : `${pci.responderName}追上来了！`
+          yield* this.emitCombatStart(quickNarrative, true)
+
+          // DM 生成有上下文的战斗开场叙事
           const loc = getSubLocationName(pci.subLocation)
           const playerAction = input.length > 20 ? input.substring(0, 20) + '…' : input
           yield* this.combatDMNarrative(
@@ -2385,6 +2445,9 @@ export class GameEngine {
             (pci.immediate ? `${pci.responderName}就在旁边，当场目击了一切，立刻出手。` : `${pci.responderName}赶到现场，截住了玩家。`) +
             `请描写这个被打断的戏剧性瞬间——先简短描写玩家当前行动的场景，然后急转直下，${pci.responderName}出现并发起攻击。用2-3句话，营造紧张感。`
           )
+
+          // 叙事结束后才解锁玩家输入
+          yield* this.emitCombatActionReq()
           session.dmMessages = getDMMessages()
           yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
           return
@@ -2601,6 +2664,63 @@ export class GameEngine {
       new ChapterManager(session).advanceTurn()
     }
 
+    // ─── NPC 记忆提取（Talk 后台提取互动要点） ───
+    const talkData = consumePendingTalkData()
+    if (talkData.length > 0) {
+      try {
+        const { extractMemory } = await import('./npc-memory-extractor.js')
+        const { appendInteraction, updateImpressions, syncPromises } = await import('./npc-memory.js')
+        for (const { npcName, playerMessage, talkOutput } of talkData) {
+          const result = await extractMemory({
+            npcName, playerMessage, dmNarrative: fullText, talkToolOutput: talkOutput, session,
+          })
+          if (result) {
+            appendInteraction(session, npcName, result.interaction)
+            if (result.impressions.length > 0) {
+              updateImpressions(session, npcName, result.impressions)
+            }
+          }
+          syncPromises(session, npcName)
+        }
+      } catch (err) {
+        console.warn(`[npc-memory] 提取失败:`, (err as Error).message)
+      }
+    }
+
+    // ─── 非 Talk 互动的代码生成记忆（零 LLM 成本） ───
+    {
+      const { appendInteraction: appendMem } = await import('./npc-memory.js')
+      const ch = session.chapter?.currentChapter ?? 'ch1'
+      const talkedNpcs = new Set(talkData.map(t => t.npcName))
+
+      // 攻击 NPC
+      if (action.type === 'ATTACK' && action.target) {
+        const targetNpc = session.npcs.find(n => n.name === action.target)
+        if (targetNpc) {
+          appendMem(session, action.target, {
+            turn: session.turnCount, chapter: ch,
+            summary: `玩家攻击了${action.target}`, type: 'combat', mood: '敌对',
+          })
+        }
+      }
+
+      // 在场目击：同场景 NPC 在 DM 叙事中被提及但没通过 Talk 互动
+      // 创建 witness 类型记忆（轻量，不调 LLM）
+      for (const npc of session.npcs) {
+        if (talkedNpcs.has(npc.name)) continue  // Talk 已处理
+        if ('target' in action && npc.name === action.target) continue // 攻击已处理
+        if (npc.location !== session.worldState.currentLocation) continue
+        if (npc.condition === 'unconscious') continue
+        // 检查 DM 叙事中是否提到了这个 NPC
+        if (fullText.includes(npc.name)) {
+          appendMem(session, npc.name, {
+            turn: session.turnCount, chapter: ch,
+            summary: `在场目睹：${input.slice(0, 15)}`, type: 'witness',
+          })
+        }
+      }
+    }
+
     // DM 消息持久化
     session.dmMessages = getDMMessages()
 
@@ -2615,6 +2735,7 @@ export class GameEngine {
       pendingMonster: !!session.combat?.pendingMonsterTurn,
       actions: dmEndActions,
       hasPendingTrade: dmEndHasPendingTrade,
+      text: fullText || undefined,  // 后端处理后的完整文本（截断修复、本地化等）
     }
 
     // ─── 怪物图鉴暗示（每回合最多 1 条） ───
@@ -2882,6 +3003,7 @@ export class GameEngine {
       if (saTailCombat.output) fullText += saTailCombat.output
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
+      fullText = trimToLastSentence(fullText)
       // 超时兜底：DM 没给战斗叙事时，发一段通用文本保证不空白
       if (!fullText.trim()) {
         fullText = combatDmTimedOut
@@ -2977,7 +3099,11 @@ export class GameEngine {
   // ─── 战斗初始化事件辅助 ────────────────────
 
   /** 生成 combat_init + combat_action_req 事件对 */
-  private *emitCombatStart(narrative?: string): Generator<TurnEvent> {
+  /**
+   * @param narrative  combat_init 事件的即时叙事文本
+   * @param deferActionReq  true = 只发 combat_init,不发 combat_action_req(调用方自行在叙事后发)
+   */
+  private *emitCombatStart(narrative?: string, deferActionReq = false): Generator<TurnEvent> {
     const combat = this.session.combat
     if (!combat?.active) return
 
@@ -3020,6 +3146,17 @@ export class GameEngine {
       initiative: combat.initiativeOrder,
       narrative,
     }
+    if (!deferActionReq) {
+      yield* this.emitCombatActionReq()
+    }
+  }
+
+  /** 发送 combat_action_req — 解锁玩家输入 + 战斗按钮 */
+  private *emitCombatActionReq(): Generator<TurnEvent> {
+    const combat = this.session.combat
+    if (!combat?.active) return
+    const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+    const aliveAllies = (combat.allies ?? []).filter(a => a.hp > 0)
     yield {
       type: 'combat_action_req',
       targets: aliveMonsters.map(m => ({ id: m.id, name: m.name, hp: m.hp, maxHp: m.maxHp })),
@@ -3475,6 +3612,7 @@ export class GameEngine {
       const openEmptyIdx = fullText.indexOf('(Empty response:')
       if (openEmptyIdx !== -1) fullText = fullText.substring(0, openEmptyIdx)
       fullText = localize(fullText)
+      fullText = trimToLastSentence(fullText)
       // 超时兜底：开场叙事必须有内容，否则玩家无法开始游戏
       if (!fullText.trim()) {
         const fallback = '马车在颠簸中缓缓前行，车轮碾过砾石的声音将你从昏沉中唤醒。你眨了眨眼，试图记起自己为何在这里——记忆如同被雾气包裹，朦胧不清。'

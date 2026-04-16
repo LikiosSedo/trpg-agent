@@ -3,6 +3,7 @@ import type { GameSession, GameEvent, NPC } from './types.js'
 import { getCombatSummary } from './combat-manager.js'
 import { getNPCSubLocation, getPlayerSubLocation, getSubLocationName } from './npc-mobility.js'
 import { getGatedFacts } from './trust-system.js'
+import { getMemoryForPrompt } from './npc-memory.js'
 import { getRecentJournal, formatJournalForPrompt, CONTEXT_INJECT_COUNT } from './dm-journal.js'
 import { getLoreStore, parseChapterNumber } from './lore/index.js'
 
@@ -77,7 +78,13 @@ export class GameFactStore {
       npcs.length ? `NPC状态:\n${npcs.map(n => {
         const conditionNames: Record<string, string> = { wounded: '负伤', unconscious: '昏迷', recovering: '恢复中' }
         const condStr = n.condition && n.condition !== 'normal' ? `[${conditionNames[n.condition]}]` : ''
-        return `- ${n.name}${condStr}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）`
+        // 注入 NPC 印象摘要（每轮可见，不只 Talk 时）
+        const mem = this.session.npcMemories?.[n.name]
+        const impressionStr = mem?.impressions?.length
+          ? ` 印象:[${mem.impressions.join(',')}]` : ''
+        const promiseStr = mem?.unfulfilledPromises?.length
+          ? ` 待兑现:[${mem.unfulfilledPromises.join(',')}]` : ''
+        return `- ${n.name}${condStr}（信任:${n.trust}, 情绪:${n.mood}, 位于:${locationNames[n.location] ?? n.location}·${getSubLocationName(getNPCSubLocation(n))}）${impressionStr}${promiseStr}`
       }).join('\n')}` : '',
       (() => {
         const party = this.session.party ?? []
@@ -168,9 +175,11 @@ export class GameFactStore {
     const log = (npc.interactionLog ?? []).length
       ? `最近交互: ${(npc.interactionLog ?? []).slice(-3).join('；')}`
       : ''
+    const memoryCtx = getMemoryForPrompt(this.session, npc.name)
     return [
       `${npc.name}（信任:${npc.trust}, 情绪:${npc.mood}, 位于:${npc.location}）`,
       facts, promises, log,
+      memoryCtx,
     ].filter(Boolean).join('。')
   }
 

@@ -26,6 +26,7 @@ import {
 import { getFacts, getSession } from './game-state.js'
 import { ChapterManager } from './chapter-manager.js'
 import { buildDMPrompt } from './dm-prompt.js'
+import { setExtractorProvider } from './npc-memory-extractor.js'
 
 // ─── Config ──────────────────────────────────
 
@@ -95,6 +96,9 @@ export function initDMAgent(): void {
     // 但不够连续 Move 到多个地点开启多个场景。
     maxTurns: 5,
     apiThrottleMs: 1500,
+    // SetActions 是 DM 每轮的最后一步 — 调用后自动结束 tool-call loop,
+    // 避免多跑一次 LLM continuation(DM 会在空轮里产生混乱思考)。
+    terminatingTools: ['SetActions'],
     // Phase 4: 上下文压缩 —— token >= 60% 阈值时把早期对话压成"归档快照"
     // 消息(从 session 代码生成,零 LLM 调用)。最近 12 turn 完整保留。
     contextManager: {
@@ -105,6 +109,9 @@ export function initDMAgent(): void {
         buildArchivalSnapshot(getSession(), { keepRecentTurns, availableToolNames }),
     },
   })
+
+  // 共享 provider 配置给 NPC 记忆提取器（用同一个 API，轻量 prompt）
+  setExtractorProvider({ model, apiKey: config.apiKey, baseUrl: config.baseUrl, type: config.type ?? 'openai', headers: config.headers })
 
   console.log(`  DM 模式: TRPG Agent (${model})`)
 }

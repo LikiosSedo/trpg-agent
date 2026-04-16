@@ -58,10 +58,23 @@ const QUICK_PATTERNS: Array<{ pattern: RegExp; build: (m: RegExpMatchArray, inpu
     build: (m) => ({ type: 'ATTACK', target: m[1].trim(), method: 'weapon' as const }) },
 
   // 移动（含标点或超过最长地名长度 → 可能有附加意图，交给 LLM）
+  // 复合意图快捷处理："去X找/问/跟/和Y..." → 提取 X 作为目的地
+  { pattern: /^(?:去|前往|走到|移动到|回到)\s*(.+?)(?:找|问|跟|和|看看|拜访|见)\s*.+/,
+    build: (m) => {
+      const dest = m[1].trim()
+      if (!dest || dest.length > MAX_LOCATION_NAME_LENGTH) return null
+      return { type: 'MOVE', destination: dest }
+    } },
   { pattern: /^(?:去|前往|走到|移动到|回到)\s*(.+)/,
     build: (m) => {
       const dest = m[1].trim()
       if (/[，。、！？；：…]/.test(dest) || dest.length > MAX_LOCATION_NAME_LENGTH) return null
+      return { type: 'MOVE', destination: dest }
+    } },
+  { pattern: /^(?:我(?:要)?去)\s*(.+?)(?:找|问|跟|和|看看|拜访|见)\s*.+/,
+    build: (m) => {
+      const dest = m[1].trim()
+      if (!dest || dest.length > MAX_LOCATION_NAME_LENGTH) return null
       return { type: 'MOVE', destination: dest }
     } },
   { pattern: /^(?:我(?:要)?去)\s*(.+)/,
@@ -118,6 +131,7 @@ const RULES_AGENT_PROMPT = `你是TRPG规则解析器。分析玩家输入，输
 2. 根据玩家意图选择最匹配的type
 3. 不确定时用 {"type":"NARRATIVE"}
 4. 如果有"当前对话:NPC名"，玩家的TALK/BUY/SELL默认指向该NPC（除非明确提到了其他NPC）
+5. 复合意图（如"去X找Y问Z"）：提取第一个物理动作作为type。例如"去草药堂找叶绿"→MOVE(destination:"草药堂")，"跟格雷格说完去铁砧铺"→TALK。不要因为有多个意图就降级为NARRATIVE
 
 动作类型和字段：
 {"type":"ATTACK","target":"NPC/怪物名","method":"weapon|spell|sneak"}

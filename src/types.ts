@@ -322,6 +322,34 @@ export interface DMJournalEntry {
   tags?: string[]
 }
 
+// ─── NPC 记忆（NPC "灵魂"系统） ──────────────────
+
+/** NPC 对某次互动的记忆 */
+export interface NPCInteractionMemory {
+  turn: number
+  chapter: string
+  /** 一句话概括（最多 60 字） */
+  summary: string
+  /** 互动类型 */
+  type: 'talk' | 'witness' | 'combat' | 'gift' | 'quest'
+  /** 玩家透露的信息 */
+  playerRevealed?: string[]
+  /** NPC 透露的信息 */
+  npcRevealed?: string[]
+  /** 互动氛围 */
+  mood?: string
+}
+
+/** 单个 NPC 的完整记忆库 */
+export interface NPCMemoryStore {
+  /** NPC 对玩家的印象（最多 3 条，每次提取整体替换） */
+  impressions: string[]
+  /** 互动记忆（FIFO，保留首条 + 最近 N 条） */
+  interactions: NPCInteractionMemory[]
+  /** 玩家未兑现的承诺（从 trust-system 同步） */
+  unfulfilledPromises: string[]
+}
+
 // ─── 游戏会话 ──────────────────────────────────
 
 export interface GameSession {
@@ -340,4 +368,5 @@ export interface GameSession {
   timeAccum?: number            // 加权时间累积值（达到阈值自动推进时段）
   npcHostileCooldowns?: Map<string, number>  // NPC 敌对响应冷却记录（npcName -> 触发回合数）
   party?: string[]       // 当前队伍中的 NPC 名（最多 2 名战斗型 NPC）
+  npcMemories?: Record<string, NPCMemoryStore>  // NPC "灵魂"记忆（互动历史、印象、承诺）
 }

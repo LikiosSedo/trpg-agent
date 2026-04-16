@@ -26,6 +26,7 @@
 
 import type { GameSession } from '../types.js'
 import { getRecentJournal, formatJournalForPrompt, SNAPSHOT_INJECT_COUNT } from '../dm-journal.js'
+import { formatMemoriesForSnapshot } from '../npc-memory.js'
 
 // ─── 对外主函数 ────────────────────────────────────
 
@@ -98,6 +99,13 @@ export function buildArchivalSnapshot(
   if (journalEntries.length > 0) {
     lines.push('')
     lines.push(formatJournalForPrompt(journalEntries, '• DM 札记(历史叙事锚点)'))
+  }
+
+  // ── NPC 记忆 —— 每个 NPC 对玩家的互动记忆摘要 ──
+  const npcMemorySnapshot = formatMemoriesForSnapshot(session)
+  if (npcMemorySnapshot) {
+    lines.push('')
+    lines.push(npcMemorySnapshot)
   }
 
   lines.push('')
