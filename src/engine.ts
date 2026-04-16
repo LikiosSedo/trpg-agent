@@ -3861,10 +3861,18 @@ export class GameEngine {
         yield { type: 'combat_status', text: line, ended: false }
       }
       // 目标死亡 → 移除网格单位
-      const targetMonster = combat.monsters.find(m => m.id === msg.targetId)
-      if (targetMonster && targetMonster.hp <= 0) {
+      if (turnResult.killed) {
         grid.removeUnit(msg.targetId)
         yield { type: 'combat_grid_death', unitId: msg.targetId }
+      }
+      // executePlayerTurn 内部可能已调用 endCombat → 直接处理结束
+      if (turnResult.ended) {
+        yield { type: 'combat_grid_end', result: turnResult.result as any, loot: turnResult.loot }
+        const endAudio = resolveAudio(session.worldState.currentLocation, session.worldState.currentSubLocation, session.worldState.timeOfDay, false)
+        yield { type: 'audio', bgm: endAudio.bgm, ambient: endAudio.ambient }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+        if (session.player.hp <= 0) yield* this.handleDeath()
+        return
       }
     }
 
@@ -3882,7 +3890,7 @@ export class GameEngine {
         yield { type: 'combat_status', text: line, ended: false }
       }
       if (fleeResult.success) {
-        endCombat(session)
+        // endCombat already called inside attemptFlee
         const fleeAudio = resolveAudio(session.worldState.currentLocation, session.worldState.currentSubLocation, session.worldState.timeOfDay, false)
         yield { type: 'audio', bgm: fleeAudio.bgm, ambient: fleeAudio.ambient }
         yield { type: 'combat_grid_end', result: 'defeat' }
@@ -3935,10 +3943,8 @@ export class GameEngine {
     const monsterResult = executeMonsterPhase(session)
     if (monsterResult.log.length > 0) {
       // 发送怪物移动动画
-      if ((monsterResult as any).gridMoves) {
-        for (const gm of (monsterResult as any).gridMoves as GridMoveRecord[]) {
-          yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
-        }
+      for (const gm of monsterResult.gridMoves) {
+        yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
       }
       yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: player.hp, playerMaxHp: player.maxHp, allies: (combat.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
     }

@@ -1278,11 +1278,12 @@ export function executeMonsterPhase(
 ): {
   log: string[]
   hits: MonsterHitRecord[]
+  gridMoves: GridMoveRecord[]
   ended: boolean
   result: CombatResult
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [], ended: true, result: 'ongoing' }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [], ended: true, result: 'ongoing' }
 
   combat.pendingMonsterTurn = false
   const monsterResult = executeMonsterTurns(session, onlyIds)
@@ -1307,7 +1308,7 @@ export function executeMonsterPhase(
     combat.round++
   }
 
-  return { log, hits: monsterResult.hits, ...check }
+  return { log, hits: monsterResult.hits, gridMoves: monsterResult.gridMoves, ...check }
 }
 
 // ─── 战斗状态摘要 ────────────────────────────────

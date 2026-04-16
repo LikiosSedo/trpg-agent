@@ -962,6 +962,12 @@
     .grid-action-btn.attack { border-color: #ff4444; color: #ff6666; }
     .grid-action-btn.attack:hover { background: rgba(60, 20, 20, 0.8); }
     .grid-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    @media (max-width: 380px) {
+      .grid-cell { width: 40px; height: 40px; }
+      .grid-unit { width: 30px; height: 30px; font-size: 14px; }
+      .grid-name { font-size: 8px; top: -12px; }
+      .grid-action-btn { padding: 6px 10px; font-size: 12px; }
+    }
 
     .msg.reconnect {
       color: #666 !important;
@@ -5777,6 +5783,8 @@
             }
           }, 300)
           if (msg.ended) {
+            // 战棋网格清理
+            if (gridState) endCombatGrid(msg.result, null)
             // 战斗结束音效
             if (msg.result === 'victory' || msg.result === 'win') playSfx('victory', 0.5)
             else if (msg.result === 'defeat' || msg.result === 'death') playSfx('death', 0.5)
@@ -5941,6 +5949,13 @@
           break
         case 'combat_grid_death':
           gridUnitDeath(msg.unitId)
+          break
+        case 'combat_grid_spawn':
+          if (gridState && msg.unit) {
+            gridState.units.push(msg.unit)
+            renderCombatGrid()
+            gridLog(`${msg.unit.name || msg.unit.id} 出现了！`)
+          }
           break
         case 'combat_grid_end':
           endCombatGrid(msg.result, msg.loot)
@@ -6873,9 +6888,11 @@
     function initCombatGrid(gridData) {
       gridState = gridData
       gridMode = 'idle'
-      // 显示网格容器，隐藏消息
+      // 显示网格容器，隐藏消息和旧战斗面板
       document.getElementById('combat-grid-container').classList.add('active')
       document.getElementById('messages').style.display = 'none'
+      const oldPanel = document.getElementById('combat-panel')
+      if (oldPanel) oldPanel.style.display = 'none'
       renderCombatGrid()
       gridLog('战斗开始！选择行动。')
       playSfx('combat_start', 0.4)
@@ -7154,6 +7171,8 @@
       gridMode = 'idle'
       document.getElementById('combat-grid-container').classList.remove('active')
       document.getElementById('messages').style.display = ''
+      const oldPanel = document.getElementById('combat-panel')
+      if (oldPanel) oldPanel.style.display = ''
       clearGridHighlights()
 
       if (result === 'victory') {
