@@ -1807,15 +1807,23 @@ export class GameEngine {
       } catch { /* ignore malformed */ }
     }
 
-    // Adaptive tool reminder
-    const reminders: string[] = []
-    if (session.turnCount % 5 === 0) reminders.push('回应结束前必须调用SetActions设置选项。')
-    if (session.turnCount % 3 === 0) reminders.push('NPC对话后请调用ChangeTrust更新信任（日常±1）。')
-    if (session.turnCount % 5 === 0) reminders.push('伤害/物品/金币变化必须通过工具，不要在文本中编造数值。')
-    if (reminders.length) parts.push(`[系统提醒] ${reminders.join(' ')}`)
-
     // ── 规则预处理：分级意图识别 + 机械动作预执行 ──
     let action = await classifyIntent(input, session)
+
+    // Adaptive tool reminder
+    // 降低周期（5→3），并对纯叙事场景（NARRATIVE/SEARCH/MOVE 成功/NARRATIVE 降级）强化 SetActions 提醒。
+    // 这些场景 DM 容易沉浸于长篇描写，忘记工具收尾，导致 dm-patch 二次请求多花 1 次 LLM 调用。
+    const reminders: string[] = []
+    const narrativeTypes: string[] = ['NARRATIVE', 'SEARCH', 'MOVE', 'LOOK']
+    const isNarrativeScene = narrativeTypes.includes(action.type)
+    if (isNarrativeScene || session.turnCount % 3 === 0) {
+      reminders.push('回应结束前必须调用SetActions设置选项——纯叙事场景最容易忘记。')
+    }
+    if (session.turnCount % 3 === 0) {
+      reminders.push('NPC对话后请调用ChangeTrust更新信任（日常±1）。')
+      reminders.push('伤害/物品/金币变化必须通过工具，不要在文本中编造数值。')
+    }
+    if (reminders.length) parts.push(`[系统提醒] ${reminders.join(' ')}`)
     console.log(`[rules-agent] 输入: "${input}" → 分类: ${JSON.stringify(action)}`)
     let actionResult: ActionResult | null = null
 

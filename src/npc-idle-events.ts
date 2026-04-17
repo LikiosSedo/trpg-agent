@@ -78,11 +78,14 @@ export function getIdleEvent(session: GameSession): string {
   if (candidates.length === 0) return ''
 
   // 冷却检查 + 筛选可用片段
+  // Bug 修复：lastTurn 用 ?? 0 default 会让游戏前 5 轮误判"所有 NPC 冷却中"，
+  //         因为从未触发过的 NPC 也会被当成"上次在 turn 0 触发"。
+  //         必须区分"未触发过"（flag 不存在）与"已触发但过了冷却"。
   const available: IdleSnippet[] = []
   for (const npc of candidates) {
     const cooldownKey = `idle_event_${npc.name}`
-    const lastTurn = Number(session.worldState.flags[cooldownKey] ?? 0)
-    if (session.turnCount - lastTurn < IDLE_COOLDOWN_TURNS) continue
+    const rawLast = session.worldState.flags[cooldownKey]
+    if (typeof rawLast === 'number' && session.turnCount - rawLast < IDLE_COOLDOWN_TURNS) continue
 
     const snippets = IDLE_SNIPPETS.filter(s =>
       s.npc === npc.name && (!s.time || s.time === time)
