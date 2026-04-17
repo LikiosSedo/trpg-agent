@@ -284,6 +284,38 @@ console.log('\n=== Test 7: findPath with difficult terrain ===')
   assert(path.length <= 5, `findPath returns reasonable path (length ${path.length})`)
 }
 
+// ─── Test 8: Resume during combat clears stale state ─────
+
+console.log('\n=== Test 8: Resume during combat ===')
+
+{
+  const session = makeSession()
+  initGameState(session)
+  const monstersDb: any = [
+    { name: 'Goblin', nameZh: '哥布林', hp: 15, dc: 12, damageDice: '1d6+2', moveSpeed: 3, attackRange: 1, specialAbility: '', loot: [] },
+  ]
+  startCombat(session, ['Goblin'], monstersDb)
+  assert(session.combat?.active === true, 'combat started')
+  assert(session.combat?.grid !== undefined, 'combat has grid')
+
+  // 模拟存档：JSON 往返（losing class methods）
+  const serialized = JSON.parse(JSON.stringify(session))
+
+  // 使用 resumeGame 加载
+  const { GameEngine } = await import('./engine.js')
+  const engine = GameEngine.resumeGame(serialized)
+
+  // 战斗应该被清空
+  assert(engine.session.combat === null, 'combat cleared on resume')
+  assert(
+    engine.session.worldState.flags['pending_encounter'] === undefined,
+    'pending_encounter cleared on resume',
+  )
+  // POI encounter triggered flags also cleared
+  const triggerFlags = Object.keys(engine.session.worldState.flags).filter(k => k.startsWith('poi_encounter_triggered_'))
+  assert(triggerFlags.length === 0, 'all poi_encounter_triggered flags cleared')
+}
+
 // ─── Summary ─────────────────────────────────────
 
 console.log(`\n${'='.repeat(40)}`)

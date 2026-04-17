@@ -974,6 +974,23 @@ export class GameEngine {
       restoreDMMessages(dmMessages)
     }
 
+    // 战斗状态不持久化：如果读档时处于战斗中，清空战斗状态（CombatGrid 是 class
+    // 实例，JSON 往返后方法丢失；pre-combat 存档策略保证这里大概率是空的，但
+    // 如果前端缓存了旧的 combat 对象，这里兜底处理——回到战斗前状态，下次移动
+    // 可能重新触发遭遇（lair_entrance 或区域随机）
+    if (session.combat?.active || session.combat?.grid) {
+      console.log('[resume] 清除过期的战斗状态（战斗不持久化）')
+      session.combat = null
+      // 清除 pending_encounter，避免一加载就立刻重新开战
+      delete session.worldState.flags['pending_encounter']
+      // 清除已触发的 lair_entrance，让玩家再次到达时重新弹入口卡片
+      for (const key of Object.keys(session.worldState.flags)) {
+        if (key.startsWith('poi_encounter_triggered_')) {
+          delete session.worldState.flags[key]
+        }
+      }
+    }
+
     const dossier = dossierData ? DossierManager.fromJSON(dossierData) : new DossierManager()
     resetIdleTracking()
 
@@ -1629,6 +1646,13 @@ export class GameEngine {
         const allDb = [...monstersJson.default, ...npcCombatJson.default] as Monster[]
 
         try {
+          // 战斗前存档：参见 pending_encounter 路径的说明
+          try {
+            session.dossierData = this.dossier.toJSON()
+            facts.save('autosave')
+            this.turnsSinceLastSave = 0
+          } catch (err) { console.warn('[save] hostile-npc pre-combat save failed:', (err as Error).message) }
+
           const combat = startCombat(session, [hostileNPC], allDb)
           yield* this.emitCombatStart(`${hostileNPC}向你发起攻击！`)
           return
@@ -2484,6 +2508,13 @@ export class GameEngine {
         const allDb = [...monstersJson, ...npcCombatJson]
         const { startCombat } = await import('./combat-manager.js')
         try {
+          // 战斗前存档
+          try {
+            session.dossierData = this.dossier.toJSON()
+            facts.save('autosave')
+            this.turnsSinceLastSave = 0
+          } catch (err) { console.warn('[save] consequence pre-combat save failed:', (err as Error).message) }
+
           startCombat(session, [pci.responderName], allDb as any)
           console.log(`[consequence] ${pci.responderName} 发起战斗！（DM 叙事后触发）`)
 
@@ -2622,6 +2653,18 @@ export class GameEngine {
     // 区域遭遇自动触发战斗（Move 工具或待机检查设置了 pending_encounter flag）
     const pendingEncounter = session.worldState.flags['pending_encounter'] as string | undefined
     if (pendingEncounter && !session.combat?.active) {
+      // 战斗前强制存档：保证 autosave 反映"战斗前"的干净状态
+      // 战斗中不会存档，所以这是玩家重新读档时能回到的最近安全点
+      try {
+        session.dossierData = this.dossier.toJSON()
+        facts.save('autosave')
+        this.turnsSinceLastSave = 0
+        console.log(`[save] pre-combat snapshot saved (encounter: ${pendingEncounter})`)
+        yield { type: 'auto_save' }
+      } catch (err) {
+        console.warn('[save] pre-combat save failed:', (err as Error).message)
+      }
+
       delete session.worldState.flags['pending_encounter']
       const monsterNames = pendingEncounter.split(',')
       try {
@@ -2844,9 +2887,9 @@ export class GameEngine {
     // Game Over 只有一个条件：HP = 0（上面已处理）
     // 全镇敌对不是 Game Over，而是持续的生存压力（NPC 会主动攻击玩家）
 
-    // 自动存档
+    // 自动存档（战斗中不存档——战斗状态不持久化，见 combat-grid 设计文档）
     this.turnsSinceLastSave++
-    if (this.turnsSinceLastSave >= 5) {
+    if (this.turnsSinceLastSave >= 5 && !session.combat?.active) {
       session.dossierData = this.dossier.toJSON()
       facts.save('autosave')
       this.turnsSinceLastSave = 0
@@ -2989,7 +3032,7 @@ export class GameEngine {
     yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
 
     this.turnsSinceLastSave++
-    if (this.turnsSinceLastSave >= 5) {
+    if (this.turnsSinceLastSave >= 5 && !session.combat?.active) {
       session.dossierData = this.dossier.toJSON()
       facts.save('autosave')
       this.turnsSinceLastSave = 0

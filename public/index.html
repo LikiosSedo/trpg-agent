@@ -3940,6 +3940,10 @@
     /** 系统自动存档 — 只写到 autosave 槽 */
     function saveToLocal(session, dossier) {
       if (!session) return
+      // 战斗中不更新 autosave ——战斗状态（尤其 combat.grid）JSON 往返后会失效，
+      // 保持 autosave 为"战斗前"的干净状态。如果玩家刷新或断线，下次读档会回到
+      // 战斗前，可以重新触发遭遇（设计文档：combat-grid-design.md §保存恢复）
+      if (session.combat?.active) return
       writeSaveSlot('auto', session, dossier, undefined)
     }
 
@@ -6046,6 +6050,17 @@
           {
             // 从服务端快照恢复完整视觉状态
             const snap = msg
+
+            // 清理可能残留的战斗 UI（本地缓存的 gridState）
+            // 服务端在 resumeGame 中清空了过期的 combat 状态，前端也要跟上
+            if (gridState) {
+              gridState = null
+              gridMode = 'idle'
+              document.getElementById('combat-grid-container').classList.remove('active')
+              document.getElementById('messages').style.display = ''
+              const oldPanel = document.getElementById('combat-panel')
+              if (oldPanel) oldPanel.style.display = ''
+            }
 
             // 1. HUD
             if (snap.session) updateHUD(snap.session)
