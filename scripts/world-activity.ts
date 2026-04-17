@@ -106,6 +106,9 @@ interface ActivityReport {
 function analyze(data: SaveData, saveFile: string): ActivityReport {
   const s: SessionShape = data.session ?? data
   const npcs = s.npcs ?? []
+  // 区分 undefined（老存档，字段不存在）vs {}（引擎已初始化但无产出）
+  const hasMemoryField = s.npcMemories !== undefined
+  const hasBestiaryField = s.player?.bestiary !== undefined
   const memories = s.npcMemories ?? {}
   const bestiary = s.player?.bestiary ?? {}
   const flags = s.worldState?.flags ?? {}
@@ -178,13 +181,21 @@ function analyze(data: SaveData, saveFile: string): ActivityReport {
     insights.push('⚠ turn=0：疑似初始/未开玩存档，下述数据仅反映初始状态')
   }
   if (turn >= 10 && totalInteractions === 0) {
-    insights.push('🔴 玩了 ≥10 轮但 npcMemories.interactions=0 — 提取器可能失败（检查 DM provider 初始化）')
+    if (!hasMemoryField) {
+      insights.push('🟡 存档无 npcMemories 字段 — 记忆系统 feature 引入前的老存档（不是 bug）')
+    } else {
+      insights.push('🔴 玩了 ≥10 轮但 npcMemories.interactions=0 — 提取器可能失败（检查 DM provider 初始化）')
+    }
   }
-  if (turn >= 10 && idleTriggered === 0) {
+  if (turn >= 10 && idleTriggered === 0 && hasMemoryField) {
+    // 新存档才报；老存档（feature 引入前）不会有 idle event 触发记录
     insights.push('🟡 玩了 ≥10 轮无 idle event 触发 — 6% 概率偏低或 NPC 不在场')
   }
   if (bEnc > 0 && bWeak === 0) {
     insights.push('🟡 遭遇了怪物但一个弱点都没发现 — 玩家未对话 NPC 获取情报，或数据门控过严')
+  }
+  if (!hasBestiaryField && turn >= 3) {
+    insights.push('🟡 存档无 player.bestiary 字段 — 图鉴系统 feature 引入前的老存档')
   }
   if (bWeak > 0) {
     insights.push(`✓ 已发现 ${bWeak} 个怪物弱点 — 战斗叙事 callback 生效`)

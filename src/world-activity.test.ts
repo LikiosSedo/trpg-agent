@@ -143,9 +143,22 @@ describe('world-activity · Idle event 统计', () => {
     assert.equal(r.idleEvents.uniqueNpcs, 2)
   })
 
-  it('10 轮后无 idle event → 警告', () => {
-    const r = analyze(makeSave({ turnCount: 15, worldState: { flags: {} } }), 'x.json')
+  it('10 轮后无 idle event（新存档）→ 警告', () => {
+    const r = analyze(makeSave({
+      turnCount: 15,
+      worldState: { flags: {} },
+      npcMemories: {}, // 新存档：字段已初始化
+    }), 'x.json')
     assert.match(r.insights.join(' '), /无 idle event/)
+  })
+
+  it('10 轮后无 idle event（老存档）→ 不误报', () => {
+    const r = analyze(makeSave({
+      turnCount: 15,
+      worldState: { flags: {} },
+      // 无 npcMemories 字段 → 老存档
+    }), 'x.json')
+    assert.equal(r.insights.some((i: string) => i.includes('无 idle event')), false)
   })
 })
 
@@ -180,9 +193,21 @@ describe('world-activity · 承诺追踪', () => {
 })
 
 describe('world-activity · 衍生洞察', () => {
-  it('玩了 >10 轮但无记忆 interactions → red flag', () => {
+  it('玩了 >10 轮、npcMemories={} → 🔴 提取器失败', () => {
     const r = analyze(makeSave({ turnCount: 12, npcMemories: {} }), 'x.json')
     assert.match(r.insights.join(' '), /提取器可能失败/)
+  })
+
+  it('玩了 >10 轮但 npcMemories 字段不存在 → 🟡 老存档（不是 bug）', () => {
+    const r = analyze(makeSave({ turnCount: 12 }), 'x.json')
+    const s = r.insights.join(' ')
+    assert.match(s, /老存档/)
+    assert.equal(s.includes('提取器可能失败'), false)
+  })
+
+  it('玩了 3+ 轮但 player.bestiary 不存在 → 🟡 老存档', () => {
+    const r = analyze(makeSave({ turnCount: 5, player: {} }), 'x.json')
+    assert.match(r.insights.join(' '), /图鉴系统.*老存档/)
   })
 
   it('遭遇怪物但无弱点 → yellow flag', () => {
