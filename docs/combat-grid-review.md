@@ -197,14 +197,19 @@ grid.getUnit('Spiderling_2'): undefined ← BUG
 
 按优先级：
 
-1. **P0**：修复 `grid_spell` 路径的网格事件丢失（Important #4）
-2. **P0**：实现盟友网格 AI（Important #6）——不然盟友视觉上"不动"很突兀
-3. **P1**：实现 Spell.gridRange 校验（Important #5）——不然玩家可以全图施法
-4. **P1**：存档/恢复支持网格（Important #7）
+1. **P0** ✅ 修复 `grid_spell` 路径的网格事件丢失 — 2026-04-17 通过 aliveBefore 快照扫描死亡
+2. **P0** ✅ 实现盟友网格 AI — 2026-04-17 完成（Greg 等盟友会在网格上寻路移动攻击）
+3. **P1** ✅ 实现 Spell.gridRange 校验 — 2026-04-17 完成（超距返回 error + LoS 检查）
+4. **P1** ✅ 存档/恢复稳定性 — 2026-04-17 采用"战斗不持久化"策略：
+   - 战斗前自动存档（pending_encounter 和 hostile NPC 两个路径）
+   - 战斗中前后端都跳过存档
+   - resumeGame 检测到过期 combat 自动清空，回到战斗前
+   - 前端 resumed 事件显示"战斗中断"提示
 5. **P2**：消除双路径（Risk #1），统一走 processGridAction
 6. **P2**：整理 processCombatAction 中的死代码路径（`combat_grid_attack` 事件、未用 imports 等）
 7. **P3**：添加怪物 AI 移动的单测（Minor #14）
 8. **P3**：用 Dijkstra 替换 BFS 在 `findPath`（Minor #8）——仅在发现实际 bug 后再改
+9. **玩法扩展**：Boss 占 2×2 格（让蛛母/蚀日兽视觉更有压迫感）
 
 ---
 
