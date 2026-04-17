@@ -35,10 +35,10 @@
 
 import type { Tool, IAgent, AgentEvent, ProviderConfig } from './types.js'
 import {
-  OpenAICompatProvider,
   type LowLevelEvent,
   type FinishReason,
 } from './provider.js'
+import { createProvider, type LLMProvider } from './provider-factory.js'
 import { runToolCall } from './tool-runner.js'
 import {
   AgentError,
@@ -92,7 +92,7 @@ const BACKOFF_MAX_JITTER_MS = 200
 // ─── Agent 主类 ──────────────────────────────────────
 
 export class TRPGAgent implements IAgent {
-  private provider: OpenAICompatProvider
+  private provider: LLMProvider
   private activeTools: Tool[]
   private readonly mutedTools = new Map<string, Tool>()
   private readonly systemPrompt?: string
@@ -109,7 +109,7 @@ export class TRPGAgent implements IAgent {
   private lastApiCallTime = 0
 
   constructor(config: AgentConfig) {
-    this.provider = new OpenAICompatProvider(config.provider)
+    this.provider = createProvider(config.provider)
     this.activeTools = [...config.tools]
     this.systemPrompt = config.systemPrompt
     this.maxTurns = config.maxTurns ?? DEFAULT_MAX_TURNS
@@ -221,10 +221,17 @@ export class TRPGAgent implements IAgent {
             isError: !!result.isError,
           }
         }
-        // 终止循环检查:如果本轮调用了 terminatingTools 中的工具,直接结束
+        // 终止循环检查:本轮调用了 terminatingTools 中的工具时:
+        //   - 如果 assistant 已经产出文本 → 终止(常规路径,Kimi/DeepSeek)
+        //   - 如果 assistant 文本为空(reasoning 模型直接调工具的退化情况)→ 继续一轮,
+        //     让 LLM 看到 tool_result 后补叙事。代价 +1 次 LLM 调用,但避免空响应。
         if (this.terminatingTools.size > 0 && toolCalls.some(tc => this.terminatingTools.has(tc.name))) {
-          yield { type: 'turn_end' }
-          return
+          const hasText = typeof assistantMsg.content === 'string' && assistantMsg.content.length > 0
+          if (hasText) {
+            yield { type: 'turn_end' }
+            return
+          }
+          // fall through to continuation
         }
         // 继续下一 turn,让 LLM 看到 tool 结果后决定下一步
         continue

@@ -31,6 +31,15 @@ import { setExtractorProvider } from './npc-memory-extractor.js'
 // ─── Config ──────────────────────────────────
 
 function loadConfig() {
+  // Codex 订阅模式 — 走 ChatGPT 订阅,不需要 sk-... key,token 从 ~/.codex/auth.json 读
+  if (process.env.TRPG_PROVIDER_TYPE === 'codex') {
+    return {
+      type: 'codex',
+      apiKey: '',  // 占位 — codex provider 自己从 auth.json 读 token
+      baseUrl: process.env.TRPG_BASE_URL ?? 'https://chatgpt.com/backend-api/codex',
+      model: process.env.TRPG_MODEL ?? 'gpt-5.4',
+    }
+  }
   // 优先用环境变量（Render 等云平台），其次读本地配置文件
   if (process.env.TRPG_API_KEY) {
     if (!process.env.TRPG_BASE_URL) {
@@ -53,7 +62,7 @@ function loadConfig() {
   }
   const configPath = join(homedir(), '.occ', 'config.json')
   if (!existsSync(configPath)) {
-    throw new Error('未找到配置。设置环境变量 TRPG_API_KEY + TRPG_BASE_URL + TRPG_MODEL，或创建 ~/.occ/config.json')
+    throw new Error('未找到配置。设置 TRPG_PROVIDER_TYPE=codex(走 ChatGPT 订阅)，或 TRPG_API_KEY + TRPG_BASE_URL + TRPG_MODEL，或创建 ~/.occ/config.json')
   }
   return JSON.parse(readFileSync(configPath, 'utf-8'))
 }
@@ -98,11 +107,14 @@ export function initDMAgent(): void {
     apiThrottleMs: 1500,
     // SetActions 是 DM 每轮的最后一步 — 调用后自动结束 tool-call loop,
     // 避免多跑一次 LLM continuation(DM 会在空轮里产生混乱思考)。
+    // 注意:agent.ts 内部判断"assistant 文本非空才真终止",空文本时会自动续轮 —
+    // 这是 Codex/gpt-5.4 等 reasoning 模型有时直接调工具不出文本的兜底路径。
     terminatingTools: ['SetActions'],
     // Phase 4: 上下文压缩 —— token >= 60% 阈值时把早期对话压成"归档快照"
     // 消息(从 session 代码生成,零 LLM 调用)。最近 12 turn 完整保留。
+    // Codex(gpt-5.4)是 1024K(1M+)上下文,Kimi/DeepSeek 是 ~128K — 按 provider 自适应
     contextManager: {
-      modelContextWindow: 100_000,
+      modelContextWindow: config.type === 'codex' ? 1_048_576 : 100_000,
       compactThreshold: 0.6,
       keepRecentTurns: 12,
       buildArchivalSnapshot: ({ keepRecentTurns, availableToolNames }) =>

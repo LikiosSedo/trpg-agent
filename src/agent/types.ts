@@ -117,8 +117,8 @@ export interface ProviderConfig {
   model: string
   apiKey: string
   baseUrl: string
-  /** 当前只支持 'openai',保留此字段为未来扩展 */
-  type?: 'openai'
+  /** 'openai' = 走 /chat/completions(默认);'codex' = 走 ChatGPT 订阅(Responses API) */
+  type?: 'openai' | 'codex'
   /** 自定义 headers(如 Kimi coding API 伪装) */
   headers?: Record<string, string>
   /** 是否在 stream 请求里带 stream_options.include_usage(某些后端不支持) */

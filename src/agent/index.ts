@@ -43,6 +43,10 @@ export {
   type FinishReason,
 } from './provider.js'
 
+// Codex 订阅 provider + factory
+export { CodexResponsesProvider } from './codex-provider.js'
+export { createProvider, type LLMProvider } from './provider-factory.js'
+
 // 错误类型
 export {
   AgentError,

@@ -88,9 +88,9 @@ export async function extractMemory(params: {
   )
 
   try {
-    // 直接调用 OpenAI-compatible API（不走 agent 循环，无工具）
-    const { OpenAICompatProvider } = await import('./agent/provider.js')
-    const provider = new OpenAICompatProvider(_providerConfig)
+    // 直接调用 LLM provider（不走 agent 循环，无工具）
+    const { createProvider } = await import('./agent/provider-factory.js')
+    const provider = createProvider(_providerConfig)
 
     let responseText = ''
     const messages = [
