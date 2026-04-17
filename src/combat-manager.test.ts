@@ -219,7 +219,10 @@ ended = false
 result = 'ongoing'
 while (!ended && rounds < 20) {
   rounds++
-  const pt = executePlayerTurn(session, 'Goblin', 'weapon')
+  // 动态选第一只活着的怪物作为目标（3 只 Goblin 的 id 是 Goblin / Goblin_2 / Goblin_3）
+  const aliveTarget = session.combat?.monsters.find(m => m.hp > 0)
+  if (!aliveTarget) break
+  const pt = executePlayerTurn(session, aliveTarget.id, 'weapon')
   if (pt.ended) { ended = true; result = pt.result; break }
   const mp = executeMonsterPhase(session)
   if (mp.ended) { ended = true; result = mp.result; break }
