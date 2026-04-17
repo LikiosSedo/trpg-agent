@@ -132,6 +132,69 @@ describe('getIdleEvent · 触发条件', () => {
   })
 })
 
+describe('getIdleEvent · 真实 session 防回归', () => {
+  // 2026-04-17 发现的 bug：NPC.condition 默认 undefined（真实游戏数据），
+  // 但过滤要求 === 'normal' 导致所有 NPC 被排除。
+  // 这个测试用"真实场景"结构（condition 不显式设）验证修复。
+  it('NPC 未显式设 condition（undefined）→ 应按 normal 处理，不被过滤', () => {
+    const s = {
+      turnCount: 5,
+      worldState: {
+        currentLocation: 'dawnbreak-town',
+        timeOfDay: 'morning',
+        flags: {},
+      },
+      npcs: [
+        { name: '格雷格', location: 'dawnbreak-town' }, // 注意：无 condition 字段
+        { name: '小莉', location: 'dawnbreak-town' },
+        { name: '格罗姆', location: 'dawnbreak-town' },
+      ],
+    } as any as GameSession
+    const origRandom = Math.random
+    Math.random = () => 0 // 保证通过 rand + 保证 picker 选第一个
+    try {
+      const out = getIdleEvent(s)
+      assert.match(out, /^\[氛围\]/, '应该触发（修复前会是空字符串）')
+    } finally {
+      Math.random = origRandom
+    }
+  })
+
+  it('NPC condition="wounded" 仍然排除', () => {
+    const s = {
+      turnCount: 5,
+      worldState: { currentLocation: 'dawnbreak-town', timeOfDay: 'morning', flags: {} },
+      npcs: [
+        { name: '格雷格', location: 'dawnbreak-town', condition: 'wounded' },
+      ],
+    } as any as GameSession
+    const origRandom = Math.random
+    Math.random = () => 0
+    try {
+      assert.equal(getIdleEvent(s), '', 'wounded 应被排除 → 无候选 → 空')
+    } finally {
+      Math.random = origRandom
+    }
+  })
+
+  it('NPC condition="unconscious" 仍然排除', () => {
+    const s = {
+      turnCount: 5,
+      worldState: { currentLocation: 'dawnbreak-town', timeOfDay: 'morning', flags: {} },
+      npcs: [
+        { name: '格雷格', location: 'dawnbreak-town', condition: 'unconscious' },
+      ],
+    } as any as GameSession
+    const origRandom = Math.random
+    Math.random = () => 0
+    try {
+      assert.equal(getIdleEvent(s), '')
+    } finally {
+      Math.random = origRandom
+    }
+  })
+})
+
 describe('getIdleEvent · 实测命中率（1000 次抽样）', () => {
   it('当前 IDLE_EVENT_CHANCE（12%）的实测命中率在 10-14%', () => {
     // 不 mock random — 用真 RNG，10 轮模拟 3000 次取平均

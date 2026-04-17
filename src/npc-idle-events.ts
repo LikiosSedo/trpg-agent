@@ -76,9 +76,14 @@ export function getIdleEvent(session: GameSession): string {
   const time = session.worldState.timeOfDay
 
   // 找同场景、状态正常、不是当前交互对象的 NPC
+  // Bug 修复（2026-04-17 第二处）：`n.condition === 'normal'` 要求严格相等，
+  //   但新 NPC 默认 condition 字段为 undefined（未设置过），导致所有 NPC 被过滤。
+  //   这是三局 playtest 共 21 轮在破晓镇 0 触发的根本原因 —— 12% rand 过了
+  //   但候选 candidates 永远为 0。
+  //   正确语义：condition 未显式标注时视为 normal（只有 wounded/unconscious/recovering 才排除）。
   const candidates = session.npcs.filter(n =>
     n.location === playerLoc
-    && n.condition === 'normal'
+    && (n.condition ?? 'normal') === 'normal'
     && n.name !== session.interactionNpc
   )
   if (candidates.length === 0) return ''
