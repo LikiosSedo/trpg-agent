@@ -77,10 +77,10 @@ describe('getIdleEvent · 触发条件', () => {
     }
   })
 
-  it('条件满足但 random > 0.06 → 不触发', () => {
+  it('条件满足但 random > IDLE_EVENT_CHANCE → 不触发', () => {
     const s = makeSession()
     const origRandom = Math.random
-    Math.random = () => 0.5
+    Math.random = () => 0.5 // 远高于任何合理阈值
     try {
       assert.equal(getIdleEvent(s), '')
     } finally {
@@ -133,7 +133,7 @@ describe('getIdleEvent · 触发条件', () => {
 })
 
 describe('getIdleEvent · 实测命中率（1000 次抽样）', () => {
-  it('6% 概率下，10 轮玩法期望触发 ≥ 0.6 次；100 轮 ≥ 6 次', () => {
+  it('当前 IDLE_EVENT_CHANCE（12%）的实测命中率在 10-14%', () => {
     // 不 mock random — 用真 RNG，10 轮模拟 3000 次取平均
     const runs = 3000
     let total = 0
@@ -144,11 +144,11 @@ describe('getIdleEvent · 实测命中率（1000 次抽样）', () => {
       if (getIdleEvent(s) !== '') total++
     }
     const rate = total / runs
-    // 6% ± 2% 容忍带
-    assert.ok(rate >= 0.04 && rate <= 0.08, `期望 4-8%，实测 ${(rate * 100).toFixed(1)}%`)
+    // 12% ± 2% 容忍带；此测试在调参时会失败，提醒更新测试
+    assert.ok(rate >= 0.10 && rate <= 0.14, `期望 10-14%，实测 ${(rate * 100).toFixed(1)}%`)
   })
 
-  it('10 轮单局：触发 0 次的概率 ≈ 54%（binomial P(X=0 | n=10, p=0.06)）', () => {
+  it('10 轮单局：触发 0 次的概率 ≈ 28%（binomial P(X=0 | n=10, p=0.12)）', () => {
     // 模拟 1000 个 10-轮局，统计零触发的局数
     let zeroRuns = 0
     const total = 1000
@@ -169,11 +169,11 @@ describe('getIdleEvent · 实测命中率（1000 次抽样）', () => {
       if (hits === 0) zeroRuns++
     }
     const zeroRate = zeroRuns / total
-    // 理论 P(X=0|n=10,p=0.06) = 0.94^10 ≈ 0.539
-    // 容忍 ±5%
+    // 理论 P(X=0|n=10,p=0.12) = 0.88^10 ≈ 0.279
+    // 容忍 ±6%
     assert.ok(
-      zeroRate > 0.45 && zeroRate < 0.65,
-      `10 轮 0 触发概率实测 ${(zeroRate * 100).toFixed(1)}% (理论 ≈ 54%)`
+      zeroRate > 0.22 && zeroRate < 0.34,
+      `10 轮 0 触发概率实测 ${(zeroRate * 100).toFixed(1)}% (理论 ≈ 28%)`
     )
   })
 })

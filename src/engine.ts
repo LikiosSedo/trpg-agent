@@ -2451,10 +2451,12 @@ export class GameEngine {
             '为当前场景生成 2-3 个玩家此刻最自然的后续行动选项。',
           )) { /* 只消费事件 */ }
         })()
-        const timeout = new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 10_000))
+        // 超时从 10s → 6s：补丁请求只需要一次 tool-call（SetActions），LLM 通常 3-5s 内返回。
+        // 10s 过于保守导致玩家感知"等待无响应"；若 6s 内没回，多半是 API 卡死，走 fallback 比继续等更好。
+        const timeout = new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 6_000))
         const result = await Promise.race([patchPromise.then(() => 'done' as const), timeout])
         if (result === 'timeout') {
-          console.warn('[dm-patch] ⚠ 补丁请求超时(10s),走 fallback')
+          console.warn('[dm-patch] ⚠ 补丁请求超时(6s),走 fallback')
         } else {
           const patched = consumeActions()
           if (patched) {

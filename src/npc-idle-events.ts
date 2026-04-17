@@ -59,8 +59,14 @@ const IDLE_SNIPPETS: IdleSnippet[] = [
 
 // ─── 冷却控制 ──────────────────────────────
 
-const IDLE_EVENT_CHANCE = 0.06  // 6% 概率
-const IDLE_COOLDOWN_TURNS = 5   // 同一 NPC 的闲置事件冷却
+// 每轮触发闲置事件的概率。2026-04-17 从 6% 调到 12%：
+//   两局真实 playtest（每局 7 轮破晓镇室内）在旧概率下都是 0 触发。
+//   理论 P(0 触发 | 7 轮, 6%) = 0.94^7 ≈ 65% — 也就是说"玩完一局完全感受不到世界呼吸"是常态。
+//   提到 12% 后：P(0 触发 | 7 轮) = 0.88^7 ≈ 41%，多数玩家至少能感受一次 NPC 生活片段。
+//   5 轮冷却 + 候选过滤保证不会 spam。
+//   —— 调整理由记录见 CLAUDE.md 修订历史。
+const IDLE_EVENT_CHANCE = 0.12
+const IDLE_COOLDOWN_TURNS = 5   // 同一 NPC 的闲置事件冷却（不变）
 
 /** 获取本轮的闲置微事件（最多 1 条），返回空字符串表示没有 */
 export function getIdleEvent(session: GameSession): string {
