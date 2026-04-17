@@ -267,6 +267,8 @@ export interface PlayerCharacter {
   }
   activeEffects?: ActiveEffect[]
   bestiary?: Record<string, BestiaryEntry>  // 怪物图鉴
+  /** 战棋每回合移动格数（来自 ClassTemplate.gridMoveSpeed） */
+  gridMoveSpeed?: number
 }
 
 // ─── 事件 ──────────────────────────────────────

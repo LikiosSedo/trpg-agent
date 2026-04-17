@@ -127,8 +127,14 @@ function setupAllyVsDummies(allyName: string, dummyHps: Array<{ hp: number; maxH
   const monsterNames = dummyHps.map(() => 'Dummy')
   startCombat(session, monsterNames, monstersDb)
 
-  // Override dummy HPs to the test values
+  // 本测试专注验证同伴"目标选择逻辑"，不测试网格位置。
+  // 删除 grid 以走非网格 AI 路径，让 selectAllyTarget 不受位置限制。
   const combat = session.combat!
+  combat.grid = undefined
+  combat.monsters.forEach(m => { m.pos = undefined })
+  combat.allies.forEach(a => { a.pos = undefined })
+
+  // Override dummy HPs to the test values
   combat.monsters.forEach((m, i) => {
     m.hp = dummyHps[i].hp
     m.maxHp = dummyHps[i].maxHp

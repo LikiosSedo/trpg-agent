@@ -3397,6 +3397,10 @@ export class GameEngine {
     // ── Phase 1.5: 高先攻同伴行动 ──
     if (beforeAllyIds.length > 0 && combat.active) {
       const allyResult = executeAllyTurns(session, beforeAllyIds)
+      // 发送盟友网格移动动画
+      for (const gm of allyResult.gridMoves) {
+        yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
+      }
       yield* emitAllyNarratives(allyResult.hits)
       if (allyResult.log.length > 0) {
         yield { type: 'combat_ally', text: allyResult.log.join('\n') }
@@ -3544,6 +3548,10 @@ export class GameEngine {
     // ── Phase 2.5: 低先攻同伴行动 ──
     if (!skipAfterPhase && afterAllyIds.length > 0 && combat.active) {
       const allyResult = executeAllyTurns(session, afterAllyIds)
+      // 发送盟友网格移动动画
+      for (const gm of allyResult.gridMoves) {
+        yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
+      }
       yield* emitAllyNarratives(allyResult.hits)
       if (allyResult.log.length > 0) {
         yield { type: 'combat_ally', text: allyResult.log.join('\n') }
@@ -3901,14 +3909,40 @@ export class GameEngine {
 
     // ── E. 施法（原地） ──
     else if (msg.action === 'grid_spell' && msg.spellName) {
+      // 校验法术射程（仅对有 gridRange 且有指定目标的法术）
+      const spell = player.spells.find(s => s.name === msg.spellName || s.name.toLowerCase() === msg.spellName!.toLowerCase())
+      if (spell?.gridRange !== undefined && spell.gridRange > 0 && msg.targetId) {
+        const targetUnit = grid.getUnit(msg.targetId)
+        if (targetUnit) {
+          const dist = manhattan(playerUnit.pos, targetUnit.pos)
+          if (dist > spell.gridRange) {
+            yield { type: 'dm_error', message: `${msg.spellName} 射程 ${spell.gridRange}，目标距离 ${dist}——目标太远了。` }
+            return
+          }
+          // 远程阻挡检查（射程 > 1 的法术）
+          if (spell.gridRange > 1 && grid.isRangeBlocked(playerUnit.pos, targetUnit.pos)) {
+            yield { type: 'dm_error', message: `视线被障碍物阻挡，无法施法。` }
+            return
+          }
+        }
+      }
+      // 死亡前快照，供 spell 后对比（找出本次 spell 导致的所有死亡）
+      const aliveBefore = new Set(combat.monsters.filter(m => m.hp > 0).map(m => m.id))
       // 施法走现有 processCombatAction 逻辑（不移动）
       yield* this.processCombatAction({ action: 'spell', spellId: msg.spellName, targetId: msg.targetId })
-      // 目标死亡 → 移除网格
-      if (msg.targetId) {
-        const tm = combat.monsters.find(m => m.id === msg.targetId)
-        if (tm && tm.hp <= 0) {
-          grid.removeUnit(msg.targetId)
-          yield { type: 'combat_grid_death', unitId: msg.targetId }
+      // 扫描所有现在死亡但仍在网格上的单位 → 发 death 事件
+      if (combat.grid) {
+        for (const m of combat.monsters) {
+          if (m.hp <= 0 && aliveBefore.has(m.id) && combat.grid.getUnit(m.id)) {
+            combat.grid.removeUnit(m.id)
+            yield { type: 'combat_grid_death', unitId: m.id }
+          }
+        }
+        for (const a of combat.allies) {
+          if (a.hp <= 0 && combat.grid.getUnit(a.id)) {
+            combat.grid.removeUnit(a.id)
+            yield { type: 'combat_grid_death', unitId: a.id }
+          }
         }
       }
       return // processCombatAction 已经处理了怪物回合

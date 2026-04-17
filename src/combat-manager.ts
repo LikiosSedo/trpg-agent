@@ -255,9 +255,8 @@ export function startCombat(
   // 从武器推断玩家射程：ranged 武器用 gridRange，melee 默认 1
   const playerWeapon = player.equipped?.weapon as any
   const playerAttackRange: number = playerWeapon?.gridRange ?? (playerWeapon?.weaponType === 'ranged' ? 4 : 1)
-  // 职业默认移动力：法师 2，其他 3
-  const playerMoveSpeed = player.abilityModifiers.INT > player.abilityModifiers.STR &&
-    player.abilityModifiers.INT > player.abilityModifiers.DEX ? 2 : 3
+  // 玩家移动力：来自职业模板（Fighter/Cleric=3, Mage=2, Ranger=4）
+  const playerMoveSpeed = player.gridMoveSpeed ?? 3
 
   const grid = initCombatGrid({
     areaId: session.worldState.currentLocation,
@@ -1048,12 +1047,15 @@ function selectAllyTarget(ally: AllyInstance, aliveMonsters: MonsterInstance[]):
 export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: AllyHitRecord[]
+  gridMoves: GridMoveRecord[]
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [] }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [] }
 
   const log: string[] = []
   const hits: AllyHitRecord[] = []
+  const gridMoves: GridMoveRecord[] = []
+  const grid = combat.grid
   const allies = combat.allies ?? []
 
   for (const entry of combat.initiativeOrder) {
@@ -1066,7 +1068,62 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
     if (aliveMonsters.length === 0) break
 
-    const target = selectAllyTarget(ally, aliveMonsters)
+    // ── 战棋移动 AI（盟友）──
+    // 策略：如果能打到目标就打（按 selectAllyTarget 偏好选），否则朝目标移动
+    let gridLockedTargetId: string | null = null
+    if (grid && ally.pos) {
+      const gridUnit = grid.getUnit(ally.id)
+      if (gridUnit) {
+        const attackable = grid.getAttackableTargets(ally.id)
+        if (attackable.length > 0) {
+          // 用 selectAllyTarget 选权重最高的攻击目标（但只从可攻击的范围内选）
+          const attackableIds = new Set(attackable.map(a => a.targetId))
+          const reachableMonsters = aliveMonsters.filter(m => attackableIds.has(m.id))
+          if (reachableMonsters.length > 0) {
+            const preferred = selectAllyTarget(ally, reachableMonsters)
+            const opt = attackable.find(a => a.targetId === preferred.id)!
+            gridLockedTargetId = opt.targetId
+            // 移动到攻击位
+            if (!posEqual(gridUnit.pos, opt.attackFrom)) {
+              const path = grid.moveUnit(ally.id, opt.attackFrom)
+              if (path.length > 1) {
+                ally.pos = { ...opt.attackFrom }
+                gridMoves.push({ unitId: ally.id, path })
+              }
+            }
+          }
+        } else {
+          // 够不到：朝最近敌人移动，不攻击
+          const preferredTarget = selectAllyTarget(ally, aliveMonsters)
+          const targetUnit = grid.getUnit(preferredTarget.id)
+          if (targetUnit) {
+            const reachable = grid.getReachable(ally.id)
+            let bestPos = gridUnit.pos
+            let bestDist = manhattan(gridUnit.pos, targetUnit.pos)
+            for (const [key] of reachable) {
+              const p = parseKey(key)
+              const d = manhattan(p, targetUnit.pos)
+              if (d < bestDist) { bestDist = d; bestPos = p }
+            }
+            if (!posEqual(bestPos, gridUnit.pos)) {
+              const path = grid.moveUnit(ally.id, bestPos)
+              if (path.length > 1) {
+                ally.pos = { ...bestPos }
+                gridMoves.push({ unitId: ally.id, path })
+              }
+            }
+          }
+          // 够不到任何目标 → 本回合只移动不攻击
+          hits.push({ allyName: ally.name, targetName: '', hit: false, isCritical: false, damage: 0, targetKilled: false })
+          continue
+        }
+      }
+    }
+
+    // 攻击目标选择：优先用网格锁定的目标
+    const target = gridLockedTargetId
+      ? (aliveMonsters.find(m => m.id === gridLockedTargetId) ?? selectAllyTarget(ally, aliveMonsters))
+      : selectAllyTarget(ally, aliveMonsters)
 
     const atk = attackRoll(ally.attackMod, target.ac)
 
@@ -1152,7 +1209,7 @@ export function executeAllyTurns(session: GameSession, onlyIds?: string[]): {
     }
   }
 
-  return { log, hits }
+  return { log, hits, gridMoves }
 }
 
 // ─── 逃跑 ─────────────────────────────────────────

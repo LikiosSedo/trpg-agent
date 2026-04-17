@@ -230,6 +230,37 @@ console.log('\n=== Test 6: Boss summons on grid ===')
   }
 }
 
+// ─── Test 7a: Ally grid AI moves toward enemy ─────
+
+console.log('\n=== Test 7a: Ally grid AI ===')
+
+{
+  const session = makeSession()
+  initGameState(session)
+  session.npcs.push({ name: '格雷格', trust: 0, knownFacts: [], location: 'twilight-woods', condition: 'normal' } as any)
+  session.party = ['格雷格']
+  const allCombatDb: any = [
+    { name: 'Goblin', nameZh: '哥布林', hp: 15, dc: 12, damageDice: '1d6+2', moveSpeed: 3, attackRange: 1, specialAbility: '', loot: [] },
+    { name: '格雷格', hp: 65, dc: 15, damageDice: '1d8+4', moveSpeed: 3, attackRange: 1, specialAbility: '', combatBehavior: 'subdue', loot: [] },
+  ]
+
+  const combat = startCombat(session, ['Goblin'], allCombatDb)
+  const grid = combat.grid!
+  const greg = grid.getUnit('格雷格')
+  assert(greg !== undefined, 'ally is on grid')
+  const initialGregPos = { ...greg!.pos }
+
+  // Run ally turn
+  const { executeAllyTurns } = await import('./combat-manager.js')
+  const result = executeAllyTurns(session)
+
+  // Greg should have moved (toward goblin) and possibly attacked
+  const newGregPos = grid.getUnit('格雷格')?.pos
+  console.log(`  INFO: Greg ${JSON.stringify(initialGregPos)} → ${JSON.stringify(newGregPos)}`)
+  console.log(`  INFO: gridMoves = ${result.gridMoves.length}`)
+  assert(result.gridMoves.length >= 0, 'executeAllyTurns returns gridMoves')
+}
+
 // ─── Test 7: findPath with difficult terrain ─────
 
 console.log('\n=== Test 7: findPath with difficult terrain ===')

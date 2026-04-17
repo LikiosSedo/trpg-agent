@@ -15,6 +15,8 @@ export interface ClassTemplate {
   skills: PlayerCharacter['skills']
   maxHp: number
   spells: Spell[]
+  /** 战棋移动格数（每回合）。不填则默认 3 */
+  gridMoveSpeed?: number
 }
 
 // 5 级冒险者模板——足够探索世界，不需要刷级
@@ -24,6 +26,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     abilities: { STR: 18, DEX: 14, CON: 16, INT: 8, WIS: 12, CHA: 10 },
     skills: ['athletics', 'intimidation'],
     maxHp: 38,
+    gridMoveSpeed: 3,  // 标准近战，重甲不算快
     spells: [
       { name: 'Second Wind', description: '战斗恢复', effect: '恢复1d10+5HP。每次短休息后可用。', usesPerRest: 3, remaining: 3, gridRange: 0 },
     ],
@@ -33,6 +36,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     abilities: { STR: 8, DEX: 14, CON: 12, INT: 18, WIS: 14, CHA: 10 },
     skills: ['arcana', 'investigation'],
     maxHp: 26,
+    gridMoveSpeed: 2,  // 法师腿短，要提前走位
     spells: [
       { name: 'Fire Bolt', description: '投射一团火焰', effect: 'Deal 2d10 fire damage on a ranged spell attack hit.', usesPerRest: 0, remaining: 0, gridRange: 4 },
       { name: 'Magic Missile', description: '三枚魔法飞弹自动命中', effect: 'Deal 3d4+3 force damage, auto-hit, split among up to 3 targets.', usesPerRest: 4, remaining: 4, gridRange: 3 },
@@ -46,6 +50,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     abilities: { STR: 14, DEX: 18, CON: 14, INT: 10, WIS: 16, CHA: 8 },
     skills: ['stealth', 'perception', 'sleight_of_hand'],
     maxHp: 34,
+    gridMoveSpeed: 4,  // DEX 18 + 轻甲：灵活游走，最快
     spells: [
       { name: "Hunter's Mark", description: '猎人印记', effect: '标记目标，对其攻击额外1d6伤害。持续1小时。', usesPerRest: 3, remaining: 3, gridRange: 4 },
       { name: 'Cure Wounds', description: '治疗伤口', effect: 'Restore 1d8+WIS modifier HP.', usesPerRest: 3, remaining: 3, gridRange: 1 },
@@ -56,6 +61,7 @@ export const CLASS_TEMPLATES: Record<string, ClassTemplate> = {
     abilities: { STR: 16, DEX: 10, CON: 16, INT: 10, WIS: 18, CHA: 14 },
     skills: ['medicine', 'insight', 'persuasion'],
     maxHp: 36,
+    gridMoveSpeed: 3,  // 标准近战，治疗需靠近队友
     spells: [
       { name: 'Cure Wounds', description: '触摸治疗伤口', effect: 'Restore 2d8+WIS modifier HP to a creature you touch.', usesPerRest: 4, remaining: 4, gridRange: 1 },
       { name: 'Guiding Bolt', description: '指引之光', effect: 'Deal 4d6 radiant damage. Next attack on target has advantage.', usesPerRest: 3, remaining: 3, gridRange: 3 },
@@ -356,6 +362,7 @@ export function createGameSession(name: string, classId: string): GameSession {
     maxHp: template.maxHp,
     xp: 0,
     gold: 20,
+    gridMoveSpeed: template.gridMoveSpeed ?? 3,
     inventory: [
       { name: '治疗药水', type: 'potion', description: '红色治疗药水。恢复2d4+2生命值。', bonus: 2 },
     ],
