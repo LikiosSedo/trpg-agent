@@ -5741,6 +5741,7 @@
             if (pu) { pu.hp = msg.playerHp; pu.maxHp = msg.playerMaxHp }
             renderCombatGrid()
             enableGridButtons()
+            gridActionPending = false  // 允许下一轮操作
           }
           break
 
@@ -6060,6 +6061,11 @@
               document.getElementById('messages').style.display = ''
               const oldPanel = document.getElementById('combat-panel')
               if (oldPanel) oldPanel.style.display = ''
+            }
+
+            // 服务端检测到上次未完成的战斗已被清理 → 提示玩家
+            if (snap.combatRewound) {
+              appendMsg('⚠ 上次战斗未完成，已回到战斗前的安全点。可以重新挑战。', 'system')
             }
 
             // 1. HUD
@@ -6967,13 +6973,16 @@
       }
     }
 
+    let gridActionPending = false  // 防止重复点击发送
+
     function onGridCellClick(x, y) {
-      if (!gridState) return
+      if (!gridState || gridActionPending) return
       const cell = getGridCell(x, y)
       if (!cell) return
 
       if (gridMode === 'move') {
         if (cell.classList.contains('reachable')) {
+          gridActionPending = true
           ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_move', target: { x, y } }))
           clearGridHighlights()
           gridMode = 'idle'
@@ -6982,6 +6991,7 @@
       } else if (gridMode === 'attack') {
         const unit = gridState.units.find(u => u.pos.x === x && u.pos.y === y && u.side === 'enemy')
         if (unit && cell.classList.contains('attackable')) {
+          gridActionPending = true
           ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_attack', targetId: unit.id }))
           clearGridHighlights()
           gridMode = 'idle'
@@ -7118,6 +7128,8 @@
     }
 
     function gridDefend() {
+      if (gridActionPending) return
+      gridActionPending = true
       ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_defend' }))
       gridMode = 'idle'
       clearGridHighlights()
@@ -7125,6 +7137,8 @@
     }
 
     function gridFlee() {
+      if (gridActionPending) return
+      gridActionPending = true
       ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_flee' }))
       gridMode = 'idle'
       clearGridHighlights()
@@ -7166,24 +7180,33 @@
 
     function gridUnitDeath(unitId) {
       if (!gridState) return
-      // 播放死亡动画
-      const el = document.querySelector(`[data-unit-id="${unitId}"]`)
-      if (el) {
-        el.classList.add('dying')
-        playSfx('creature_die', 0.4)
-      }
-      // 从 gridState 移除
-      setTimeout(() => {
-        if (gridState) {
-          gridState.units = gridState.units.filter(u => u.id !== unitId)
-          renderCombatGrid()
+      // 立即从 gridState 移除，避免动画期间其他事件重新渲染单位
+      const unit = gridState.units.find(u => u.id === unitId)
+      if (!unit) return
+      const deathPos = { ...unit.pos }
+      gridState.units = gridState.units.filter(u => u.id !== unitId)
+      playSfx('creature_die', 0.4)
+      // 在原位置放一个临时死亡动画元素（不依赖 gridState，独立 DOM）
+      const cell = getGridCell(deathPos.x, deathPos.y)
+      if (cell) {
+        const corpse = document.createElement('div')
+        corpse.className = `grid-unit ${unit.side} dying`
+        corpse.style.pointerEvents = 'none'
+        if (unit.portrait) {
+          corpse.style.backgroundImage = `url(${unit.portrait})`
+        } else {
+          corpse.textContent = unit.side === 'player' ? '⚔' : unit.side === 'ally' ? '🛡' : '👹'
         }
-      }, 500)
+        cell.appendChild(corpse)
+        setTimeout(() => { if (corpse.parentNode) corpse.remove() }, 600)
+      }
+      renderCombatGrid()
     }
 
     function endCombatGrid(result, loot) {
       gridState = null
       gridMode = 'idle'
+      gridActionPending = false
       document.getElementById('combat-grid-container').classList.remove('active')
       document.getElementById('messages').style.display = ''
       const oldPanel = document.getElementById('combat-panel')

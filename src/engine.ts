@@ -978,9 +978,11 @@ export class GameEngine {
     // 实例，JSON 往返后方法丢失；pre-combat 存档策略保证这里大概率是空的，但
     // 如果前端缓存了旧的 combat 对象，这里兜底处理——回到战斗前状态，下次移动
     // 可能重新触发遭遇（lair_entrance 或区域随机）
+    let combatWasRewound = false
     if (session.combat?.active || session.combat?.grid) {
       console.log('[resume] 清除过期的战斗状态（战斗不持久化）')
       session.combat = null
+      combatWasRewound = true
       // 清除 pending_encounter，避免一加载就立刻重新开战
       delete session.worldState.flags['pending_encounter']
       // 清除已触发的 lair_entrance，让玩家再次到达时重新弹入口卡片
@@ -989,6 +991,8 @@ export class GameEngine {
           delete session.worldState.flags[key]
         }
       }
+      // 标记给前端显示提示（setState 时 read）
+      ;(session as any).__combatRewound = true
     }
 
     const dossier = dossierData ? DossierManager.fromJSON(dossierData) : new DossierManager()
@@ -4095,7 +4099,11 @@ export class GameEngine {
       // resume 时附带当前章节的 fresh fallback actions，避免前端 fallback 到陈旧的
       // localStorage 缓存（可能来自前一章甚至前一局）。战斗中由 combat 字段接管 UI。
       actions: session.combat?.active ? null : buildFallbackActions(session),
+      // 标记：resumeGame 中清除了过期战斗状态 → 前端应该提示玩家
+      combatRewound: !!(session as any).__combatRewound,
     }
+    // 一次性消费，避免后续读档提示
+    delete (session as any).__combatRewound
 
     // 如果在战斗中，发送战斗状态供前端重建 UI
     if (session.combat?.active) {
