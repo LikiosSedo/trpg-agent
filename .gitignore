@@ -21,3 +21,9 @@ public/portraits/scenes/*.png
 
 # fetch-assets.mjs 的临时文件
 .fetch-*.tar.gz
+
+# Playwright e2e
+test-results/
+tests/e2e/report/
+tests/e2e/screenshots/*.png
+playwright-report/

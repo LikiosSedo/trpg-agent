@@ -6,6 +6,10 @@
     "play": "tsx src/dice-tavern.ts",
     "start": "tsx src/main.ts",
     "web": "tsx src/server.ts",
+    "web:sandbox": "PORT=3008 tsx src/server.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "publish-assets": "node scripts/publish-assets.mjs",
     "verify-assets": "node scripts/verify-assets.mjs",
@@ -21,6 +25,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.2",
     "@types/ws": "^8.18.1",
