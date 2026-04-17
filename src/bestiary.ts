@@ -179,6 +179,30 @@ export function getKnownCombatTraits(
 }
 
 /**
+ * 构造战斗上下文中"对手:"一行的敌人描述。
+ * 逐个活着的敌人拼接：中文名 + 受伤状态 + （已发现的）战斗特性。
+ *
+ * @param alive 活着的敌人（combat.monsters.filter(m => m.hp > 0)）
+ * @param session 供读取 bestiary
+ * @param monstersDb 战斗体数据库（monsters + npc-combatants）
+ * @param localize 外部提供的名称本地化函数（engine 注入 localize）
+ */
+export function formatEnemyDescForPrompt(
+  alive: Array<{ name: string; hp: number; maxHp: number }>,
+  session: GameSession,
+  monstersDb: Monster[],
+  localize: (name: string) => string,
+): string {
+  return alive.map(m => {
+    const ePct = Math.round((m.hp / m.maxHp) * 100)
+    const eState = ePct > 60 ? '' : ePct > 25 ? '（已受伤）' : '（重伤）'
+    const traits = getKnownCombatTraits(session, m.name, monstersDb)
+    const traitsStr = traits ? `（你记得：${traits}）` : ''
+    return `${localize(m.name)}${eState}${traitsStr}`
+  }).join('、')
+}
+
+/**
  * 检查 NPC 是否能提供某怪物的情报
  * 返回可解锁的知识类型，或 null（NPC 不知道/信任不够）
  */

@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { getKnownCombatTraits } from './bestiary.js'
+import { getKnownCombatTraits, formatEnemyDescForPrompt } from './bestiary.js'
 import type { GameSession, BestiaryEntry, Monster } from './types.js'
 
 function makeSession(bestiary: Record<string, Partial<BestiaryEntry>> = {}): GameSession {
@@ -104,5 +104,65 @@ describe('getKnownCombatTraits · 防泄漏（只透露已知的）', () => {
     const out = getKnownCombatTraits(s, 'Goblin', DB)
     assert.equal(out.includes('fire'), false, '弱点 fire 不能出现')
     assert.equal(out, '抗poison')
+  })
+})
+
+// 集成：engine.buildCombatContext 的 "对手:" 一行 === formatEnemyDescForPrompt(...)
+// 单测锁定玩家端到端体验：探索发现弱点 → 战斗上下文 callback
+describe('formatEnemyDescForPrompt · 集成场景', () => {
+  const localize = (name: string) => name === 'Goblin' ? '哥布林' : name === 'Wolf' ? '灰狼' : name
+
+  it('探索-战斗回路：发现弱点 → 战斗 context 含"你记得：怕"', () => {
+    const session = makeSession({
+      Goblin: { encountered: true, weaknessKnown: true },
+    })
+    const alive = [{ name: 'Goblin', hp: 8, maxHp: 8 }]
+    const desc = formatEnemyDescForPrompt(alive, session, DB, localize)
+    assert.match(desc, /哥布林/, '中文名已注入')
+    assert.match(desc, /你记得：怕fire/, 'callback 已注入')
+  })
+
+  it('未探索 → 战斗 context 只有中文名，无 callback', () => {
+    const session = makeSession() // 空 bestiary
+    const alive = [{ name: 'Goblin', hp: 8, maxHp: 8 }]
+    const desc = formatEnemyDescForPrompt(alive, session, DB, localize)
+    assert.equal(desc, '哥布林')
+    assert.equal(desc.includes('你记得'), false)
+  })
+
+  it('多敌人 mix：一个已探索、一个未探索 → 只有已探索的 callback', () => {
+    const session = makeSession({
+      Goblin: { encountered: true, weaknessKnown: true },
+    })
+    const alive = [
+      { name: 'Goblin', hp: 8, maxHp: 8 },
+      { name: 'Wolf', hp: 11, maxHp: 11 },
+    ]
+    const desc = formatEnemyDescForPrompt(alive, session, DB, localize)
+    assert.match(desc, /哥布林.*你记得：怕fire/)
+    assert.match(desc, /灰狼/)
+    // Wolf 后面没有括号
+    const wolfIdx = desc.indexOf('灰狼')
+    const afterWolf = desc.slice(wolfIdx + '灰狼'.length, wolfIdx + '灰狼'.length + 4)
+    assert.equal(afterWolf.includes('你记得'), false, 'Wolf 没有 callback')
+  })
+
+  it('受伤状态 + callback 组合：先伤势后知识', () => {
+    const session = makeSession({
+      Goblin: { encountered: true, weaknessKnown: true },
+    })
+    // hp 5/8 = 62%  > 60 ⇒ 无伤势标注；改用 4/8 = 50% ⇒ '（已受伤）'
+    const alive = [{ name: 'Goblin', hp: 4, maxHp: 8 }]
+    const desc = formatEnemyDescForPrompt(alive, session, DB, localize)
+    assert.equal(desc, '哥布林（已受伤）（你记得：怕fire）', '顺序：中文名 → 伤势 → 知识')
+  })
+
+  it('重伤（<25%）+ 全部已知特性', () => {
+    const session = makeSession({
+      Goblin: { encountered: true, weaknessKnown: true, resistanceKnown: true, immunityKnown: true },
+    })
+    const alive = [{ name: 'Goblin', hp: 1, maxHp: 8 }] // 12.5% ⇒ 重伤
+    const desc = formatEnemyDescForPrompt(alive, session, DB, localize)
+    assert.equal(desc, '哥布林（重伤）（你记得：怕fire，抗poison，免疫charm）')
   })
 })
