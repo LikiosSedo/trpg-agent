@@ -113,6 +113,29 @@ async function playOneTurn(
   const eventTypes: string[] = []
   const errors: string[] = []
 
+  // 如果在战斗中，先把战斗推完（自动防御）再处理本轮 input。
+  // playtest 脚本不适合模拟细致战斗决策，默认"防御 + 挺过去"。
+  if (engine.session.combat?.active) {
+    console.log(`  [combat] 进入战斗状态，自动防御过关`)
+    let guard = 0
+    while (engine.session.combat?.active && guard < 12) {
+      guard++
+      try {
+        for await (const e of engine.processGridAction({ action: 'grid_defend' })) {
+          eventTypes.push('[combat]' + e.type)
+        }
+      } catch (err) {
+        errors.push('combat turn failed: ' + (err as Error).message)
+        break
+      }
+    }
+    if (engine.session.combat?.active) {
+      errors.push('战斗 12 轮后仍未结束 — 放弃本轮')
+      return { idx, input, dmText, eventTypes, durationMs: Date.now() - start, before, after: snap(engine.session), errors }
+    }
+    console.log(`  [combat] 战斗结束`)
+  }
+
   try {
     for await (const event of engine.processTurn(input)) {
       eventTypes.push(event.type)
