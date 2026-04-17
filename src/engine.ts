@@ -3942,6 +3942,15 @@ export class GameEngine {
     combat.pendingMonsterTurn = true
     const monsterResult = executeMonsterPhase(session)
     if (monsterResult.log.length > 0) {
+      // 发送 Boss 召唤（在移动动画之前，这样玩家先看到"新怪物出现"）
+      for (const sp of monsterResult.gridSpawns) {
+        yield { type: 'combat_grid_spawn', unit: {
+          id: sp.unitId, side: 'enemy', name: sp.name,
+          hp: sp.hp, maxHp: sp.maxHp, pos: sp.pos,
+          moveSpeed: sp.moveSpeed, attackRange: sp.attackRange,
+          portrait: '',
+        }}
+      }
       // 发送怪物移动动画
       for (const gm of monsterResult.gridMoves) {
         yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }

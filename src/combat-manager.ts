@@ -533,10 +533,34 @@ export function executePlayerAttack(
  * Boss 特殊技能 — 在怪物普通攻击之后执行
  * 返回额外日志
  */
+/** 找 pos 周围最近的空格子（BFS），用于放置召唤物 */
+function findNearbyEmptyGridCell(
+  grid: import('./combat-grid.js').CombatGrid,
+  origin: { x: number; y: number },
+): { x: number; y: number } | null {
+  const queue: Array<{ x: number; y: number }> = [origin]
+  const seen = new Set<string>([`${origin.x},${origin.y}`])
+  const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
+  while (queue.length > 0) {
+    const p = queue.shift()!
+    for (const d of dirs) {
+      const nb = { x: p.x + d.x, y: p.y + d.y }
+      const k = `${nb.x},${nb.y}`
+      if (seen.has(k)) continue
+      seen.add(k)
+      if (!grid.isInBounds(nb)) continue
+      if (grid.isEmpty(nb)) return nb
+      if (!grid.isWall(nb)) queue.push(nb)
+    }
+  }
+  return null
+}
+
 function executeBossAbility(
   session: GameSession,
   monster: MonsterInstance,
   combat: CombatState,
+  spawns?: GridSpawnRecord[],
 ): string[] {
   const round = combat.round
   const log: string[] = []
@@ -585,6 +609,24 @@ function executeBossAbility(
           loot: ['蜘蛛丝'],
           conditions: [],
           vulnerability: ['fire'],
+          moveSpeed: 3,
+          attackRange: 1,
+        }
+        // 网格：放置在 Boss 周围空格
+        if (combat.grid && monster.pos) {
+          const spawnPos = findNearbyEmptyGridCell(combat.grid, monster.pos)
+          if (spawnPos) {
+            spiderling.pos = { ...spawnPos }
+            combat.grid.placeUnit({
+              id: spiderling.id, side: 'enemy', pos: spawnPos,
+              moveSpeed: 3, attackRange: 1,
+            })
+            if (spawns) spawns.push({
+              unitId: spiderling.id, name: spiderling.name,
+              hp: spiderling.hp, maxHp: spiderling.maxHp,
+              pos: spawnPos, moveSpeed: 3, attackRange: 1,
+            })
+          }
         }
         combat.monsters.push(spiderling)
         combat.initiativeOrder.push({
@@ -639,6 +681,23 @@ function executeBossAbility(
         vulnerability: ['radiant'],
         resistance: ['cold'],
         immunity: ['necrotic'],
+        moveSpeed: 3,
+        attackRange: 1,
+      }
+      if (combat.grid && monster.pos) {
+        const spawnPos = findNearbyEmptyGridCell(combat.grid, monster.pos)
+        if (spawnPos) {
+          shadow.pos = { ...spawnPos }
+          combat.grid.placeUnit({
+            id: shadow.id, side: 'enemy', pos: spawnPos,
+            moveSpeed: 3, attackRange: 1,
+          })
+          if (spawns) spawns.push({
+            unitId: shadow.id, name: shadow.name,
+            hp: shadow.hp, maxHp: shadow.maxHp,
+            pos: spawnPos, moveSpeed: 3, attackRange: 1,
+          })
+        }
       }
       combat.monsters.push(shadow)
       combat.initiativeOrder.push({
@@ -714,13 +773,25 @@ export interface GridMoveRecord {
   path: Array<{ x: number; y: number }>
 }
 
+/** 单位出生记录（Boss 召唤/分裂，供前端渲染） */
+export interface GridSpawnRecord {
+  unitId: string
+  name: string
+  hp: number
+  maxHp: number
+  pos: { x: number; y: number }
+  moveSpeed: number
+  attackRange: number
+}
+
 export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: MonsterHitRecord[]
   gridMoves: GridMoveRecord[]
+  gridSpawns: GridSpawnRecord[]
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [], gridMoves: [] }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [] }
 
   const player = session.player
   let playerAC = calculatePlayerAC(player)
@@ -728,6 +799,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   const log: string[] = []
   const hits: MonsterHitRecord[] = []
   const gridMoves: GridMoveRecord[] = []
+  const gridSpawns: GridSpawnRecord[] = []
   const grid = combat.grid
 
   for (const entry of combat.initiativeOrder) {
@@ -748,6 +820,8 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     // ── 战棋移动 AI ──
     // 当网格存在时，怪物先移动再攻击
     let canAttackAfterMove = true
+    // 网格 AI 锁定的目标 id（优先攻击此目标，避免旧权重随机选到不在射程内的目标）
+    let gridLockedTargetId: string | null = null
     if (grid && monster.pos) {
       const gridUnit = grid.getUnit(monster.id)
       if (gridUnit) {
@@ -766,6 +840,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
             }
             if (w > bestWeight) { bestWeight = w; bestTarget = opt }
           }
+          gridLockedTargetId = bestTarget.targetId
           // 移动到攻击位
           if (!posEqual(gridUnit.pos, bestTarget.attackFrom)) {
             const path = grid.moveUnit(monster.id, bestTarget.attackFrom)
@@ -780,7 +855,6 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
           const playerUnit = grid.getUnit('player')
           if (playerUnit) {
             const reachable = grid.getReachable(monster.id)
-            // 找可达格中离玩家最近的
             let bestPos = gridUnit.pos
             let bestDist = manhattan(gridUnit.pos, playerUnit.pos)
             for (const [key] of reachable) {
@@ -813,19 +887,26 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       { id: 'player', name: player.name, ac: playerAC, isPlayer: true, isAlly: false },
       ...aliveAllies.map(a => ({ id: a.id, name: a.name, ac: a.ac, isPlayer: false, isAlly: true })),
     ]
-    const weights = targets.map(t => {
-      if (t.isPlayer) return 2
-      // 嘲讽：格雷格在场时权重 ×3
-      const allyObj = aliveAllies.find(a => a.id === t.id)
-      if (allyObj?.allyAbility?.effect === 'taunt') return 3
-      return 1
-    })
-    const totalWeight = weights.reduce((a, b) => a + b, 0)
-    let roll = Math.random() * totalWeight
-    let target = targets[0]
-    for (let i = 0; i < targets.length; i++) {
-      roll -= weights[i]
-      if (roll <= 0) { target = targets[i]; break }
+    let target: Target
+    // 网格 AI 已锁定目标 → 直接用，不走权重随机（保证攻击目标和移动目标一致）
+    const lockedTarget = gridLockedTargetId ? targets.find(t => t.id === gridLockedTargetId) : null
+    if (lockedTarget) {
+      target = lockedTarget
+    } else {
+      const weights = targets.map(t => {
+        if (t.isPlayer) return 2
+        // 嘲讽：格雷格在场时权重 ×3
+        const allyObj = aliveAllies.find(a => a.id === t.id)
+        if (allyObj?.allyAbility?.effect === 'taunt') return 3
+        return 1
+      })
+      const totalWeight = weights.reduce((a, b) => a + b, 0)
+      let roll = Math.random() * totalWeight
+      target = targets[0]
+      for (let i = 0; i < targets.length; i++) {
+        roll -= weights[i]
+        if (roll <= 0) { target = targets[i]; break }
+      }
     }
 
     const targetAC = target.ac
@@ -835,7 +916,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       log.push(`${monster.id} 攻击${target.name}: d20(${atk.roll})+${monster.attackMod}=${atk.total} vs AC${targetAC} → 未命中`)
       hits.push({ monsterName: monster.name, targetName: target.name, targetIsAlly: target.isAlly, hit: false, isCritical: false, damage: 0, playerKilled: false, allyKilled: false })
       // Boss 特殊技能（即使普通攻击未命中也执行）
-      const bossMissLog = executeBossAbility(session, monster, combat)
+      const bossMissLog = executeBossAbility(session, monster, combat, gridSpawns)
       if (bossMissLog.length > 0) log.push(...bossMissLog)
       continue
     }
@@ -909,7 +990,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     }
 
     // Boss 特殊技能
-    const bossLog = executeBossAbility(session, monster, combat)
+    const bossLog = executeBossAbility(session, monster, combat, gridSpawns)
     if (bossLog.length > 0) {
       log.push(...bossLog)
     }
@@ -925,7 +1006,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
     }
   }
 
-  return { log, hits, gridMoves }
+  return { log, hits, gridMoves, gridSpawns }
 }
 
 // ─── 同伴回合（全自动）─────────────────────────────
@@ -1279,11 +1360,12 @@ export function executeMonsterPhase(
   log: string[]
   hits: MonsterHitRecord[]
   gridMoves: GridMoveRecord[]
+  gridSpawns: GridSpawnRecord[]
   ended: boolean
   result: CombatResult
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [], gridMoves: [], ended: true, result: 'ongoing' }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [], ended: true, result: 'ongoing' }
 
   combat.pendingMonsterTurn = false
   const monsterResult = executeMonsterTurns(session, onlyIds)
@@ -1294,21 +1376,22 @@ export function executeMonsterPhase(
     log.push('\n=== 战斗失败 ===')
     endCombat(session)
   } else if (!check.ended && endRound) {
-    // 回合结束：递减效果持续时间
     const expired = tickEffects(session.player)
     if (expired.length > 0) {
       log.push(`[效果消散] ${expired.join('、')}`)
     }
-    // 清除防御姿态
     combat.playerDefending = false
-    // 清除 Boss 回合效果 flag
     delete session.worldState.flags['boss_shadow_veil']
     delete session.worldState.flags['boss_web_player']
-    // 准备下一轮
     combat.round++
   }
 
-  return { log, hits: monsterResult.hits, gridMoves: monsterResult.gridMoves, ...check }
+  return {
+    log, hits: monsterResult.hits,
+    gridMoves: monsterResult.gridMoves,
+    gridSpawns: monsterResult.gridSpawns,
+    ...check,
+  }
 }
 
 // ─── 战斗状态摘要 ────────────────────────────────

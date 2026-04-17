@@ -152,12 +152,17 @@ export class CombatGrid {
 
   /**
    * 移动单位到目标位置，返回 BFS 最短路径（含起终点）。
-   * 不做合法性校验——调用方负责确保 `to` 在 getReachable 结果中。
+   * 如果目标不可达（不在 reachable 范围内），不移动，返回空数组。
    */
   moveUnit(unitId: string, to: GridPos): GridPos[] {
     const unit = this.units.get(unitId)
     if (!unit) return []
+    if (posEqual(unit.pos, to)) return [unit.pos]
+    // 合法性校验：必须在可达范围内，且终点不能被其他单位占据
+    const reachable = this.getReachable(unitId)
+    if (!reachable.has(posKey(to))) return []
     const path = this.findPath(unit.pos, to, unit.moveSpeed, unit.side)
+    if (path.length < 2) return []
     unit.pos = { ...to }
     return path
   }
