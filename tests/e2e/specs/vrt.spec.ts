@@ -4,6 +4,10 @@ import { ActionsPage } from '../fixtures/actions-page.js'
 import { InventoryPage } from '../fixtures/inventory-page.js'
 import { CombatPanelPage } from '../fixtures/combat-panel-page.js'
 import { baseScenario, bossScenario, lowHpScenario } from '../fixtures/scenarios.js'
+import { TradePage } from '../fixtures/trade-page.js'
+import { NPCDetailPage } from '../fixtures/npc-detail-page.js'
+import { HUDPage } from '../fixtures/hud-page.js'
+import { QuestHintPage } from '../fixtures/quest-hint-page.js'
 
 // 视觉回归基线 —— 每个关键界面固定一张截图，任何像素级回归都会被捕获。
 // 首次运行：npx playwright test vrt --update-snapshots
@@ -78,6 +82,76 @@ test.describe('VRT 基线', () => {
       content: `#login-screen, #header, #quest-hint-bar, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #messages, #input-container, #tab-bar { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; } #panel-sheet { position: static !important; max-height: none !important; transform: none !important; }`,
     })
     await expect(page.locator('#panel-sheet')).toHaveScreenshot('inventory.png', VRT)
+  })
+
+  test('交易 · 余额充足 + 砍价', async ({ page }) => {
+    const t = new TradePage(page)
+    await t.boot(100)
+    await t.show({
+      npc: '铁匠韩猛',
+      items: [
+        { name: '治疗药水', quantity: 3, price: 15 },
+        { name: '火把', quantity: 2, price: 5 },
+      ],
+      canBargain: true,
+    })
+    await page.addStyleTag({
+      content: `#login-screen, #header, #quest-hint-bar, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #input-container, #tab-bar, #panel-sheet, #panel-overlay { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; } #messages { padding: 24px !important; max-width: 520px; margin: 0 auto; }`,
+    })
+    await expect(page.locator('.trade-proposal-card')).toHaveScreenshot('trade-basic.png', VRT)
+  })
+
+  test('交易 · 余额不足', async ({ page }) => {
+    const t = new TradePage(page)
+    await t.boot(10)
+    await t.show({ npc: '商人', items: [{ name: '稀有药水', price: 50 }] })
+    await page.addStyleTag({
+      content: `#login-screen, #header, #quest-hint-bar, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #input-container, #tab-bar, #panel-sheet, #panel-overlay { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; } #messages { padding: 24px !important; max-width: 520px; margin: 0 auto; }`,
+    })
+    await expect(page.locator('.trade-proposal-card')).toHaveScreenshot('trade-insufficient.png', VRT)
+  })
+
+  test('NPC 详情 · 中等信任 + 情报分组', async ({ page }) => {
+    const n = new NPCDetailPage(page)
+    await n.boot()
+    await n.show({
+      name: '小莉',
+      title: '破晓镇孤女',
+      trust: 5,
+      appearance: '瘦小，棕色短发，破旧的连衣裙',
+      discovered: [
+        { fact: '父母死于瘟疫', category: '背景' },
+        { fact: '喜欢糖果', category: '喜好' },
+      ],
+      locked: 2,
+    })
+    await page.addStyleTag({
+      content: `#login-screen, #header, #quest-hint-bar, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #messages, #input-container, #tab-bar { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; } #panel-sheet { position: static !important; max-height: none !important; transform: none !important; }`,
+    })
+    await expect(page.locator('#panel-sheet')).toHaveScreenshot('npc-detail.png', VRT)
+  })
+
+  test('HUD · 健康态', async ({ page }) => {
+    const h = new HUDPage(page)
+    await h.boot()
+    await h.update({
+      player: { hp: 18, maxHp: 20, gold: 42 },
+      worldState: { timeOfDay: 'morning', currentLocation: 'dawnbreak-town' },
+    })
+    await page.addStyleTag({
+      content: `#login-screen, #quest-hint-bar, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #messages, #input-container, #tab-bar, #panel-sheet, #panel-overlay { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; } #header { padding: 16px !important; } #player-hud { font-size: 16px !important; }`,
+    })
+    await expect(page.locator('#header')).toHaveScreenshot('hud-healthy.png', VRT)
+  })
+
+  test('任务条 · 进度中', async ({ page }) => {
+    const q = new QuestHintPage(page)
+    await q.boot()
+    await q.update({ chapter: 'Ch1', objective: '收集 3 个线索', progress: '1/3' })
+    await page.addStyleTag({
+      content: `#login-screen, #header, #bgm-toast, #combat-hud, #combat-panel, #combat-grid-container, #messages, #input-container, #tab-bar, #panel-sheet, #panel-overlay { display: none !important; } body { background: linear-gradient(180deg,#1a1530,#0a0812) !important; padding-top: 20px; } #quest-hint-bar { max-width: 520px; margin: 24px auto !important; }`,
+    })
+    await expect(page.locator('#quest-hint-bar')).toHaveScreenshot('quest-progress.png', VRT)
   })
 
   test('战斗面板 · 目标选择', async ({ page }) => {
