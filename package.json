@@ -11,6 +11,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "world-activity": "tsx scripts/world-activity.ts",
+    "playtest": "tsx scripts/playtest.ts",
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "publish-assets": "node scripts/publish-assets.mjs",
     "verify-assets": "node scripts/verify-assets.mjs",
