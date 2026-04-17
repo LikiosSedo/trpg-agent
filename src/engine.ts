@@ -47,7 +47,10 @@ import { localize, StreamingLocalizer } from './i18n-terms.js'
 import { SetActionsStreamFilter, parseSetActionsBlock } from './setactions-stream-filter.js'
 import { injectPendingActions } from './tools/set-actions.js'
 import { readFileSync } from 'fs'
-import { checkAvailableHints, markHintShown } from './bestiary.js'
+import { checkAvailableHints, markHintShown, getKnownCombatTraits } from './bestiary.js'
+import monstersJsonData from '../data/monsters.json' with { type: 'json' }
+import npcCombatJsonData from '../data/npc-combatants.json' with { type: 'json' }
+const COMBAT_DB_ALL = [...monstersJsonData, ...npcCombatJsonData] as unknown as import('./types.js').Monster[]
 
 // ─── <think> 标签流式解析器 ─────────────────────────
 // DM 用 <think>...</think> 包裹内部推理，引擎分离为 dm_thinking 事件
@@ -3069,7 +3072,11 @@ export class GameEngine {
           const eState = ePct > 60 ? '' : ePct > 25 ? '（已受伤）' : '（重伤）'
           // 给 DM 看中文名：localize 会把 "Cockatrice" 之类替换成 "鸡蛇兽"
           // （NPC 战斗体已经是中文名，localize 不会动）
-          return `${localize(m.name)}${eState}`
+          // 注入玩家已发现的战斗特性（弱点/抗性/免疫），让 DM 在叙事里可以 callback
+          // 玩家之前学到的知识（"你记得哥布林怕火"）
+          const traits = getKnownCombatTraits(session, m.name, COMBAT_DB_ALL)
+          const traitsStr = traits ? `（你记得：${traits}）` : ''
+          return `${localize(m.name)}${eState}${traitsStr}`
         }).join('、')
       }
     }

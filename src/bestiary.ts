@@ -143,6 +143,42 @@ export function getBestiarySummary(session: GameSession, monstersDb: Monster[]):
 }
 
 /**
+ * 提取玩家已发现的战斗相关特性，用于注入战斗叙事 DM prompt。
+ * 只返回已解锁的信息（weaknessKnown/resistanceKnown/immunityKnown）。
+ *
+ * 示例：玩家通过对话得知哥布林怕火 → 战斗叙事时 DM 看到
+ *   "哥布林（你记得：怕火）"
+ * 并可自然地在开场描写里 callback 这个记忆。
+ *
+ * @returns 一段简短的中文描述，无已知信息时返回空字符串
+ */
+export function getKnownCombatTraits(
+  session: GameSession,
+  monsterName: string,
+  monstersDb: Monster[],
+): string {
+  const bestiary = session.player.bestiary
+  if (!bestiary) return ''
+  const entry = bestiary[monsterName]
+  if (!entry?.encountered) return ''
+
+  const template = monstersDb.find(m => m.name === monsterName)
+  if (!template) return ''
+
+  const parts: string[] = []
+  if (entry.weaknessKnown && template.vulnerability?.length) {
+    parts.push(`怕${template.vulnerability.join('/')}`)
+  }
+  if (entry.resistanceKnown && template.resistance?.length) {
+    parts.push(`抗${template.resistance.join('/')}`)
+  }
+  if (entry.immunityKnown && template.immunity?.length) {
+    parts.push(`免疫${template.immunity.join('/')}`)
+  }
+  return parts.join('，')
+}
+
+/**
  * 检查 NPC 是否能提供某怪物的情报
  * 返回可解锁的知识类型，或 null（NPC 不知道/信任不够）
  */
