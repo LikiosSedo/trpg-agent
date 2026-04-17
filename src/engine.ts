@@ -305,7 +305,9 @@ function trimToLastSentence(text: string): string {
   const trimmed = text.trimEnd()
   if (!trimmed) return trimmed
   // 以句终标点或引号结尾 → 完整句子，不处理
-  if (/[。！？…」』"）\n]$/.test(trimmed)) return trimmed
+  // 注意：中英文引号都要认（U+201C "、U+201D "、U+2018 '、U+2019 '、ASCII " '）
+  //   Codex 倾向用中文弯引号 " "；Kimi 倾向用 ASCII " —— 都得支持，否则正常结尾被误判。
+  if (/[。！？…」』"'"'')）\n]$/.test(trimmed)) return trimmed
   // 找最后一个句终标点的位置
   const lastEnd = Math.max(
     trimmed.lastIndexOf('。'),
@@ -313,7 +315,10 @@ function trimToLastSentence(text: string): string {
     trimmed.lastIndexOf('？'),
     trimmed.lastIndexOf('…'),
     trimmed.lastIndexOf('"'),
+    trimmed.lastIndexOf('"'), // U+201D 右中文双引号
+    trimmed.lastIndexOf('"'), // U+201C 左中文双引号（罕见但防误报）
     trimmed.lastIndexOf('」'),
+    trimmed.lastIndexOf('』'),
   )
   if (lastEnd > 0 && lastEnd > trimmed.length * 0.5) {
     // 截到最后一个完整句子，加省略号表示自然收尾
