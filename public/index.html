@@ -6309,6 +6309,7 @@
           break
         case 'combat_grid_move':
           // Wave 2 Sprint A1: 入队 + 逐格滑动,等卡片弹完才走单位
+          // 脚步节流由 animateGridMoveAsync 内部按"每 2 格一播"控制(防 machine-gun)
           battleQueue.enqueue(async () => {
             await animateGridMoveAsync(msg.unitId, msg.path)
           })
@@ -6316,6 +6317,15 @@
         case 'combat_grid_death':
           // 入队保证死亡动画在攻击演出后才播
           battleQueue.enqueue(async () => {
+            // 死亡声:主轨惨叫 + 80ms 后 thud (营造"倒地"质感)
+            const u = gridState && gridState.units.find(x => x.id === msg.unitId)
+            const isPlayer = u && u.side === 'player'
+            if (isPlayer) {
+              playSfx('death', 0.55)
+            } else {
+              playSfx(monsterSfxKey(u, 'die'), 0.5)
+              playSfx('monster_die_thud', 0.4, { delay: 120 })
+            }
             gridUnitDeath(msg.unitId)
             await battleSleep(900)
           })
@@ -6365,6 +6375,9 @@
             } : null
             // 回合开始大字 banner(我方=金/敌方=红/盟友=绿) — 与卡片同帧入场
             showTurnBanner(msg.side, msg.actorName, msg.intent)
+            // 回合 cue:我方=轻 chime / 敌方=低 thud (盟友也用 player chime)
+            // 音量小(0.25)避免压住卡片演出主视觉
+            playSfx(msg.side === 'enemy' ? 'turn_enemy' : 'turn_player', 0.28)
             showActorPair(attacker, target)
             highlightGridActor(msg.actorId)
             // 停留时间按 intent 区分(2026-04-18 +50%):attack/spell 长 defend/move 短
@@ -6386,11 +6399,32 @@
         // ─── Wave 2 Tier 1:命中演出(震动/红 flash/伤害数字/暴击 banner)
         case 'combat_grid_attack':
           battleQueue.enqueue(async () => {
+            // SFX 时序:swing 在事件入口立即播,impact 80ms 后播(对齐红 flash 视觉)
+            const attacker = gridState && gridState.units.find(u => u.id === msg.attackerId)
+            const isPlayerAttack = attacker && attacker.side === 'player'
+            // 1) Swing:玩家用剑挥砍,怪物用爪/口器
+            if (isPlayerAttack) {
+              playSfx('attack_swing', 0.4)
+            } else if (attacker) {
+              playSfx(monsterSfxKey(attacker, 'attack'), 0.4)
+            }
+            // 2) Impact (与 playHitEffect 红 flash 同步,+80ms)
             playHitEffect({
               hit: !!msg.hit,
               isCritical: !!msg.isCritical,
               damage: msg.damage ?? 0,
             })
+            if (!msg.hit) {
+              // Miss:不播 hit,但补一个 whoosh 尾音让玩家感知"挥空了"
+              playSfx('attack_miss', 0.32, { delay: 80 })
+            } else if (msg.isCritical) {
+              // 暴击:主轨重击 + 40ms 副轨金属余音 → 形成"咚-叮"两层
+              playSfx('attack_crit', 0.6, { delay: 80 })
+              playSfx('attack_crit_ring', 0.45, { delay: 120 })
+            } else {
+              // 普通命中:玩家攻击用 attack_hit,敌人攻击玩家用 enemy_hit (有铠甲质感)
+              playSfx(isPlayerAttack ? 'attack_hit' : 'enemy_hit', 0.45, { delay: 80 })
+            }
             // 演出节奏(2026-04-18 +50%):Miss 0.6s / 命中 0.9s / 暴击 1.35s
             const wait = !msg.hit ? 600 : (msg.isCritical ? 1350 : 900)
             await battleSleep(wait)
@@ -7983,9 +8017,11 @@
       const unit = gridState.units.find(u => u.id === unitId)
       if (!unit) return
       // 跳过 path[0](起点已经在那),从 path[1] 开始一步步走
+      // 脚步节流:每 2 格播 1 次,音量低(0.18) — 防 machine-gun 噪音
       for (let i = 1; i < path.length; i++) {
         unit.pos = { ...path[i] }
         renderCombatGrid()
+        if (i % 2 === 1) playSfx('grid_step', 0.18)
         await battleSleep(130)
       }
     }
@@ -7997,7 +8033,7 @@
       if (!unit) return
       const deathPos = { ...unit.pos }
       gridState.units = gridState.units.filter(u => u.id !== unitId)
-      playSfx('creature_die', 0.4)
+      // SFX 已由 combat_grid_death handler 负责(monster_die + thud 双轨),此处不重复播
       // 在原位置放一个临时死亡动画元素（不依赖 gridState，独立 DOM）
       const cell = getGridCell(deathPos.x, deathPos.y)
       if (cell) {
@@ -8630,7 +8666,13 @@
     const SFX_MAP = {
       // ── 战斗：玩家攻击（挥砍用重剑，命中用重击） ──
       attack_swing: ['heavy_sword_swing_01.wav', 'sword_swing_01.wav', 'sword_swing_02.wav'],
-      attack_hit: ['heavy_hit_01.wav', 'heavy_hit_02.wav', 'heavy_hit_03.wav'],
+      attack_hit: ['heavy_hit_01.wav', 'heavy_hit_02.wav', 'heavy_hit_03.wav', 'sword_hit_01.wav', 'sword_hit_02.wav', 'sword_hit_03.wav'],
+      // 暴击主轨:更厚重的 heavy_hit_03,在调用点叠加 ring_tail 副轨
+      attack_crit: ['heavy_hit_03.wav', 'heavy_hit_02.wav'],
+      // 暴击副轨:金属余音 / 撞击共振 (调用点 +40ms 叠加,营造"重击 + 颤音")
+      attack_crit_ring: ['spell_impact_01.wav', 'metal_01.ogg', 'metal_02.ogg'],
+      // Miss:纯挥砍无 impact (玩家最强烈感知"按钮没坏")
+      attack_miss: ['sword_swing_01.wav', 'sword_swing_02.wav', 'heavy_sword_swing_01.wav'],
       // ── 战斗：法术 ──
       spell_cast: ['spell_launch_01.wav', 'spell_01.ogg', 'spell_02.ogg'],
       spell_hit: ['spell_impact_01.wav', 'spell_fire_01.ogg'],
@@ -8639,11 +8681,26 @@
       shield: ['shield_01.wav', 'shield_02.wav'],
       // ── 战斗：受击（敌方打玩家，沉闷肉感 + 铠甲重击混合） ──
       enemy_hit: ['kenney-impact/impactSoft_heavy_000.ogg', 'kenney-impact/impactSoft_heavy_001.ogg', 'kenney-impact/impactSoft_heavy_002.ogg', 'kenney-impact/impactPlate_heavy_000.ogg', 'kenney-impact/impactPlate_heavy_001.ogg'],
+      // ── 战斗：怪物 (按特征声粗分;具体 unit 在调用点路由,2026-04-18 为 generic 兜底) ──
+      monster_attack: ['creature_misc_05.ogg', 'creature_misc_06.ogg', 'creature_monster_01.ogg', 'creature_monster_02.ogg'],
+      monster_attack_beast: ['creature_roar_01.ogg', 'creature_roar_02.ogg'],   // 狼/熊类
+      monster_attack_small: ['creature_misc_05.ogg', 'creature_misc_06.ogg', 'creature_misc_07.ogg'],  // 哥布林/小型
+      monster_attack_arachnid: ['creature_misc_01.ogg', 'creature_misc_02.ogg', 'creature_slime_01.ogg'],  // 蜘蛛
+      monster_attack_boss: ['creature_roar_03.ogg', 'creature_monster_03.ogg', 'creature_monster_04.ogg'],
+      monster_hurt: ['creature_hurt_01.ogg', 'creature_hurt_02.ogg'],
+      // 怪物死亡:主轨惨叫 + 调用点叠 thud
+      monster_die: ['creature_die_01.ogg', 'creature_hurt_01.ogg'],
+      monster_die_thud: ['heavy_hit_01.wav', 'heavy_hit_02.wav'],
       // ── 战斗：开始 / 结束 ──
       combat_start: ['sword_unsheathe_01.wav', 'kenney-rpg/drawKnife1.ogg', 'kenney-rpg/drawKnife2.ogg'],
       creature_die: ['creature_die_01.ogg'],
       victory: ['item_gem_01.ogg', 'item_gem_02.ogg'],
       death: ['creature_hurt_01.ogg'],
+      // ── 战斗：回合提示 (轻量 cue,不能盖过卡片演出) ──
+      turn_player: ['kenney-rpg/bookFlip1.ogg', 'item_gem_03.ogg'],   // 翻页式轻 chime
+      turn_enemy: ['stones_01.ogg', 'stones_02.ogg'],                 // 低沉石质 thud
+      // 网格脚步 (调用点节流)
+      grid_step: ['kenney-impact/footstep_grass_000.ogg', 'kenney-impact/footstep_grass_001.ogg', 'kenney-impact/footstep_wood_000.ogg', 'kenney-impact/footstep_wood_001.ogg'],
       // ── 战斗：逃跑 ──
       flee: ['kenney-impact/footstep_wood_000.ogg', 'kenney-impact/footstep_wood_001.ogg', 'kenney-impact/footstep_grass_000.ogg'],
       // ── UI 交互 ──
@@ -8659,17 +8716,54 @@
       item_acquire: ['item_misc_01.ogg', 'item_misc_02.ogg'],
     }
 
-    function playSfx(key, volume) {
+    // 调试 hook:e2e 测试用 spy 验证哪些 sfx 被触发了
+    window._sfxLog = []
+
+    /**
+     * playSfx 统一入口
+     * - 自动 ducking:同时活跃 sfx 多时降音量,避免炸耳朵
+     * - 缺失 key 静默 (不报错,允许调用点写更激进)
+     * - delay 可选(用于双轨层叠,主轨先,副轨 +40ms 进)
+     */
+    function playSfx(key, volume, opts) {
+      // spy log 在 unlock 检查之前 push,e2e 可验证调用路径(即使 audio 未解锁也行)
+      if (window._sfxLog) window._sfxLog.push({ key, t: performance.now(), unlocked: audioUnlocked })
       if (!audioUnlocked) return
       const files = SFX_MAP[key]
       if (!files || files.length === 0) return
+      const delay = (opts && opts.delay) || 0
       const file = files[Math.floor(Math.random() * files.length)]
-      const audio = sfxPool[sfxIndex % SFX_POOL_SIZE]
-      sfxIndex++
-      audio.volume = volume !== undefined ? volume : 0.4
-      audio.currentTime = 0
-      audio.src = SFX_BASE + file
-      audio.play().catch(() => { })
+      // ducking:扫池子里活跃的 sfx (currentTime < 0.2 算"刚开始"),多于 2 个就降音量
+      const active = sfxPool.filter(a => !a.paused && !isNaN(a.duration) && a.currentTime < 0.2).length
+      const duck = active > 2 ? 0.55 : (active > 1 ? 0.78 : 1.0)
+      const vol = (volume !== undefined ? volume : 0.4) * duck
+      const fire = () => {
+        const audio = sfxPool[sfxIndex % SFX_POOL_SIZE]
+        sfxIndex++
+        audio.volume = Math.min(1, vol)
+        audio.currentTime = 0
+        audio.src = SFX_BASE + file
+        audio.play().catch(() => { })
+      }
+      if (delay > 0) setTimeout(fire, delay)
+      else fire()
+    }
+
+    /**
+     * 怪物 sfx 路由:按 unit 名/id 选合适的 attack pack
+     * 没有匹配走 generic monster_attack
+     */
+    function monsterSfxKey(unit, suffix /* 'attack' | 'hurt' | 'die' */) {
+      if (suffix === 'hurt') return 'monster_hurt'
+      if (suffix === 'die') return 'monster_die'
+      // attack 路由
+      const name = ((unit && (unit.name || unit.id)) || '').toLowerCase()
+      if (name.includes('matriarch') || name.includes('女王') || name.includes('boss')) return 'monster_attack_boss'
+      if (name.includes('spider') || name.includes('蜘蛛')) return 'monster_attack_arachnid'
+      if (name.includes('wolf') || name.includes('狼') || name.includes('bear')) return 'monster_attack_beast'
+      if (name.includes('goblin') || name.includes('哥布林') || name.includes('imp') || name.includes('小')) return 'monster_attack_small'
+      if (name.includes('cockatrice') || name.includes('鸡蛇')) return 'monster_attack_beast'  // 鸡蛇用 roar 顶
+      return 'monster_attack'
     }
 
     // ─── 输入 ───
