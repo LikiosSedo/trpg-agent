@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v3",
   "description": "资源文件清单 — 由 publish-assets / verify-assets 维护。verify-assets 用它做 path+size 对比。manifest 故意不内嵌此清单，以保持 git diff 干净。",
   "packs": [
     {
@@ -1330,6 +1330,90 @@
           "size": 12875
         },
         {
+          "path": "public/audio/sfx/monsters/cockatrice/attack_01.ogg",
+          "size": 14693
+        },
+        {
+          "path": "public/audio/sfx/monsters/cockatrice/call_01.ogg",
+          "size": 18050
+        },
+        {
+          "path": "public/audio/sfx/monsters/cockatrice/die_01.ogg",
+          "size": 14461
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/attack_01.ogg",
+          "size": 6486
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/attack_02.ogg",
+          "size": 6855
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/attack_03.ogg",
+          "size": 6218
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/die_01.ogg",
+          "size": 14082
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/die_02.ogg",
+          "size": 11221
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/hurt_01.ogg",
+          "size": 7627
+        },
+        {
+          "path": "public/audio/sfx/monsters/goblin/hurt_02.ogg",
+          "size": 6539
+        },
+        {
+          "path": "public/audio/sfx/monsters/matriarch/chitter_01.ogg",
+          "size": 21341
+        },
+        {
+          "path": "public/audio/sfx/monsters/matriarch/die_01.ogg",
+          "size": 9136
+        },
+        {
+          "path": "public/audio/sfx/monsters/matriarch/entrance_01.ogg",
+          "size": 19960
+        },
+        {
+          "path": "public/audio/sfx/monsters/matriarch/roar_01.ogg",
+          "size": 10806
+        },
+        {
+          "path": "public/audio/sfx/monsters/spider/chitter_01.ogg",
+          "size": 25364
+        },
+        {
+          "path": "public/audio/sfx/monsters/spider/chitter_02.ogg",
+          "size": 16135
+        },
+        {
+          "path": "public/audio/sfx/monsters/spider/die_01.ogg",
+          "size": 8290
+        },
+        {
+          "path": "public/audio/sfx/monsters/wolf/die_01.ogg",
+          "size": 12847
+        },
+        {
+          "path": "public/audio/sfx/monsters/wolf/growl_01.ogg",
+          "size": 7233
+        },
+        {
+          "path": "public/audio/sfx/monsters/wolf/growl_02.ogg",
+          "size": 7169
+        },
+        {
+          "path": "public/audio/sfx/monsters/wolf/howl_01.ogg",
+          "size": 9733
+        },
+        {
           "path": "public/audio/sfx/shield_01.wav",
           "size": 474030
         },
@@ -1521,6 +1605,26 @@
         {
           "path": "public/portraits/monster-shadow.png",
           "size": 668870
+        },
+        {
+          "path": "public/portraits/monsters/monster-cockatrice.png",
+          "size": 1223155
+        },
+        {
+          "path": "public/portraits/monsters/monster-giant-spider.png",
+          "size": 792367
+        },
+        {
+          "path": "public/portraits/monsters/monster-goblin.png",
+          "size": 877522
+        },
+        {
+          "path": "public/portraits/monsters/monster-spider-matriarch.png",
+          "size": 1321803
+        },
+        {
+          "path": "public/portraits/monsters/monster-wolf.png",
+          "size": 1440409
         },
         {
           "path": "public/portraits/pc-cleric.png",
