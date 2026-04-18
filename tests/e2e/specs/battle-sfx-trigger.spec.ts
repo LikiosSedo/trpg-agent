@@ -156,8 +156,8 @@ test('SFX · 怪物攻击玩家走 monster_attack_* + enemy_hit', async ({ page 
   })
   await page.waitForTimeout(400)
   const keys = await getSfxKeys(page)
-  // Spider 应该路由到 monster_attack_arachnid (而不是 generic monster_attack)
-  expect(keys).toContain('monster_attack_arachnid')
+  // Spider 走 mon_spider_attack (chitter_01 / chitter_02 随机选一)
+  expect(keys).toContain('mon_spider_attack')
   expect(keys).toContain('enemy_hit')
 })
 
@@ -171,8 +171,70 @@ test('SFX · 死亡双轨 (monster_die + thud)', async ({ page }) => {
   await fireWs(page, { type: 'combat_grid_death', unitId: 'Goblin' })
   await page.waitForTimeout(400)
   const keys = await getSfxKeys(page)
-  expect(keys).toContain('monster_die')
+  // Goblin 走 mon_goblin_die + 通用 thud
+  expect(keys).toContain('mon_goblin_die')
   expect(keys).toContain('monster_die_thud')
+})
+
+test('SFX · 5 个怪物 attack 各自走独占 key (听感不重复)', async ({ page }) => {
+  test.setTimeout(30_000)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('http://localhost:3008/')
+  await page.evaluate(() => {
+    const menu = document.getElementById('resume-screen')
+    if (menu) menu.style.display = 'none'
+    const game = document.getElementById('game-screen')
+    if (game) game.style.display = 'flex'
+    // 注入 5 怪 + player
+    const fakeGrid = {
+      width: 9, height: 5,
+      terrain: Array.from({ length: 5 }, () => Array(9).fill(0)),
+      units: [
+        { id: 'player', side: 'player', pos: { x: 4, y: 4 }, moveSpeed: 3, attackRange: 1, name: '林克', hp: 30, maxHp: 38 },
+        { id: 'g', side: 'enemy', pos: { x: 0, y: 0 }, moveSpeed: 3, attackRange: 1, name: 'Goblin', hp: 15, maxHp: 15 },
+        { id: 'w', side: 'enemy', pos: { x: 2, y: 0 }, moveSpeed: 3, attackRange: 1, name: 'Wolf', hp: 12, maxHp: 12 },
+        { id: 's', side: 'enemy', pos: { x: 4, y: 0 }, moveSpeed: 3, attackRange: 1, name: 'Giant Spider', hp: 12, maxHp: 12 },
+        { id: 'c', side: 'enemy', pos: { x: 6, y: 0 }, moveSpeed: 3, attackRange: 1, name: 'Cockatrice', hp: 18, maxHp: 18 },
+        { id: 'm', side: 'enemy', pos: { x: 8, y: 0 }, moveSpeed: 3, attackRange: 1, name: 'Spider Matriarch', hp: 60, maxHp: 60 },
+      ]
+    }
+    // @ts-ignore
+    window.initCombatGrid(fakeGrid)
+  })
+  await page.evaluate(() => { document.body.click() })
+  await page.waitForTimeout(100)
+
+  const monsters = ['g', 'w', 's', 'c', 'm']
+  const expected = ['mon_goblin_attack', 'mon_wolf_attack', 'mon_spider_attack', 'mon_cockatrice_attack', 'mon_matriarch_attack']
+  // 单个攻击演出 ~900ms (swing + 80ms + hit + 600ms wait), 等 1100ms 保证队列排空
+  for (let i = 0; i < monsters.length; i++) {
+    await page.evaluate(() => { (window as any)._sfxLog = [] })
+    await page.evaluate((id) => {
+      // @ts-ignore
+      window.handleWsMessage({ data: JSON.stringify({
+        type: 'combat_grid_attack', attackerId: id, targetId: 'player',
+        damage: 4, hit: true, isCritical: false, narrative: ''
+      })})
+    }, monsters[i])
+    await page.waitForTimeout(1100)
+    const keys = await page.evaluate(() => ((window as any)._sfxLog || []).map((e: any) => e.key))
+    expect(keys, `怪物 ${monsters[i]} 应触发 ${expected[i]}`).toContain(expected[i])
+  }
+
+  // matriarch 已经在循环里验证过 attack,这里单独验 layer (stones rumble +60ms)
+  await page.waitForTimeout(500)
+  await page.evaluate(() => { (window as any)._sfxLog = [] })
+  await page.evaluate(() => {
+    // @ts-ignore
+    window.handleWsMessage({ data: JSON.stringify({
+      type: 'combat_grid_attack', attackerId: 'm', targetId: 'player',
+      damage: 8, hit: true, isCritical: false, narrative: ''
+    })})
+  })
+  await page.waitForTimeout(1100)
+  const matriarchKeys = await page.evaluate(() => ((window as any)._sfxLog || []).map((e: any) => e.key))
+  expect(matriarchKeys).toContain('mon_matriarch_attack')
+  expect(matriarchKeys).toContain('mon_matriarch_attack_layer')  // stones rumble +60ms
 })
 
 test('SFX · 移动节流 (4 格走 → 2 个脚步声)', async ({ page }) => {

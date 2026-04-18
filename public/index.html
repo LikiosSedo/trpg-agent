@@ -3721,6 +3721,84 @@
       50% { box-shadow: inset 0 0 0 3px #ffe98a, 0 0 24px rgba(255,217,61,0.9); }
     }
 
+    /* ─── 战斗字幕条(方案 ② · 2026-04-18) ───
+     * 战斗期间展示当前叙事(combat_narrative / system_message / 等),
+     * 一条一条串行替换,与立绘/棋盘演出同队播放,避免文本瞬间 dump 到 #messages。
+     * 位于 .combat-grid 下方、.grid-actions 上方,视线焦点区,不挡交互。
+     */
+    /* fixed 定位:飘在棋盘上方、操作按钮下方,不参与父容器布局
+     * → 不影响 #combat-grid-container 的 fit-content 宽度(保护 VRT 基线) */
+    #battle-subtitle {
+      position: fixed;
+      left: 50%;
+      bottom: 210px;  /* 桌面:预留 tab-bar 56 + 输入区 80 + 操作按钮 60 + 间距 14 */
+      transform: translateX(-50%);
+      width: min(760px, calc(100vw - 32px));
+      padding: 10px 24px;
+      background: linear-gradient(90deg,
+        rgba(10,10,18,0) 0%,
+        rgba(10,10,18,0.85) 12%,
+        rgba(10,10,18,0.85) 88%,
+        rgba(10,10,18,0) 100%);
+      border-top: 1px solid rgba(255,140,66,0.15);
+      border-bottom: 1px solid rgba(255,140,66,0.15);
+      color: #e8d4a0;
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: 0.3px;
+      text-align: center;
+      display: none;  /* 非战斗时完全不占空间 */
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 940;
+      transition: opacity 0.3s ease;
+      box-sizing: border-box;
+    }
+    body.in-combat #battle-subtitle { display: flex; }
+    #battle-subtitle.show { opacity: 1; }
+    #battle-subtitle.variant-narrative { color: #e8d4a0; }
+    #battle-subtitle.variant-narrative .marker { color: #ff8c42; margin-right: 10px; font-weight: bold; }
+    #battle-subtitle.variant-system { color: #b8860b; font-style: italic; }
+    #battle-subtitle.variant-ally { color: #9bbb59; }
+    #battle-subtitle.variant-ally .marker { color: #9bbb59; margin-right: 10px; font-weight: bold; }
+    #battle-subtitle.variant-enemy { color: #ff8c8c; }
+    #battle-subtitle.variant-enemy .marker { color: #ff6b5a; margin-right: 10px; font-weight: bold; }
+    #battle-subtitle.variant-warning { color: #ffb400; }
+    @media (max-width: 768px) {
+      #battle-subtitle {
+        width: calc(100vw - 16px);
+        bottom: 160px;  /* 移动端:tab-bar 56 + 输入 40 + 操作 56 + 间距 8 */
+        padding: 6px 12px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+    }
+
+    /* 战斗期间折叠 #messages —— 把原来的消息滚动区压成一条"查看日志"小条
+     * 避免占高度,让棋盘/字幕获得视线焦点。
+     */
+    body.in-combat #messages { display: none; }
+    #battle-log-toggle {
+      display: none;
+      text-align: center;
+      padding: 6px;
+      color: #666;
+      font-size: 11px;
+      background: rgba(20, 20, 30, 0.4);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      user-select: none;
+    }
+    #battle-log-toggle:hover { color: #aaa; }
+    body.in-combat #battle-log-toggle { display: block; }
+    body.in-combat.log-expanded #messages {
+      display: block;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
     /* ─── Bestiary Panel ─── */
     .bestiary-header { padding: 0 0 12px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px; }
     .bestiary-stats { font-size: 0.95em; color: #ccc; }
@@ -3914,6 +3992,8 @@
       <div class="chud-enemies" id="chud-enemies"></div>
     </div>
     <div id="messages"></div>
+    <!-- 战斗中折叠 #messages,显示一条"查看日志"小条 -->
+    <div id="battle-log-toggle" onclick="toggleBattleLog()">⇣ 战斗日志(点击展开/收起)</div>
 
     <!-- 战棋网格容器（战斗时替代 messages） -->
     <div class="combat-grid-container" id="combat-grid-container">
@@ -3960,6 +4040,8 @@
   <div id="battle-actor-stage"></div>
   <div id="battle-turn-banner"></div>
   <div id="battle-crit-banner">暴 击!</div>
+  <!-- 战斗字幕条(方案 ② · 2026-04-18) · fixed 定位,不参与 flex 布局 -->
+  <div id="battle-subtitle"></div>
 
   <!-- DM 思考日志面板 -->
   <div id="dm-thinking-panel" class="thinking-panel collapsed" style="display:none">
@@ -6051,16 +6133,29 @@
           break
 
         case 'combat_ally':
-          setTimeout(function () {
-            appendMsg('── 同伴行动 ──', 'combat-divider')
-            setTimeout(function () {
+          if (isBattleVisualActive()) {
+            // 战斗中:入 battleQueue,与棋盘/卡片演出同队串行
+            battleQueue.enqueue(async () => {
+              showBattleSubtitle(msg.text, 'ally')
+              appendMsg('── 同伴行动 ──', 'combat-divider')
               playSfx('attack_hit', 0.3)
               appendMsg(msg.text, 'combat-ally')
-            }, 300)
-          }, 400)
+              await battleSleep(900)
+            })
+          } else {
+            // legacy 非战斗: 原 setTimeout 行为
+            setTimeout(function () {
+              appendMsg('── 同伴行动 ──', 'combat-divider')
+              setTimeout(function () {
+                playSfx('attack_hit', 0.3)
+                appendMsg(msg.text, 'combat-ally')
+              }, 300)
+            }, 400)
+          }
           break
 
         case 'combat_action_req':
+          // 数据立即写入(玩家下一轮操作依赖这些数据,不能延迟)
           combatMode = true
           combatTargets = msg.targets || []
           combatSpells = msg.spells || []
@@ -6069,13 +6164,8 @@
           combatPlayerHp = msg.playerHp || 0
           combatPlayerMaxHp = msg.playerMaxHp || 0
           window._combatActiveEffects = msg.activeEffects || []
-          unlockInput()
-          setCombatButtonsEnabled(true)
-          hideCombatSelector()
-          updateCombatPanel()
-          // 战棋模式：同步 HP 并解锁网格按钮
+          // 战棋模式:同步 gridState 里的 HP
           if (gridState) {
-            // 更新 gridState 中的 HP
             for (const t of (msg.targets || [])) {
               const u = gridState.units.find(u => u.id === t.id)
               if (u) { u.hp = t.hp; u.maxHp = t.maxHp }
@@ -6084,36 +6174,73 @@
               const u = gridState.units.find(u => u.id === a.id)
               if (u) { u.hp = a.hp; u.maxHp = a.maxHp }
             }
-            // 更新玩家 HP
             const pu = gridState.units.find(u => u.id === 'player')
             if (pu) { pu.hp = msg.playerHp; pu.maxHp = msg.playerMaxHp }
             renderCombatGrid()
-            enableGridButtons()
-            gridActionPending = false  // 允许下一轮操作
-            clearGridPendingTimeout()
+          }
+          updateCombatPanel()
+          // UI 解锁排到队尾 — 确保演出播完才让玩家点下一动作
+          if (isBattleVisualActive() || gridState) {
+            battleQueue.enqueue(async () => {
+              hideBattleSubtitle()  // 轮次间清字幕,避免上轮残留
+              unlockInput()
+              setCombatButtonsEnabled(true)
+              hideCombatSelector()
+              if (gridState) {
+                enableGridButtons()
+                gridActionPending = false
+                clearGridPendingTimeout()
+              }
+            })
+          } else {
+            unlockInput()
+            setCombatButtonsEnabled(true)
+            hideCombatSelector()
           }
           break
 
         case 'combat_narrative':
-          appendMsg(msg.text, 'combat-narrative')
+          if (isBattleVisualActive()) {
+            // 战斗中:入队,与立绘/棋盘同步播放
+            battleQueue.enqueue(async () => {
+              showBattleSubtitle(msg.text, 'narrative')
+              appendMsg(msg.text, 'combat-narrative')
+              // 停留时长按文本长度动态调整(中文 ~90ms/字,min 900 / max 2400)
+              const readMs = Math.min(2400, Math.max(900, msg.text.length * 90))
+              await battleSleep(readMs)
+            })
+          } else {
+            appendMsg(msg.text, 'combat-narrative')
+          }
           break
 
         case 'combat_narrative_actions':
-          // 战斗叙事后 DM 生成的后续行动建议
-          if (msg.actions && !combatMode) showSceneActions(msg.actions)
-          unlockInput()
+          // 战斗叙事后 DM 生成的后续行动建议 — 排到队尾(演出完才展示选项)
+          if (isBattleVisualActive()) {
+            battleQueue.enqueue(async () => {
+              if (msg.actions && !combatMode) showSceneActions(msg.actions)
+              unlockInput()
+            })
+          } else {
+            if (msg.actions && !combatMode) showSceneActions(msg.actions)
+            unlockInput()
+          }
           break
 
         case 'combat_monster':
-          // 立即更新 HP 数据（HUD 在延迟显示时同步刷新）
+          // 立即更新 HP 数据(HUD 在延迟显示时同步刷新)
           if (msg.playerHp != null) combatPlayerHp = msg.playerHp
           if (msg.playerMaxHp != null) combatPlayerMaxHp = msg.playerMaxHp
           if (msg.allies) combatAllies = msg.allies
-          // Sprint A2: 战棋模式下数值日志只写 gridLog,#messages 主区域不再插入分隔/文本
-          // (避免和卡片演出抢视觉焦点 + setTimeout 节奏与 queue 不同步)
           if (gridState) {
-            gridLog(msg.text)
-            updateCombatHUD()
+            // 战棋模式:入队 — gridLog + HUD + HP flash
+            battleQueue.enqueue(async () => {
+              if (msg.text) gridLog(msg.text)
+              updateCombatHUD()
+              const ps = document.querySelector('.chud-player')
+              if (ps) { ps.style.animation = 'chudDamageFlash 0.4s ease-out'; setTimeout(() => ps.style.animation = '', 500) }
+              await battleSleep(350)
+            })
           } else {
             // legacy 非战棋模式,保留旧行为
             setTimeout(() => {
@@ -6131,8 +6258,13 @@
 
         case 'combat_status':
           if (gridState) {
-            // Sprint A2: 战棋模式只写 gridLog,不再 appendMsg 到 #messages
-            gridLog(msg.text)
+            // 战棋模式:log 文本入队(ended:false 的 log),cleanup 在下面分支也入队
+            if (msg.text) {
+              battleQueue.enqueue(async () => {
+                gridLog(msg.text)
+                await battleSleep(250)
+              })
+            }
           } else {
             // legacy 非战棋模式
             appendMsg('── 你的回合 ──', 'combat-divider')
@@ -6146,43 +6278,46 @@
             }, 300)
           }
           if (msg.ended) {
-            // 战棋网格清理
-            if (gridState) endCombatGrid(msg.result, null)
-            // 战斗结束音效
-            if (msg.result === 'victory' || msg.result === 'win') playSfx('victory', 0.5)
-            else if (msg.result === 'defeat' || msg.result === 'death') playSfx('death', 0.5)
-            else playSfx('creature_die', 0.4)
-            combatMode = false
-            combatTargets = []
-            combatSpells = []
-            combatItems = []
-            combatAllies = []
-            // Reset HUD state
-            combatAllMonsters = []
-            combatMonsterPortraits = {}
-            combatSelectedTarget = null
-            combatPlayerHp = 0
-            combatPlayerMaxHp = 0
-            // 不在这里 unlockInput()——等 combat_narrative_actions 或 sync 事件到达后再解锁
-            // 战斗结束后 DM 还需要生成叙事和 SetActions
-            document.getElementById('input').disabled = true
-            document.getElementById('input').placeholder = 'DM 正在描述战斗结局...'
-            document.getElementById('send').disabled = true
-            document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
-            updateCombatPanel()
-            // 战斗结束 → 切回场景 BGM（从当前会话状态推导）
-            const savedSess = getSavedSession()
-            if (savedSess) {
-              const loc = savedSess.worldState?.currentLocation || 'dawnbreak-town'
-              const sub = savedSess.worldState?.currentSubLocation
-              const time = savedSess.worldState?.timeOfDay || 'morning'
-              // 简单映射：根据位置选回场景音乐
-              const bgmMap = { 'dawnbreak-town': time === 'night' ? 'town-night' : 'town-day', 'twilight-woods': 'forest', 'greyspine-mines': 'mines', 'shatterstone-wastes': 'wasteland' }
-              const ambMap = { 'dawnbreak-town': time === 'night' ? 'crickets' : 'birds', 'twilight-woods': 'birds', 'greyspine-mines': 'drip', 'shatterstone-wastes': 'wind' }
-              if (sub === 'shattered-shield-tavern') { switchAudio('tavern', 'fire') }
-              else { switchAudio(bgmMap[loc] || 'town-day', ambMap[loc] || 'silence') }
+            // ended:true = 终结信号 — enqueue cleanup 排到队尾,
+            // 确保在所有 narrative / grid_end 之后才执行,避免打断叙事播放
+            const endResult = msg.result
+            const doCleanup = async () => {
+              if (gridState) endCombatGrid(endResult, null)
+              if (endResult === 'victory' || endResult === 'win') playSfx('victory', 0.5)
+              else if (endResult === 'defeat' || endResult === 'death') playSfx('death', 0.5)
+              else playSfx('creature_die', 0.4)
+              combatMode = false
+              combatTargets = []
+              combatSpells = []
+              combatItems = []
+              combatAllies = []
+              combatAllMonsters = []
+              combatMonsterPortraits = {}
+              combatSelectedTarget = null
+              combatPlayerHp = 0
+              combatPlayerMaxHp = 0
+              document.getElementById('input').disabled = true
+              document.getElementById('input').placeholder = 'DM 正在描述战斗结局...'
+              document.getElementById('send').disabled = true
+              document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
+              updateCombatPanel()
+              const savedSess = getSavedSession()
+              if (savedSess) {
+                const loc = savedSess.worldState?.currentLocation || 'dawnbreak-town'
+                const sub = savedSess.worldState?.currentSubLocation
+                const time = savedSess.worldState?.timeOfDay || 'morning'
+                const bgmMap = { 'dawnbreak-town': time === 'night' ? 'town-night' : 'town-day', 'twilight-woods': 'forest', 'greyspine-mines': 'mines', 'shatterstone-wastes': 'wasteland' }
+                const ambMap = { 'dawnbreak-town': time === 'night' ? 'crickets' : 'birds', 'twilight-woods': 'birds', 'greyspine-mines': 'drip', 'shatterstone-wastes': 'wind' }
+                if (sub === 'shattered-shield-tavern') { switchAudio('tavern', 'fire') }
+                else { switchAudio(bgmMap[loc] || 'town-day', ambMap[loc] || 'silence') }
+              }
+              showSceneActions()
             }
-            showSceneActions()
+            if (isBattleVisualActive() || gridState) {
+              battleQueue.enqueue(async () => { await doCleanup() })
+            } else {
+              doCleanup()
+            }
           }
           break
 
@@ -6317,14 +6452,16 @@
         case 'combat_grid_death':
           // 入队保证死亡动画在攻击演出后才播
           battleQueue.enqueue(async () => {
-            // 死亡声:主轨惨叫 + 80ms 后 thud (营造"倒地"质感)
+            // 死亡声:主轨惨叫 + 80ms 后 thud + (boss 还会有特征 rumble layer)
             const u = gridState && gridState.units.find(x => x.id === msg.unitId)
             const isPlayer = u && u.side === 'player'
             if (isPlayer) {
               playSfx('death', 0.55)
             } else {
-              playSfx(monsterSfxKey(u, 'die'), 0.5)
+              const route = monsterSfxKey(u, 'die')
+              playSfx(route.primary, 0.5)
               playSfx('monster_die_thud', 0.4, { delay: 120 })
+              if (route.layer) playSfx(route.layer, 0.4, { delay: 200 })  // boss 倒地 rumble
             }
             gridUnitDeath(msg.unitId)
             await battleSleep(900)
@@ -6347,20 +6484,25 @@
           }
           break
         case 'combat_grid_end':
-          // 战斗结束时 queue 清空,清掉所有演出残留(卡片/banner/网格高亮)
-          battleQueue.clear()
-          hideActorCard()
-          // A4: 兜底清暴击 banner(若刚好暴击+战斗结束的边界态)
-          {
-            const banner = document.getElementById('battle-crit-banner')
-            if (banner) { banner.style.display = 'none'; banner.style.animation = '' }
-            // 兜底清回合 banner
-            const tb = document.getElementById('battle-turn-banner')
-            if (tb) { tb.className = ''; tb.textContent = '' }
-            document.body.classList.remove('battle-screen-shake')
-          }
-          highlightGridActor(null)  // 清网格高亮
-          endCombatGrid(msg.result, msg.loot)
+          // 2026-04-18: 不再立即 battleQueue.clear — 改为 enqueue cleanup 到队尾,
+          // 让之前入队的结束叙事 / 卡片退场先播完,再做清理。
+          battleQueue.enqueue(async () => {
+            hideActorCard()
+            // A4: 兜底清暴击 banner(若刚好暴击+战斗结束的边界态)
+            {
+              const banner = document.getElementById('battle-crit-banner')
+              if (banner) { banner.style.display = 'none'; banner.style.animation = '' }
+              const tb = document.getElementById('battle-turn-banner')
+              if (tb) { tb.className = ''; tb.textContent = '' }
+              document.body.classList.remove('battle-screen-shake')
+            }
+            highlightGridActor(null)
+            hideBattleSubtitle()
+            endCombatGrid(msg.result, msg.loot)
+            // 清除 grid_end 之后意外入队的残留 job(例如网络延迟的 narrative)
+            // 不影响当前执行的这个 job
+            battleQueue.queue.length = 0
+          })
           break
 
         // ─── 战斗演出 · 角色回合开始/结束 (Wave 2 双立绘对决) ───
@@ -6402,11 +6544,13 @@
             // SFX 时序:swing 在事件入口立即播,impact 80ms 后播(对齐红 flash 视觉)
             const attacker = gridState && gridState.units.find(u => u.id === msg.attackerId)
             const isPlayerAttack = attacker && attacker.side === 'player'
-            // 1) Swing:玩家用剑挥砍,怪物用爪/口器
+            // 1) Swing:玩家用剑挥砍,怪物用爪/口器(特征怪物叠 layer 增辨识度)
             if (isPlayerAttack) {
               playSfx('attack_swing', 0.4)
             } else if (attacker) {
-              playSfx(monsterSfxKey(attacker, 'attack'), 0.4)
+              const route = monsterSfxKey(attacker, 'attack')
+              playSfx(route.primary, 0.4)
+              if (route.layer) playSfx(route.layer, 0.32, { delay: 60 })  // chitter/sizzle/rumble
             }
             // 2) Impact (与 playHitEffect 红 flash 同步,+80ms)
             playHitEffect({
@@ -6445,11 +6589,25 @@
         // ─── 系统消息（时间推进等） ───
         case 'system_message':
         case 'narrative_warning': {
-          const sysDiv = document.createElement('div')
-          sysDiv.style.cssText = 'text-align:center;color:#b8860b;font-size:13px;padding:8px 0;opacity:0.9;font-style:italic;'
-          sysDiv.textContent = msg.text
-          document.getElementById('messages').appendChild(sysDiv)
-          smartScrollToBottom()
+          const doAppend = () => {
+            const sysDiv = document.createElement('div')
+            sysDiv.style.cssText = 'text-align:center;color:#b8860b;font-size:13px;padding:8px 0;opacity:0.9;font-style:italic;'
+            sysDiv.textContent = msg.text
+            document.getElementById('messages').appendChild(sysDiv)
+            smartScrollToBottom()
+          }
+          if (isBattleVisualActive()) {
+            // 战斗中:入队,字幕条展示 + appendMsg 存档
+            const variant = msg.type === 'narrative_warning' ? 'warning' : 'system'
+            battleQueue.enqueue(async () => {
+              showBattleSubtitle(msg.text, variant)
+              doAppend()
+              const readMs = Math.min(1800, Math.max(700, msg.text.length * 80))
+              await battleSleep(readMs)
+            })
+          } else {
+            doAppend()
+          }
           break
         }
 
@@ -7409,6 +7567,57 @@
       if (battleQueue.skipMode) return Promise.resolve()
       return new Promise(r => setTimeout(r, ms))
     }
+
+    // ─── 战斗字幕条(方案 ② · 2026-04-18) ─────────────
+    // 战斗期间,所有叙事/日志文本同步显示在 #battle-subtitle,
+    // 一条一条替换,由 battleQueue 串行调度保证和棋盘演出同步。
+    // 同时依然 append 到 #messages 作为战后回看存档(通过折叠条访问)。
+    function showBattleSubtitle(text, variant) {
+      const el = document.getElementById('battle-subtitle')
+      if (!el) return
+      variant = variant || 'narrative'
+      // 清除旧 variant class,加新 variant
+      el.className = ''
+      el.classList.add('variant-' + variant)
+      const marker = variant === 'system' || variant === 'warning' ? '' :
+                     variant === 'ally' ? '✦ ' :
+                     variant === 'enemy' ? '☠ ' : '▸ '
+      el.innerHTML = marker
+        ? `<span class="marker">${marker}</span><span class="subtitle-text"></span>`
+        : '<span class="subtitle-text"></span>'
+      el.querySelector('.subtitle-text').textContent = text
+      el.classList.add('show')
+    }
+    function hideBattleSubtitle() {
+      const el = document.getElementById('battle-subtitle')
+      if (!el) return
+      el.classList.remove('show')
+    }
+    // 暴露给 e2e
+    window.showBattleSubtitle = showBattleSubtitle
+    window.hideBattleSubtitle = hideBattleSubtitle
+
+    // ─── 战斗中折叠 #messages ─────────────────────
+    // 战斗开始 → body.in-combat,#messages 隐藏,显示 #battle-log-toggle
+    // 战斗结束 → body 去 in-combat,#messages 恢复
+    function setCombatBodyMode(active) {
+      document.body.classList.toggle('in-combat', !!active)
+      if (!active) document.body.classList.remove('log-expanded')
+    }
+    function toggleBattleLog() {
+      document.body.classList.toggle('log-expanded')
+      if (document.body.classList.contains('log-expanded')) {
+        const msgs = document.getElementById('messages')
+        if (msgs) msgs.scrollTop = msgs.scrollHeight
+      }
+    }
+    window.toggleBattleLog = toggleBattleLog
+
+    // 判断是否"战斗叙事事件应进队列":用 body.in-combat 作为权威信号,
+    // 因为它在战斗全周期(开场 → 结束 cleanup)都是 true,比 gridState/combatMode 更稳定。
+    function isBattleVisualActive() {
+      return document.body.classList.contains('in-combat')
+    }
     // B3: Space / Enter / Esc 快进当前所有演出
     document.addEventListener('keydown', (e) => {
       // 只在战棋模式下生效,且不打断玩家在输入框打字
@@ -7594,6 +7803,8 @@
       document.getElementById('messages').style.display = 'none'
       const oldPanel = document.getElementById('combat-panel')
       if (oldPanel) oldPanel.style.display = 'none'
+      // 标记进入战斗 — body.in-combat 控制字幕条 + #messages 折叠
+      setCombatBodyMode(true)
       renderCombatGrid()
       gridLog('战斗开始！选择行动。')
       playSfx('combat_start', 0.4)
@@ -8061,6 +8272,9 @@
       const oldPanel = document.getElementById('combat-panel')
       if (oldPanel) oldPanel.style.display = ''
       clearGridHighlights()
+      // 退出战斗 — 清字幕条 + 恢复 #messages
+      hideBattleSubtitle()
+      setCombatBodyMode(false)
 
       if (result === 'victory') {
         playSfx('victory', 0.5)
@@ -8681,14 +8895,41 @@
       shield: ['shield_01.wav', 'shield_02.wav'],
       // ── 战斗：受击（敌方打玩家，沉闷肉感 + 铠甲重击混合） ──
       enemy_hit: ['kenney-impact/impactSoft_heavy_000.ogg', 'kenney-impact/impactSoft_heavy_001.ogg', 'kenney-impact/impactSoft_heavy_002.ogg', 'kenney-impact/impactPlate_heavy_000.ogg', 'kenney-impact/impactPlate_heavy_001.ogg'],
-      // ── 战斗：怪物 (按特征声粗分;具体 unit 在调用点路由,2026-04-18 为 generic 兜底) ──
+      // ── 战斗:怪物 per-unit 特化 (2026-04-18: 用真特化 sfx 包) ──
+      // 来源:artisticdude Goblins Sound Pack (CC0) + rubberduck 80 CC0 creature SFX
+      //      + spookymodem Spider Chattering (CC-BY 3.0, 见 CREDITS.md)
+      // 文件已 ffmpeg 处理为 OGG 96kbps mono;路径前缀 monsters/<species>/
+      // 哥布林: artisticdude 真哥布林声(7 文件: 3 attack + 2 hurt + 2 die)
+      mon_goblin_attack: ['monsters/goblin/attack_01.ogg', 'monsters/goblin/attack_02.ogg', 'monsters/goblin/attack_03.ogg'],
+      mon_goblin_hurt:   ['monsters/goblin/hurt_01.ogg', 'monsters/goblin/hurt_02.ogg'],
+      mon_goblin_die:    ['monsters/goblin/die_01.ogg', 'monsters/goblin/die_02.ogg'],
+      // 狼: 真 growl 作 attack, 真 howl 作 cue/layer, hurt fallback 通用
+      mon_wolf_attack:       ['monsters/wolf/growl_01.ogg', 'monsters/wolf/growl_02.ogg'],
+      mon_wolf_howl:         ['monsters/wolf/howl_01.ogg'],   // boss 入场/猎杀 cue
+      mon_wolf_hurt:         ['creature_hurt_01.ogg'],         // fallback (rubberduck pool 没单独 wolf hurt)
+      mon_wolf_die:          ['monsters/wolf/die_01.ogg'],
+      // 蜘蛛: chitter_01 (CC-BY spookymodem) + chitter_02 (CC-BY Minimare hiss) + 死叫
+      // 攻击随机选一个,无 layer (两轨都是 attack 主轨,不需要叠 - 改成攻击时另一个变体)
+      mon_spider_attack: ['monsters/spider/chitter_01.ogg', 'monsters/spider/chitter_02.ogg'],
+      mon_spider_hurt:   ['creature_hurt_01.ogg'],
+      mon_spider_die:    ['monsters/spider/die_01.ogg'],
+      // 鸡蛇兽: alien attack + call (奇怪混合生物的高频叫声)
+      mon_cockatrice_attack:       ['monsters/cockatrice/attack_01.ogg', 'monsters/cockatrice/call_01.ogg'],
+      mon_cockatrice_attack_layer: ['spell_fire_03.ogg', 'electric_hit_01.wav'],  // 复用现有素材作"嘶嘶"层
+      mon_cockatrice_call:         ['monsters/cockatrice/call_01.ogg'],
+      mon_cockatrice_hurt:         ['creature_hurt_01.ogg'],
+      mon_cockatrice_die:          ['monsters/cockatrice/die_01.ogg'],
+      // Spider Matriarch (boss): 入场 + 攻击叠 boss roar + 死叠 rumble
+      mon_matriarch_entrance:       ['monsters/matriarch/entrance_01.ogg'],
+      mon_matriarch_entrance_layer: ['monsters/matriarch/roar_01.ogg'],
+      mon_matriarch_attack:         ['monsters/matriarch/chitter_01.ogg'],  // 蜘蛛之母 chittering
+      mon_matriarch_attack_layer:   ['monsters/matriarch/roar_01.ogg'],     // 攻击叠 boss roar
+      mon_matriarch_hurt:           ['creature_roar_02.ogg'],
+      mon_matriarch_die:            ['monsters/matriarch/die_01.ogg'],
+      mon_matriarch_die_layer:      ['stones_04.ogg'],   // 倒地 rumble (现有素材)
+      // 通用 fallback (未匹配怪物)
       monster_attack: ['creature_misc_05.ogg', 'creature_misc_06.ogg', 'creature_monster_01.ogg', 'creature_monster_02.ogg'],
-      monster_attack_beast: ['creature_roar_01.ogg', 'creature_roar_02.ogg'],   // 狼/熊类
-      monster_attack_small: ['creature_misc_05.ogg', 'creature_misc_06.ogg', 'creature_misc_07.ogg'],  // 哥布林/小型
-      monster_attack_arachnid: ['creature_misc_01.ogg', 'creature_misc_02.ogg', 'creature_slime_01.ogg'],  // 蜘蛛
-      monster_attack_boss: ['creature_roar_03.ogg', 'creature_monster_03.ogg', 'creature_monster_04.ogg'],
       monster_hurt: ['creature_hurt_01.ogg', 'creature_hurt_02.ogg'],
-      // 怪物死亡:主轨惨叫 + 调用点叠 thud
       monster_die: ['creature_die_01.ogg', 'creature_hurt_01.ogg'],
       monster_die_thud: ['heavy_hit_01.wav', 'heavy_hit_02.wav'],
       // ── 战斗：开始 / 结束 ──
@@ -8750,20 +8991,26 @@
     }
 
     /**
-     * 怪物 sfx 路由:按 unit 名/id 选合适的 attack pack
-     * 没有匹配走 generic monster_attack
+     * 怪物 sfx 路由:按 unit name/id 优先匹配特化 key (mon_<species>_<suffix>)
+     * - 未匹配落 generic monster_<suffix>
+     * - 返回 { primary: string, layer?: string }; layer 在调用点 +60-80ms 叠加
      */
     function monsterSfxKey(unit, suffix /* 'attack' | 'hurt' | 'die' */) {
-      if (suffix === 'hurt') return 'monster_hurt'
-      if (suffix === 'die') return 'monster_die'
-      // attack 路由
       const name = ((unit && (unit.name || unit.id)) || '').toLowerCase()
-      if (name.includes('matriarch') || name.includes('女王') || name.includes('boss')) return 'monster_attack_boss'
-      if (name.includes('spider') || name.includes('蜘蛛')) return 'monster_attack_arachnid'
-      if (name.includes('wolf') || name.includes('狼') || name.includes('bear')) return 'monster_attack_beast'
-      if (name.includes('goblin') || name.includes('哥布林') || name.includes('imp') || name.includes('小')) return 'monster_attack_small'
-      if (name.includes('cockatrice') || name.includes('鸡蛇')) return 'monster_attack_beast'  // 鸡蛇用 roar 顶
-      return 'monster_attack'
+      let species = null
+      if (name.includes('matriarch') || name.includes('女王') || name.includes('boss')) species = 'matriarch'
+      else if (name.includes('spider') || name.includes('蜘蛛')) species = 'spider'
+      else if (name.includes('wolf') || name.includes('狼')) species = 'wolf'
+      else if (name.includes('goblin') || name.includes('哥布林')) species = 'goblin'
+      else if (name.includes('cockatrice') || name.includes('鸡蛇')) species = 'cockatrice'
+      if (species) {
+        const primary = `mon_${species}_${suffix}`
+        // 攻击/入场场景叠特征层(只对有 _layer pool 的怪物生效)
+        const layerKey = `mon_${species}_${suffix}_layer`
+        const hasLayer = SFX_MAP[layerKey] && SFX_MAP[layerKey].length > 0
+        return { primary, layer: hasLayer ? layerKey : null }
+      }
+      return { primary: `monster_${suffix}`, layer: null }
     }
 
     // ─── 输入 ───
