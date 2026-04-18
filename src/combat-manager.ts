@@ -346,7 +346,7 @@ export function executePlayerAttack(
   targetId: string,
   method: 'weapon' | 'spell',
   spellId?: string,
-): { log: string[]; killed: boolean; hit: boolean; isCritical: boolean } {
+): { log: string[]; killed: boolean; hit: boolean; isCritical: boolean; damage: number } {
   const combat = session.combat
   if (!combat?.active) throw new Error('当前没有进行中的战斗')
 
@@ -382,7 +382,7 @@ export function executePlayerAttack(
 
     if (!spellHits) {
       log.push(`${player.name} 施放${spellId}: d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
-      return { log, killed: false, hit: false, isCritical: false }
+      return { log, killed: false, hit: false, isCritical: false, damage: 0 }
     }
 
     const dmgMatch = spell.effect.match(/(\d+d\d+(?:[+-]\d+)?)/i)
@@ -441,7 +441,7 @@ export function executePlayerAttack(
       const killKey = `kills_${monster.name}`
       session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
     }
-    return { log, killed, hit: true, isCritical: spellIsCritical }
+    return { log, killed, hit: true, isCritical: spellIsCritical, damage }
   }
 
   // 武器攻击
@@ -466,7 +466,7 @@ export function executePlayerAttack(
 
   if (!weaponHits) {
     log.push(`${player.name} 攻击(${weapon.name}): d20(${atk.roll})+${atkMod}=${atk.total} vs AC${monster.ac} → 未命中`)
-    return { log, killed: false, hit: false, isCritical: false }
+    return { log, killed: false, hit: false, isCritical: false, damage: 0 }
   }
 
   const dmgMatch = weapon.description.match(/(\d+d\d+)/i)
@@ -523,7 +523,7 @@ export function executePlayerAttack(
     const killKey = `kills_${monster.name}`
     session.worldState.flags[killKey] = (Number(session.worldState.flags[killKey] ?? 0)) + 1
   }
-  return { log, killed, hit: true, isCritical: weaponIsCritical }
+  return { log, killed, hit: true, isCritical: weaponIsCritical, damage }
 }
 
 // ─── Boss 特殊技能 ──────────────────────────────
@@ -783,14 +783,26 @@ export interface GridSpawnRecord {
   attackRange: number
 }
 
+/** 单个怪物在本轮的产出切片 —— 演出系统按此逐个播放 actor_turn */
+export type MonsterTurnSlice = {
+  monsterId: string
+  monsterName: string
+  log: string[]
+  hits: MonsterHitRecord[]
+  gridMoves: GridMoveRecord[]
+  gridSpawns: GridSpawnRecord[]
+}
+
 export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   log: string[]
   hits: MonsterHitRecord[]
   gridMoves: GridMoveRecord[]
   gridSpawns: GridSpawnRecord[]
+  /** 每个怪物独立的切片,按先攻顺序。演出层据此拆 actor_turn_start/end。 */
+  perMonster: MonsterTurnSlice[]
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [] }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [], perMonster: [] }
 
   const player = session.player
   let playerAC = calculatePlayerAC(player)
@@ -799,6 +811,7 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
   const hits: MonsterHitRecord[] = []
   const gridMoves: GridMoveRecord[] = []
   const gridSpawns: GridSpawnRecord[] = []
+  const perMonster: MonsterTurnSlice[] = []
   const grid = combat.grid
 
   for (const entry of combat.initiativeOrder) {
@@ -807,6 +820,13 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
 
     const monster = combat.monsters.find(m => m.id === entry.id)
     if (!monster || monster.hp <= 0) continue
+
+    // 演出分片:记录起点,try/finally 保证无论 continue/break 都能 slice 出这个怪物的片段
+    const logStart = log.length
+    const hitsStart = hits.length
+    const movesStart = gridMoves.length
+    const spawnsStart = gridSpawns.length
+    try {
 
     // 被擒拿的怪物跳过行动，并在回合结束后解除
     if (monster.conditions.includes('grappled')) {
@@ -1003,9 +1023,20 @@ export function executeMonsterTurns(session: GameSession, onlyIds?: string[]): {
       getFacts().addEvent(`${player.name}在战斗中倒下`, 'critical')
       break
     }
+    } finally {
+      // 无论 continue / break / 正常 fall through,都 slice 出这个怪物本轮的产出
+      perMonster.push({
+        monsterId: monster.id,
+        monsterName: monster.name,
+        log: log.slice(logStart),
+        hits: hits.slice(hitsStart),
+        gridMoves: gridMoves.slice(movesStart),
+        gridSpawns: gridSpawns.slice(spawnsStart),
+      })
+    }
   }
 
-  return { log, hits, gridMoves, gridSpawns }
+  return { log, hits, gridMoves, gridSpawns, perMonster }
 }
 
 // ─── 同伴回合（全自动）─────────────────────────────
@@ -1327,6 +1358,7 @@ export function executePlayerTurn(
   isCritical?: boolean
   killed?: boolean
   targetName?: string
+  damage?: number  // Wave 2: 演出层用
   firstInnocentKill?: boolean
 } {
   const combat = session.combat!
@@ -1382,6 +1414,7 @@ export function executePlayerTurn(
       roundLog, ended: true, result: 'victory', loot,
       hit: attackResult.hit, isCritical: attackResult.isCritical,
       killed: attackResult.killed, targetName: targetId,
+      damage: attackResult.damage,
       firstInnocentKill,
     }
   }
@@ -1395,6 +1428,7 @@ export function executePlayerTurn(
     roundLog, ended: check.ended, result: check.result,
     hit: attackResult.hit, isCritical: attackResult.isCritical,
     killed: attackResult.killed, targetName: targetId,
+    damage: attackResult.damage,
   }
 }
 
@@ -1418,11 +1452,12 @@ export function executeMonsterPhase(
   hits: MonsterHitRecord[]
   gridMoves: GridMoveRecord[]
   gridSpawns: GridSpawnRecord[]
+  perMonster: MonsterTurnSlice[]
   ended: boolean
   result: CombatResult
 } {
   const combat = session.combat
-  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [], ended: true, result: 'ongoing' }
+  if (!combat?.active) return { log: [], hits: [], gridMoves: [], gridSpawns: [], perMonster: [], ended: true, result: 'ongoing' }
 
   combat.pendingMonsterTurn = false
   const monsterResult = executeMonsterTurns(session, onlyIds)
@@ -1447,6 +1482,7 @@ export function executeMonsterPhase(
     log, hits: monsterResult.hits,
     gridMoves: monsterResult.gridMoves,
     gridSpawns: monsterResult.gridSpawns,
+    perMonster: monsterResult.perMonster,
     ...check,
   }
 }

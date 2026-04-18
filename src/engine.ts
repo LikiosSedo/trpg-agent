@@ -263,6 +263,36 @@ const ACTION_TYPE_ICONS: Record<string, string> = {
   GIVE: 'ra-hand',
 }
 
+/**
+ * 怪物命中叙事 helper (模块级,供 processTurn / processGridAction / processCombatAction 复用)
+ *
+ * 之前只在 processCombatAction 里以闭包形式定义,导致 grid 战斗路径(processGridAction)
+ * 调用时 ReferenceError。提到模块级后 3 条战斗路径都能调。
+ */
+function* emitMonsterNarratives(
+  session: GameSession,
+  hits: any[],
+): Generator<TurnEvent> {
+  for (const mhit of hits) {
+    const monsterZh = localize(mhit.monsterName)
+    if (mhit.targetIsAlly) {
+      const outcome = mhit.isCritical ? 'monster_critical_ally' : mhit.hit ? 'monster_hit_ally' : 'monster_miss_ally'
+      const text = pickNarrative(outcome as any, { monster: monsterZh, ally: mhit.targetName })
+      if (text) yield { type: 'combat_narrative' as const, text }
+      if (mhit.allyKilled) {
+        const downText = pickNarrative('ally_down' as any, { ally: mhit.targetName })
+        if (downText) yield { type: 'combat_narrative' as const, text: downText }
+      }
+    } else {
+      const isNpc = session.npcs.some(n => n.name === mhit.monsterName)
+      const prefix = isNpc ? 'npc' : 'monster'
+      const outcome = mhit.isCritical ? `${prefix}_critical` : mhit.hit ? `${prefix}_hit` : `${prefix}_miss`
+      const text = pickNarrative(outcome as any, { monster: monsterZh })
+      if (text) yield { type: 'combat_narrative' as const, text }
+    }
+  }
+}
+
 function classifySuggestion(text: string): ClassifiedSuggestion {
   const clean = text.startsWith('★') ? text.slice(1) : text
   const action = quickMatch(clean)
@@ -345,9 +375,17 @@ const NPC_PORTRAITS: Record<string, string> = {
 }
 
 const MONSTER_PORTRAITS: Record<string, string> = {
+  // 第一地图：暮色森林
+  'Goblin': 'portraits/monsters/monster-goblin.png',
+  'Wolf': 'portraits/monsters/monster-wolf.png',
+  'Cockatrice': 'portraits/monsters/monster-cockatrice.png',
+  'Giant Spider': 'portraits/monsters/monster-giant-spider.png',
+  'Spider Matriarch': 'portraits/monsters/monster-spider-matriarch.png',
+  // 第二地图：灰脊矿道
   'Shadow': 'portraits/monster-shadow.png',
   'Ghoul': 'portraits/monster-ghoul.png',
   'Mimic': 'portraits/monster-mimic.png',
+  // 第三地图：荒石塔
   'Eclipsed Beast': 'portraits/monster-eclipsed-beast.png',
 }
 
@@ -400,6 +438,28 @@ export type TurnEvent =
   | { type: 'system_message'; text: string }
   | { type: 'bestiary_hint'; text: string; npc: string; monster: string }
   /**
+   * 战斗演出 · 角色回合开始
+   * 前端在收到此事件时:
+   *   - 弹出该角色的立绘卡片(BattleAnimationQueue 入队)
+   *   - 如果带 target 字段,同时弹出右 slot 的受击卡片(双立绘对决)
+   *   - 锁定后续战斗事件归属此 actor,直到 actor_turn_end
+   * intent 给前端用于选择卡片样式(attack/spell/defend/move/item/flee)
+   * target* 字段(Wave 2 加):双立绘联动用,无目标动作(防御/纯移动)不填
+   */
+  | { type: 'actor_turn_start';
+      actorId: string;
+      actorName: string;
+      side: 'player' | 'enemy' | 'ally';
+      portrait: string;
+      intent?: 'attack' | 'spell' | 'defend' | 'move' | 'item' | 'flee';
+      targetId?: string;
+      targetName?: string;
+      targetSide?: 'player' | 'enemy' | 'ally';
+      targetPortrait?: string;
+    }
+  /** 战斗演出 · 角色回合结束 */
+  | { type: 'actor_turn_end'; actorId: string }
+  /**
    * 统一的"发现"弹窗事件，承载 POI 发现、物品获取（系统发放）或两者兼有的场景。
    * - Search 同时找到 POI + 物品 → 单条事件包含 poi + items + gold（前端单一弹窗）
    * - Move 首次到达 POI → 仅 poi
@@ -439,6 +499,11 @@ export function buildFallbackActions(session: GameSession): SceneActions {
   const subLoc = session.worldState.currentSubLocation
   const time = session.worldState.timeOfDay
   const isNight = time === 'night'
+  // 玩家刚踏入巢穴/即将开战时,任何"前往别处""和某 NPC 交谈"都不合时宜
+  // (战斗一触即发,选项应留给战斗叙事生成,不要让 fallback 注入旅行选项)
+  if (session.worldState.flags['pending_encounter']) {
+    return { details: [], suggestions: [] }
+  }
   const inCombatAftermath = session.npcs.some(n =>
     n.condition === 'unconscious' && n.location === loc &&
     (n.subLocation ?? n.homeBase) === subLoc
@@ -2267,7 +2332,12 @@ export class GameEngine {
           const parsedBlock = parseSetActionsBlock(block)
           if (parsedBlock) injectPendingActions(parsedBlock)
         }
-        fullText += flushedFiltered.output
+        if (flushedFiltered.output) {
+          // 关键:也要通过 localizer 流出 dm_text_delta,否则前端 streaming 少这一段
+          const localized = localizer.feed(flushedFiltered.output)
+          if (localized) yield { type: 'dm_text_delta', text: localized }
+          fullText += flushedFiltered.output
+        }
       }
       // flush saFilter 尾部
       const saTailMain = saFilter.flush()
@@ -2278,7 +2348,12 @@ export class GameEngine {
           console.log(`[dm] flush 时拦截 inline <setactions> 残留块`)
         }
       }
-      if (saTailMain.output) fullText += saTailMain.output
+      if (saTailMain.output) {
+        // 同理:saFilter 的尾部残留要走 localizer 吐到前端
+        const localized = localizer.feed(saTailMain.output)
+        if (localized) yield { type: 'dm_text_delta', text: localized }
+        fullText += saTailMain.output
+      }
       // Flush streaming localizer 尾部 buffer（防止最后几个字符卡在 buffer 里）
       const tail = localizer.flush()
       if (tail) yield { type: 'dm_text_delta', text: tail }
@@ -2546,6 +2621,7 @@ export class GameEngine {
             combat: true,
             pendingMonster: !!session.combat?.pendingMonsterTurn,
             actions: null as any,
+            text: fullText || undefined,  // 权威文本,前端优先用它渲染
           }
 
           // 追击打断过渡弹窗：前端显示 NPC 立绘 + 追击原因，
@@ -2726,18 +2802,39 @@ export class GameEngine {
       // 保存怪物数据用于战后 NPC 状态同步（endCombat 会清空 combat）
       const combatMonstersSnapshot = session.combat.monsters.map(m => ({ name: m.name, hp: m.hp, maxHp: m.maxHp }))
       const monsterResult = executeMonsterPhase(session)
+      // 敌方回合叙事:逐击生成 combat_narrative,让玩家感受到节奏
+      // (之前只发原始 log 单行 → 体验干巴巴)
+      yield* emitMonsterNarratives(session, monsterResult.hits ?? [])
       if (monsterResult.log.length > 0) {
         yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: session.player.hp, playerMaxHp: session.player.maxHp, allies: (session.combat?.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
       }
       if (monsterResult.ended) {
         syncNPCConditionAfterCombat(session, combatMonstersSnapshot, session.combat?.allies)
+        // 战利品:胜利时发放,和前端 combat_status ended 同步
+        const lootInfo = monsterResult.result === 'victory' ? awardLoot(session) : undefined
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
           ended: true, result: monsterResult.result,
         }
+        // 补发 combat_grid_end 让前端清理棋盘 UI 并解锁输入
+        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
+        // 关键:清理 session.combat 状态,否则下一轮操作会撞"当前没有战斗"报错
+        endCombat(session)
+        // 恢复探索 BGM + sync 让前端彻底回到场景
+        const audio = resolveAudio(
+          session.worldState.currentLocation,
+          session.worldState.currentSubLocation,
+          session.worldState.timeOfDay,
+          false,
+        )
+        yield { type: 'audio', bgm: audio.bgm, ambient: audio.ambient }
         if (session.chapter) {
           new ChapterManager(session).onEvent('combat_end')
+        }
+        yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
+        if (session.player.hp <= 0) {
+          yield* this.handleDeath()
         }
       } else {
         const status = getCombatSummary(session)
@@ -3047,6 +3144,7 @@ export class GameEngine {
       combat: false,
       pendingMonster: false,
       actions: actions ? classifyActions(actions) : null,
+      text: fullText || undefined,  // 权威文本,前端优先用它渲染
     }
 
     // 同步
@@ -3648,11 +3746,14 @@ export class GameEngine {
       if (monsterResult.ended) {
         combat.phase = 'ended'
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
+        const lootInfo = monsterResult.result === 'victory' ? awardLoot(session) : undefined
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
           ended: true, result: monsterResult.result,
         }
+        // 补发 combat_grid_end 让前端清棋盘 + 解锁输入
+        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
         if (monsterResult.result === 'victory') {
           const isNpcFight2 = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
           yield* this.combatDMNarrative(
@@ -3663,6 +3764,16 @@ export class GameEngine {
         } else {
           yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，世界在眼前逐渐暗去。` }
         }
+        // 关键:清理 session.combat,否则下一轮操作撞"当前没有战斗"
+        endCombat(session)
+        // 恢复探索 BGM
+        const audio = resolveAudio(
+          session.worldState.currentLocation,
+          session.worldState.currentSubLocation,
+          session.worldState.timeOfDay,
+          false,
+        )
+        yield { type: 'audio', bgm: audio.bgm, ambient: audio.ambient }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         if (session.player.hp <= 0) {
@@ -3833,7 +3944,13 @@ export class GameEngine {
         }
       }
     }
-    yield { type: 'dm_end', combat: false, pendingMonster: false, actions: actions ? classifyActions(actions) : null }
+    yield {
+      type: 'dm_end',
+      combat: false,
+      pendingMonster: false,
+      actions: actions ? classifyActions(actions) : null,
+      text: fullText || undefined,  // 权威文本（含截断修复 + 本地化）,前端最终渲染用它
+    }
 
     // 开场 NPC 解锁（只有"真的在同一房间"才算见面）
     //   - 同 location：排除车夫提到外地 NPC
@@ -3893,6 +4010,53 @@ export class GameEngine {
     const { pickNarrative } = await import('./combat-narrative.js')
     const { executePlayerTurn, executeMonsterPhase, checkCombatEnd, endCombat, awardLoot } = await import('./combat-manager.js')
 
+    // ─── 演出 · 玩家回合 actor_turn_start ───
+    // intent 决定卡片样式(attack=红/spell=紫/defend=蓝/move=灰/...)
+    // 用 try/finally 包整个 body,保证任何 return 路径下 actor_turn_end 都 yield
+    const playerIntent: 'attack' | 'spell' | 'defend' | 'move' | 'item' | 'flee' =
+      msg.action === 'grid_attack' ? 'attack'
+      : msg.action === 'grid_spell' ? 'spell'
+      : msg.action === 'grid_defend' ? 'defend'
+      : msg.action === 'grid_flee' ? 'flee'
+      : msg.action === 'grid_item' ? 'item'
+      : 'move'
+    const playerClassId = (session.player as any).classId ?? 'fighter'
+    // Wave 2: 玩家攻击/施法 时附带 target 信息,前端右 slot 弹受击卡
+    let playerTarget: { targetId: string; targetName: string; targetSide: 'enemy' | 'ally'; targetPortrait: string } | null = null
+    if ((msg.action === 'grid_attack' || msg.action === 'grid_spell') && msg.targetId) {
+      const m = combat.monsters.find(x => x.id === msg.targetId)
+      if (m) {
+        playerTarget = {
+          targetId: m.id,
+          targetName: m.name,
+          targetSide: 'enemy',
+          targetPortrait: MONSTER_PORTRAITS[m.name] ?? NPC_PORTRAITS[m.name] ?? '',
+        }
+      } else {
+        const a = combat.allies?.find(x => x.id === msg.targetId)
+        if (a) {
+          playerTarget = {
+            targetId: a.id,
+            targetName: a.name,
+            targetSide: 'ally',
+            targetPortrait: NPC_PORTRAITS[a.name] ?? '',
+          }
+        }
+      }
+    }
+    yield {
+      type: 'actor_turn_start',
+      actorId: 'player',
+      actorName: player.name,
+      side: 'player',
+      portrait: `portraits/pc-${playerClassId}.png`,
+      intent: playerIntent,
+      ...(playerTarget ?? {}),
+    }
+    // 玩家回合结束标志 —— 正常路径在怪物回合前显式 yield,early return 由 finally 兜底
+    let playerTurnEnded = false
+    try {
+
     // ── A. 纯移动 ──
     if (msg.action === 'grid_move' && msg.target) {
       const reachable = grid.getReachable('player')
@@ -3926,6 +4090,16 @@ export class GameEngine {
       // 发送攻击结果
       for (const line of turnResult.roundLog) {
         yield { type: 'combat_status', text: line, ended: false }
+      }
+      // 演出: 命中/未命中事件 → 前端触发 target 卡片震动 + 伤害数字飞出
+      yield {
+        type: 'combat_grid_attack',
+        attackerId: 'player',
+        targetId: msg.targetId,
+        damage: turnResult.damage ?? 0,
+        hit: !!turnResult.hit,
+        isCritical: !!turnResult.isCritical,
+        narrative: '',
       }
       // 目标死亡 → 移除网格单位
       if (turnResult.killed) {
@@ -4031,12 +4205,52 @@ export class GameEngine {
       return
     }
 
-    // ── 怪物回合 ──
+    // ── 玩家回合结束,怪物回合开始 ──
+    // 这是正常路径:玩家动作完成,准备进入怪物回合
+    yield { type: 'actor_turn_end', actorId: 'player' }
+    playerTurnEnded = true
+
     combat.pendingMonsterTurn = true
     const monsterResult = executeMonsterPhase(session)
-    if (monsterResult.log.length > 0) {
-      // 发送 Boss 召唤（在移动动画之前，这样玩家先看到"新怪物出现"）
-      for (const sp of monsterResult.gridSpawns) {
+
+    // 按 perMonster 切片逐个怪物演出 —— 每个怪物一对 actor_turn_start/end
+    // 这样前端 BattleAnimationQueue 能逐个播放,不再"一起瞬间结算"
+    for (const slice of monsterResult.perMonster) {
+      const portrait = MONSTER_PORTRAITS[slice.monsterName] ?? NPC_PORTRAITS[slice.monsterName] ?? ''
+      // Wave 2: 怪物的第一次 hit 决定它打谁(玩家/同伴),前端右 slot 弹受击卡
+      let monsterTargetFields: any = {}
+      const firstHit = slice.hits.find(h => h.targetName)  // 跳过擒拿等空 hit
+      if (firstHit) {
+        if (firstHit.targetIsAlly) {
+          const ally = combat.allies?.find(a => a.name === firstHit.targetName)
+          if (ally) {
+            monsterTargetFields = {
+              targetId: ally.id,
+              targetName: ally.name,
+              targetSide: 'ally',
+              targetPortrait: NPC_PORTRAITS[ally.name] ?? '',
+            }
+          }
+        } else {
+          monsterTargetFields = {
+            targetId: 'player',
+            targetName: player.name,
+            targetSide: 'player',
+            targetPortrait: `portraits/pc-${(session.player as any).classId ?? 'fighter'}.png`,
+          }
+        }
+      }
+      yield {
+        type: 'actor_turn_start',
+        actorId: slice.monsterId,
+        actorName: slice.monsterName,
+        side: 'enemy',
+        portrait,
+        intent: 'attack',
+        ...monsterTargetFields,
+      }
+      // 该怪物的 Boss 召唤(应该先于移动动画)
+      for (const sp of slice.gridSpawns) {
         yield { type: 'combat_grid_spawn', unit: {
           id: sp.unitId, side: 'enemy', name: sp.name,
           hp: sp.hp, maxHp: sp.maxHp, pos: sp.pos,
@@ -4044,11 +4258,33 @@ export class GameEngine {
           portrait: '',
         }}
       }
-      // 发送怪物移动动画
-      for (const gm of monsterResult.gridMoves) {
+      // 该怪物的移动动画
+      for (const gm of slice.gridMoves) {
         yield { type: 'combat_grid_move', unitId: gm.unitId, path: gm.path }
       }
-      yield { type: 'combat_monster', text: monsterResult.log.join('\n'), playerHp: player.hp, playerMaxHp: player.maxHp, allies: (combat.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
+      // 该怪物的命中叙事(逐 hit 一段 combat_narrative)
+      yield* emitMonsterNarratives(session, slice.hits)
+      // 演出: 每次 hit 发 combat_grid_attack 触发受击演出(震动 + 伤害数字)
+      for (const h of slice.hits) {
+        if (!h.targetName) continue  // 擒拿等空 hit 跳过
+        const tId = h.targetIsAlly
+          ? (combat.allies?.find(a => a.name === h.targetName)?.id ?? h.targetName)
+          : 'player'
+        yield {
+          type: 'combat_grid_attack',
+          attackerId: slice.monsterId,
+          targetId: tId,
+          damage: h.damage ?? 0,
+          hit: !!h.hit,
+          isCritical: !!h.isCritical,
+          narrative: '',
+        }
+      }
+      // 该怪物的数值日志
+      if (slice.log.length > 0) {
+        yield { type: 'combat_monster', text: slice.log.join('\n'), playerHp: player.hp, playerMaxHp: player.maxHp, allies: (combat.allies ?? []).map(a => ({ id: a.id, name: a.name, hp: a.hp, maxHp: a.maxHp })) }
+      }
+      yield { type: 'actor_turn_end', actorId: slice.monsterId }
     }
 
     // 怪物击杀检查
@@ -4090,6 +4326,13 @@ export class GameEngine {
     // 死亡检查
     if (player.hp <= 0) {
       yield* this.handleDeath()
+    }
+
+    } finally {
+      // early return 兜底:玩家 actor_turn_end 必须 yield(前端关卡片)
+      if (!playerTurnEnded) {
+        yield { type: 'actor_turn_end', actorId: 'player' }
+      }
     }
   }
 

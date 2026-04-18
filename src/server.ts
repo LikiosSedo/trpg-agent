@@ -282,7 +282,9 @@ wss.on('connection', (ws: WebSocket, req) => {
         case 'dm_text_delta':
           send('dm', { text: ev.text }); break
         case 'dm_end':
-          send('dm_end', { combat: ev.combat, pendingMonster: ev.pendingMonster, actions: ev.actions, hasPendingTrade: ev.hasPendingTrade }); break
+          // text 是 engine 端做过"截断修复 + 本地化"的权威文本,前端优先用它
+          // (否则前端 fallback 到 streaming 累积的 _fullText,可能因 chunk 抖动被"吞")
+          send('dm_end', { combat: ev.combat, pendingMonster: ev.pendingMonster, actions: ev.actions, hasPendingTrade: ev.hasPendingTrade, text: (ev as any).text }); break
         case 'dm_error':
           send('error', { text: ev.message }); break
         case 'broken_promise':
@@ -348,6 +350,11 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('combat_grid_attack', ev); break
         case 'combat_grid_end':
           send('combat_grid_end', { result: (ev as any).result, loot: (ev as any).loot }); break
+        // 战斗演出 · 角色回合开始/结束(BattleAnimationQueue 用)
+        case 'actor_turn_start':
+          send('actor_turn_start', ev); break
+        case 'actor_turn_end':
+          send('actor_turn_end', { actorId: (ev as any).actorId }); break
         case 'game_over':
           send('game_over', { reason: localize(ev.reason), canContinue: ev.canContinue, continueHint: ev.continueHint }); break
         case 'narrative_warning':
