@@ -71,16 +71,37 @@ export interface AudioState {
   ambient: string   // ambient track id
 }
 
+/**
+ * 战斗上下文(可选): 让 resolveAudio 在 inCombat=true 时选不同的 BGM
+ * - hasBoss: 有 boss 级怪物 → boss-battle
+ * - monsterCount: ≥3 → danger (更紧迫); 1-2 → battle (标准)
+ * - 不传则按"普通战斗"处理
+ */
+export interface CombatContext {
+  hasBoss?: boolean
+  monsterCount?: number
+}
+
 /** 根据游戏状态自动选择音频（纯确定性） */
 export function resolveAudio(
   location: string,
   subLocation: string | undefined,
   timeOfDay: string,
   inCombat: boolean,
+  combatCtx?: CombatContext,
 ): AudioState {
-  // 战斗优先
+  // 战斗优先 — 按上下文分流, 区域 ambient 保留增加场景感
   if (inCombat) {
-    return { bgm: 'battle', ambient: 'silence' }
+    const isNight = timeOfDay === 'night' || timeOfDay === 'evening'
+    // 区域 ambient: 战斗中也保留场景音, 不切 silence (沉浸感)
+    let ambient: string = 'silence'
+    if (location === 'twilight-woods') ambient = isNight ? 'crickets' : 'birds'
+    else if (location === 'greyspine-mines') ambient = 'drip'
+    else if (location === 'shatterstone-wastes') ambient = 'wind'
+    // BGM 分流
+    if (combatCtx?.hasBoss) return { bgm: 'boss-battle', ambient }
+    if ((combatCtx?.monsterCount ?? 0) >= 3) return { bgm: 'danger', ambient }
+    return { bgm: 'battle', ambient }
   }
 
   // 子地点特殊覆盖（破晓镇室内场景，每家店铺独立 BGM）

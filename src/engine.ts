@@ -2812,13 +2812,19 @@ export class GameEngine {
         syncNPCConditionAfterCombat(session, combatMonstersSnapshot, session.combat?.allies)
         // 战利品:胜利时发放,和前端 combat_status ended 同步
         const lootInfo = monsterResult.result === 'victory' ? awardLoot(session) : undefined
+        // 先发 log 文本(ended:false,仅作为日志),避免前端 ended:true cleanup 早于后续叙事/清理
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
+          ended: false,
+        }
+        // 无 combatDMNarrative 此处 → 直接 grid_end + 终结 combat_status(两者被前端排入队尾 cleanup)
+        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
+        yield {
+          type: 'combat_status',
+          text: '',
           ended: true, result: monsterResult.result,
         }
-        // 补发 combat_grid_end 让前端清理棋盘 UI 并解锁输入
-        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
         // 关键:清理 session.combat 状态,否则下一轮操作会撞"当前没有战斗"报错
         endCombat(session)
         // 恢复探索 BGM + sync 让前端彻底回到场景
@@ -3194,10 +3200,27 @@ export class GameEngine {
   }
 
   /** 调用 DM 生成 2-3 句战斗场景叙事（开场/结束/逃跑）
-   *  大部分工具被临时静音，只保留 SetActions 以便生成后续选项 */
+   *  大部分工具被临时静音，只保留 SetActions 以便生成后续选项
+   *  2026-04-18: 按句分段流式 yield — 每完整一句立即 emit,让前端 battleQueue
+   *  能按句入队播放,消除 LLM 全文生成的 5-20 秒静默期,和棋盘演出自然交错。 */
   private async *combatDMNarrative(scene: string): AsyncGenerator<TurnEvent> {
     const context = this.buildCombatContext()
     let fullText = ''
+    let streamBuf = ''  // 分句缓冲:遇到句号/感叹号/问号就 flush 一段
+    let emittedAny = false
+    // 匹配一段完整句子(含中/英标点 + 可选右引号 + 尾部空白)
+    const SENTENCE_RE = /^[\s\S]*?[。！？!?\.][」"'""』]?\s*/
+    const flushSentences = function* (): Generator<TurnEvent> {
+      let m: RegExpExecArray | null
+      while ((m = SENTENCE_RE.exec(streamBuf))) {
+        const piece = localize(m[0].trim())
+        if (piece) {
+          emittedAny = true
+          yield { type: 'combat_narrative' as const, text: piece }
+        }
+        streamBuf = streamBuf.slice(m[0].length)
+      }
+    }
     muteDMTools()  // 🔇 静音：只保留 SetActions
     const combatSaFilter = new SetActionsStreamFilter()  // 防御 inline <setactions> 幻觉
     let combatDmTimedOut = false
@@ -3227,12 +3250,17 @@ export class GameEngine {
           }
           if (filtered.output) {
             fullText += filtered.output
+            streamBuf += filtered.output
             const truncated = detectRepetition(fullText)
             if (truncated) {
               console.warn(`[combat-dm] 重复检测触发，截断输出 (${fullText.length}→${truncated.length}字)`)
               fullText = truncated
+              // 重复检测截断后不再 push 新句 — streamBuf 里残留放弃
+              streamBuf = ''
               break
             }
+            // 流式分句 emit
+            yield* flushSentences()
           }
         }
       }
@@ -3243,18 +3271,28 @@ export class GameEngine {
         const parsedBlock = parseSetActionsBlock(block)
         if (parsedBlock) injectPendingActions(parsedBlock)
       }
-      if (saTailCombat.output) fullText += saTailCombat.output
+      if (saTailCombat.output) {
+        fullText += saTailCombat.output
+        streamBuf += saTailCombat.output
+      }
+      // 收尾:完整句先 flush,剩下的残句(没有终结标点)做最后一次清理后 emit
+      yield* flushSentences()
       const emptyIdx = fullText.indexOf('(Empty response:')
       if (emptyIdx !== -1) fullText = fullText.substring(0, emptyIdx)
-      fullText = trimToLastSentence(fullText)
-      // 超时兜底：DM 没给战斗叙事时，发一段通用文本保证不空白
-      if (!fullText.trim()) {
-        fullText = combatDmTimedOut
+      const tailPiece = streamBuf.trim() ? trimToLastSentence(streamBuf) : ''
+      if (tailPiece) {
+        emittedAny = true
+        yield { type: 'combat_narrative', text: localize(tailPiece) }
+      }
+      streamBuf = ''
+      // 兜底:DM 完全没给叙事(空响应/超时)→ 发一段通用文本保证不空白
+      if (!emittedAny) {
+        const fallback = combatDmTimedOut
           ? '战斗中的时间仿佛被拉长，每一次呼吸都变得沉重。'
           : '战况在片刻寂静中继续。'
         console.warn(`[combat-dm] 空响应，发送兜底文本 (timedOut=${combatDmTimedOut})`)
+        yield { type: 'combat_narrative', text: localize(fallback) }
       }
-      yield { type: 'combat_narrative', text: localize(fullText.trim()) }
       // 如果 DM 调用了 SetActions 生成了选项，传出去
       const narrativeActions = consumeActions()
       if (narrativeActions) {
@@ -3352,16 +3390,25 @@ export class GameEngine {
 
     combat.phase = 'player_turn'
 
-    // 切换战斗 BGM
+    const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
+
+    // 切换战斗 BGM — 按 boss / 怪物数 分流
+    // boss 检测: name 含 matriarch/女王/boss, 或 challengeRating >= 5 (D&D 标准)
+    const hasBoss = aliveMonsters.some(m => {
+      const n = (m.name || '').toLowerCase()
+      if (n.includes('matriarch') || n.includes('boss') || (m.name || '').includes('女王')) return true
+      const cr = (m as any).challengeRating
+      if (typeof cr === 'number' && cr >= 5) return true
+      return false
+    })
     const combatAudio = resolveAudio(
       this.session.worldState.currentLocation,
       this.session.worldState.currentSubLocation,
       this.session.worldState.timeOfDay,
       true,
+      { hasBoss, monsterCount: aliveMonsters.length },
     )
     yield { type: 'audio', bgm: combatAudio.bgm, ambient: combatAudio.ambient }
-
-    const aliveMonsters = combat.monsters.filter(m => m.hp > 0)
 
     // 发送战斗立绘（确保所有战斗触发路径都显示立绘）
     yield {
@@ -3650,7 +3697,8 @@ export class GameEngine {
           const { items, gold } = turnResult.loot
           if (items.length || gold) lines.push(`获得: ${items.join(', ')}${gold ? ` + ${gold}金币` : ''}`)
         }
-        yield { type: 'combat_status', text: lines.join('\n'), ended: true, result: turnResult.result }
+        // 先发 log 文本(ended:false) — 保证前端 combatMode 在叙事期间仍为 true
+        yield { type: 'combat_status', text: lines.join('\n'), ended: false }
 
         // 首次击败无辜NPC警告
         if (turnResult.firstInnocentKill) {
@@ -3669,6 +3717,8 @@ export class GameEngine {
                 : `玩家一击制胜，${enemyNames}轰然倒下！描写最后致命一击的画面，战利品散落的场景，以及战斗后短暂的宁静。`)
             : `${enemyNames}的攻势压垮了玩家。描写玩家倒下的最后时刻——是什么样的一击终结了战斗，意识模糊中最后的感知。`
         )
+        // 叙事播完才发 ended:true 作为终结信号(前端排入队尾 cleanup,确保不打断播放)
+        yield { type: 'combat_status', text: '', ended: true, result: turnResult.result }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
@@ -3680,12 +3730,13 @@ export class GameEngine {
     const endCheck = checkCombatEnd(session)
     if (endCheck.ended) {
       combat.phase = 'ended'
+      // 先发 log 文本(ended:false),让叙事在 combatMode=true 下 enqueue 播放
       if (endCheck.result === 'victory') {
         const loot = awardLoot(session)
         const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
-        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
+        yield { type: 'combat_status', text: lootText, ended: false }
       } else if (endCheck.result === 'defeat') {
-        yield { type: 'combat_status', text: '战斗失败...', ended: true, result: 'defeat' }
+        yield { type: 'combat_status', text: '战斗失败...', ended: false }
       }
       syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
       endCombat(session)
@@ -3694,6 +3745,8 @@ export class GameEngine {
           ? `${enemyNames}终于倒下了！描写战场上恢复平静的瞬间，玩家擦去汗水或鲜血，审视这场胜利的余波。`
           : `玩家在${enemyNames}的猛攻下再也支撑不住。描写最后的挣扎和倒下的瞬间，战场归于沉寂。`
       )
+      // 叙事播完才发终结信号(队尾 cleanup,不打断播放)
+      yield { type: 'combat_status', text: '', ended: true, result: endCheck.result }
       if (session.chapter) new ChapterManager(session).onEvent('combat_end')
       yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
       if (session.player.hp <= 0) {
@@ -3747,13 +3800,13 @@ export class GameEngine {
         combat.phase = 'ended'
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         const lootInfo = monsterResult.result === 'victory' ? awardLoot(session) : undefined
+        // 先发 log 文本(ended:false),不触发前端 cleanup
         yield {
           type: 'combat_status',
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
-          ended: true, result: monsterResult.result,
+          ended: false,
         }
-        // 补发 combat_grid_end 让前端清棋盘 + 解锁输入
-        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
+        // 叙事在 combatMode=true 期间 enqueue 播放
         if (monsterResult.result === 'victory') {
           const isNpcFight2 = combatMonsters.some(m => session.npcs.some(n => n.name === m.name))
           yield* this.combatDMNarrative(
@@ -3764,6 +3817,9 @@ export class GameEngine {
         } else {
           yield { type: 'combat_narrative', text: `${enemyNames}的攻势如潮水般涌来。最后一击落下时，你的视野开始模糊，世界在眼前逐渐暗去。` }
         }
+        // 叙事播完 → grid_end(队尾清理) + 终结信号(队尾 cleanup)
+        yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
+        yield { type: 'combat_status', text: '', ended: true, result: monsterResult.result }
         // 关键:清理 session.combat,否则下一轮操作撞"当前没有战斗"
         endCombat(session)
         // 恢复探索 BGM
