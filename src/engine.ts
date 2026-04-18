@@ -491,6 +491,10 @@ export type TurnEvent =
   | { type: 'combat_grid_attack'; attackerId: string; targetId: string; damage: number; hit: boolean; isCritical: boolean; narrative: string }
   /** 战棋战斗结束 */
   | { type: 'combat_grid_end'; result: 'victory' | 'defeat'; loot?: any }
+  /** 战斗胜利结算弹窗 — 在 ended:true 之前发,前端弹独立 popup 显示战利品 */
+  | { type: 'combat_loot'; result: 'victory' | 'defeat' | 'fled';
+      loot?: { items: string[]; gold: number };
+      monsters?: string[] }
 
 // ─── 默认选项 fallback ──────────────────────────
 
@@ -2838,6 +2842,13 @@ export class GameEngine {
           text: monsterResult.result === 'victory' ? '战斗胜利！' : '战斗失败...',
           ended: false,
         }
+        // 战利品弹窗(在 grid_end 前发,前端先看到 popup 再触发清理)
+        yield {
+          type: 'combat_loot',
+          result: monsterResult.result as any,
+          loot: lootInfo,
+          monsters: combatMonstersSnapshot.map(m => m.name),
+        }
         // 无 combatDMNarrative 此处 → 直接 grid_end + 终结 combat_status(两者被前端排入队尾 cleanup)
         yield { type: 'combat_grid_end', result: monsterResult.result as any, loot: lootInfo }
         yield {
@@ -3634,10 +3645,15 @@ export class GameEngine {
         combat.phase = 'ended'
         const loot = awardLoot(session)
         const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
-        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
+        // 1) log 文本(ended:false) — 前端 combatMode 仍为 true,允许后续 DM 叙事流式播放
+        yield { type: 'combat_status', text: lootText, ended: false }
+        // 2) 战利品弹窗事件(独立显示,不依赖 message log)
+        yield { type: 'combat_loot', result: 'victory', loot, monsters: combatMonsters.map(m => m.name) }
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         endCombat(session)
         yield* this.combatDMNarrative(`同伴们帮你解决了${enemyNames}。描写战斗结束后同伴间的默契和战后余韵。`)
+        // 3) 终结信号(ended:true) — 叙事播完才发,前端排到队尾 cleanup
+        yield { type: 'combat_status', text: '', ended: true, result: 'victory' }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return
@@ -3719,6 +3735,13 @@ export class GameEngine {
         }
         // 先发 log 文本(ended:false) — 保证前端 combatMode 在叙事期间仍为 true
         yield { type: 'combat_status', text: lines.join('\n'), ended: false }
+        // 战利品弹窗(独立显示,胜利时给玩家明显感知)
+        yield {
+          type: 'combat_loot',
+          result: turnResult.result as any,
+          loot: turnResult.loot,
+          monsters: combatMonsters.map(m => m.name),
+        }
 
         // 首次击败无辜NPC警告
         if (turnResult.firstInnocentKill) {
@@ -3751,12 +3774,20 @@ export class GameEngine {
     if (endCheck.ended) {
       combat.phase = 'ended'
       // 先发 log 文本(ended:false),让叙事在 combatMode=true 下 enqueue 播放
+      let endLoot: { items: string[]; gold: number } | undefined
       if (endCheck.result === 'victory') {
-        const loot = awardLoot(session)
-        const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
+        endLoot = awardLoot(session)
+        const lootText = `战斗胜利！获得: ${endLoot.items.join(', ')}${endLoot.gold ? ` + ${endLoot.gold}金币` : ''}`
         yield { type: 'combat_status', text: lootText, ended: false }
       } else if (endCheck.result === 'defeat') {
         yield { type: 'combat_status', text: '战斗失败...', ended: false }
+      }
+      // 战利品弹窗(胜利+失败都发,失败时 loot=undefined,前端按 result 区分)
+      yield {
+        type: 'combat_loot',
+        result: endCheck.result as any,
+        loot: endLoot,
+        monsters: combatMonsters.map(m => m.name),
       }
       syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
       endCombat(session)
@@ -3791,10 +3822,12 @@ export class GameEngine {
         combat.phase = 'ended'
         const loot = awardLoot(session)
         const lootText = `战斗胜利！获得: ${loot.items.join(', ')}${loot.gold ? ` + ${loot.gold}金币` : ''}`
-        yield { type: 'combat_status', text: lootText, ended: true, result: 'victory' }
+        yield { type: 'combat_status', text: lootText, ended: false }
+        yield { type: 'combat_loot', result: 'victory', loot, monsters: combatMonsters.map(m => m.name) }
         syncNPCConditionAfterCombat(session, combatMonsters, session.combat?.allies)
         endCombat(session)
         yield* this.combatDMNarrative(`同伴们协力击败了${enemyNames}。描写最后的敌人倒下的瞬间和团队战后的喘息。`)
+        yield { type: 'combat_status', text: '', ended: true, result: 'victory' }
         if (session.chapter) new ChapterManager(session).onEvent('combat_end')
         yield { type: 'sync', session, dossier: this.dossier.toJSON(), questHint: getQuestHint(session) }
         return

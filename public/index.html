@@ -3700,6 +3700,90 @@
       #battle-turn-banner { font-size: 18px; padding: 4px 12px; top: 10%; }
     }
 
+    /* ─── 战斗胜利结算弹窗 (2026-04-18) ─── */
+    /* 屏幕中央独立 popup,胜利金边/失败红边/逃离灰边 */
+    .combat-loot-popup {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.85);
+      min-width: 320px;
+      max-width: 80vw;
+      background: linear-gradient(180deg, #1a1325 0%, #0e0a14 100%);
+      border-radius: 12px;
+      padding: 22px 26px 18px;
+      box-shadow: 0 12px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06);
+      z-index: 1100;
+      opacity: 0;
+      pointer-events: auto;
+      cursor: pointer;
+      transition: opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.2,0.9,0.3,1.2);
+    }
+    .combat-loot-popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .combat-loot-popup.victory {
+      border: 2px solid #f0c060;
+      box-shadow: 0 12px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06), 0 0 32px rgba(240,192,96,0.35);
+    }
+    .combat-loot-popup.defeat {
+      border: 2px solid #c0504d;
+      box-shadow: 0 12px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06), 0 0 32px rgba(192,80,77,0.35);
+    }
+    .combat-loot-popup.fled {
+      border: 2px solid #8090a0;
+    }
+    .combat-loot-popup .loot-title {
+      text-align: center;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      margin-bottom: 4px;
+    }
+    .combat-loot-popup.victory .loot-title { color: #ffd93d; text-shadow: 0 0 14px rgba(255,217,61,0.65); }
+    .combat-loot-popup.defeat .loot-title  { color: #ff7a6c; text-shadow: 0 0 14px rgba(255,107,90,0.65); }
+    .combat-loot-popup.fled .loot-title    { color: #b0c0d0; }
+    .combat-loot-popup .loot-subtitle {
+      text-align: center;
+      color: #aaa;
+      font-size: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px dashed rgba(255,255,255,0.1);
+    }
+    .combat-loot-popup .loot-list {
+      display: flex; flex-direction: column; gap: 6px; min-width: 240px;
+    }
+    .combat-loot-popup .loot-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .combat-loot-popup .loot-row.gold .loot-name { color: #ffd93d; }
+    .combat-loot-popup .loot-row.gold i { color: #ffd93d; }
+    .combat-loot-popup .loot-row.item .loot-name { color: #c5e0ff; }
+    .combat-loot-popup .loot-row.item i { color: #88aaff; }
+    .combat-loot-popup .loot-name { flex: 1; }
+    .combat-loot-popup .loot-amt { color: #fff; font-weight: 700; }
+    .combat-loot-popup .loot-empty {
+      text-align: center;
+      color: #888;
+      font-size: 13px;
+      padding: 16px 0;
+    }
+    .combat-loot-popup .loot-hint {
+      text-align: center;
+      color: #555;
+      font-size: 10px;
+      margin-top: 14px;
+      letter-spacing: 1px;
+    }
+    @media (max-width: 768px) {
+      .combat-loot-popup { min-width: 280px; padding: 18px 20px 14px; }
+      .combat-loot-popup .loot-title { font-size: 26px; letter-spacing: 6px; }
+      .combat-loot-popup .loot-row { font-size: 13px; padding: 5px 10px; }
+    }
+
     /* 暴击大字 — B2: 移到地图正上方(避开卡片顶 + 操作按钮) */
     #battle-crit-banner {
       position: fixed;
@@ -6515,6 +6599,11 @@
           })
           break
 
+        // 战斗胜利结算弹窗(独立 popup,玩家明显感知"我赢了 + 拿到了什么")
+        case 'combat_loot':
+          showCombatLootPopup(msg.result, msg.loot, msg.monsters)
+          break
+
         // ─── 战斗演出 · 角色回合开始/结束 (Wave 2 双立绘对决) ───
         // 每条事件入队列,串行播放保证"逐个角色结算"节奏
         case 'actor_turn_start':
@@ -8416,6 +8505,63 @@
       }
       if (parts.length === 0) return ''
       return `<div class="equip-compare">vs ${esc(current.name)}：${parts.join(' ')}</div>`
+    }
+
+    /**
+     * 战斗胜利结算弹窗 (2026-04-18)
+     * - 在 combat_status ended:true 之前触发,显示战利品 + 击败的敌人
+     * - 自动 4s 后淡出,点击任意处立即关闭
+     * - 失败时也显示("败北"标题,无 loot)
+     */
+    function showCombatLootPopup(result, loot, monsters) {
+      // 移除旧的胜利弹窗(防止连战叠层)
+      document.querySelectorAll('.combat-loot-popup').forEach(el => el.remove())
+      const popup = document.createElement('div')
+      popup.className = 'combat-loot-popup ' + (result === 'victory' ? 'victory' : (result === 'fled' ? 'fled' : 'defeat'))
+
+      const titleText = result === 'victory' ? '⚔ 胜  利' : (result === 'fled' ? '◇ 逃 离 战 斗' : '✖ 败  北')
+      const monsterText = (monsters && monsters.length) ? monsters.join('、') : '敌人'
+
+      let lootHtml = ''
+      if (result === 'victory' && loot) {
+        const items = (loot.items || []).filter(Boolean)
+        const gold = loot.gold || 0
+        if (items.length === 0 && gold === 0) {
+          lootHtml = '<div class="loot-empty">未获得战利品</div>'
+        } else {
+          lootHtml = '<div class="loot-list">'
+          if (gold > 0) {
+            lootHtml += `<div class="loot-row gold"><i class="ra ra-gold-bar"></i> <span class="loot-name">金币</span><span class="loot-amt">+${gold}</span></div>`
+          }
+          for (const item of items) {
+            lootHtml += `<div class="loot-row item"><i class="ra ra-ammo-bag"></i> <span class="loot-name">${esc(item)}</span><span class="loot-amt">×1</span></div>`
+          }
+          lootHtml += '</div>'
+        }
+      } else if (result === 'fled') {
+        lootHtml = '<div class="loot-empty">逃离战斗,无战利品</div>'
+      } else {
+        lootHtml = '<div class="loot-empty">你倒下了…</div>'
+      }
+
+      popup.innerHTML = `
+        <div class="loot-title">${titleText}</div>
+        <div class="loot-subtitle">${result === 'defeat' ? `${esc(monsterText)} 击倒了你` : (result === 'fled' ? `成功脱离 ${esc(monsterText)} 的追击` : `击败 ${esc(monsterText)}`)}</div>
+        ${lootHtml}
+        <div class="loot-hint">点击关闭 · 4s 自动消失</div>
+      `
+      document.body.appendChild(popup)
+      // 音效:胜利+战利品 sting
+      if (result === 'victory') playSfx('victory', 0.55)
+      // 入场动画
+      requestAnimationFrame(() => popup.classList.add('show'))
+      // 点击关闭
+      const close = () => {
+        popup.classList.remove('show')
+        setTimeout(() => popup.remove(), 300)
+      }
+      popup.onclick = close
+      setTimeout(close, 4000)
     }
 
     function showItemNotification(text) {

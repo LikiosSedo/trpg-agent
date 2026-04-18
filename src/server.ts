@@ -350,6 +350,9 @@ wss.on('connection', (ws: WebSocket, req) => {
           send('combat_grid_attack', ev); break
         case 'combat_grid_end':
           send('combat_grid_end', { result: (ev as any).result, loot: (ev as any).loot }); break
+        // 战斗胜利结算弹窗
+        case 'combat_loot':
+          send('combat_loot', { result: (ev as any).result, loot: (ev as any).loot, monsters: ((ev as any).monsters || []).map((n: string) => localize(n)) }); break
         // 战斗演出 · 角色回合开始/结束(BattleAnimationQueue 用)
         case 'actor_turn_start':
           send('actor_turn_start', ev); break
