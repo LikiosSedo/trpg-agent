@@ -151,8 +151,18 @@ export class CodexResponsesProvider {
     // 3. 翻译 tools(去 function: 嵌套)
     const responsesTools = tools.map(t => toolToResponsesFormat(t))
 
-    // 4. Reasoning 配置(gpt-5.x 都支持)
-    //    summary: 'auto' 让模型决定是否吐思考链总结
+    // 4. Reasoning 配置
+    //    默认 summary:'auto' — 模型自己决定要不要吐思考链总结,实测 gpt-5.4 下
+    //    此配置几乎从不 emit reasoning_summary_text.delta(省 token / 省延迟)。
+    //
+    //    开发者开关 TRPG_DEV_THINKING=1 → 切到 effort:'medium' + summary:'detailed',
+    //    这个组合在实测里能让模型大概率(非 100%,API 本身带随机性)输出 reasoning
+    //    summary。前端"更多 → 显示 DM 思考日志"开启后即可看到。
+    //    代价:每次请求多几十到上百 reasoning token,response 慢 1-3 秒。
+    const devThinking = process.env.TRPG_DEV_THINKING === '1'
+    const reasoningConfig = devThinking
+      ? { effort: 'medium', summary: 'detailed' }
+      : { summary: 'auto' }
     const body: any = {
       model: this.model,
       instructions,
@@ -160,7 +170,7 @@ export class CodexResponsesProvider {
       tools: responsesTools,
       tool_choice: 'auto',
       parallel_tool_calls: false,
-      reasoning: { summary: 'auto' },
+      reasoning: reasoningConfig,
       store: false,
       stream,
       include: ['reasoning.encrypted_content'],
