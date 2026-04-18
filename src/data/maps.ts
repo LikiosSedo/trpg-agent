@@ -545,6 +545,38 @@ export const MAX_LOCATION_NAME_LENGTH = Math.max(
   ).map(n => n.length)
 )
 
+// ─── POI 发现状态: session-scoped, 不污染 module ─────────────────
+//
+// 历史 bug (修复于 2026-04-18): tools/search.ts 直接 mutate
+// `loc.pointsOfInterest[i].discovered = true`,这是 module-level 共享对象,
+// 改动会持续到 server 重启,导致"开新游戏后地图仍显示上局发现的隐藏 POI"。
+//
+// 修复设计:
+// - POI_INITIAL_DISCOVERED 在模块加载时 snapshot 一次,作为 immutable 默认状态
+// - 玩家发现 POI 通过 markPoiDiscovered → 写入 session.worldState.flags
+// - 所有 .discovered 读取改 isPoiDiscovered(session, poi) — 综合 snapshot + flag
+// - 即使 module 数据因任何原因被 mutate,helper 只信任 snapshot,新 session 干净
+const POI_INITIAL_DISCOVERED: ReadonlySet<string> = (() => {
+  const set = new Set<string>()
+  for (const loc of Object.values(locations)) {
+    for (const poi of loc.pointsOfInterest ?? []) {
+      if (poi.discovered === true) set.add(poi.id)
+    }
+  }
+  return set
+})()
+
+interface SessionLike { worldState: { flags: Record<string, any> } }
+
+export function isPoiDiscovered(session: SessionLike, poi: { id: string }): boolean {
+  if (POI_INITIAL_DISCOVERED.has(poi.id)) return true
+  return !!session.worldState.flags[`poi_discovered_${poi.id}`]
+}
+
+export function markPoiDiscovered(session: SessionLike, poiId: string): void {
+  session.worldState.flags[`poi_discovered_${poiId}`] = true
+}
+
 export const WORLD_OVERVIEW = `
      ████████████████
      █  灰脊矿道    █

@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 import type { Tool } from '../agent/types.js'
-import { locations, connections } from '../data/maps.js'
+import { locations, connections, isPoiDiscovered } from '../data/maps.js'
 import { getSession } from '../game-state.js'
 
 export const LookTool: Tool = {
@@ -39,7 +39,7 @@ export const LookTool: Tool = {
       }
       // 目标不在注册表中 — 标记降级，让 engine 注入 POI 上下文给 DM
       const knownPois = loc.pointsOfInterest
-        .filter((p: any) => p.discovered)
+        .filter((p: any) => isPoiDiscovered(session, p))
         .map((p: any) => p.nameZh)
         .join('、')
       return {
@@ -58,7 +58,7 @@ export const LookTool: Tool = {
       })
 
     const pois = loc.pointsOfInterest
-      .filter(p => p.discovered)
+      .filter(p => isPoiDiscovered(session, p))
       .map(p => `${p.nameZh}(${p.name})`)
 
     const npcsHere = session.npcs

@@ -10,7 +10,7 @@ import type { Tool } from '../agent/types.js'
 import type { Monster } from '../types.js'
 import { getSession, getFacts } from '../game-state.js'
 import { skillCheck } from '../rules-engine.js'
-import { locations } from '../data/maps.js'
+import { locations, isPoiDiscovered, markPoiDiscovered } from '../data/maps.js'
 import { ChapterManager } from '../chapter-manager.js'
 import { LOOT_TABLES, rollLootTable } from '../loot-tables.js'
 import { getEffectBonus } from '../effect-manager.js'
@@ -171,11 +171,12 @@ area 和 body 的物品由系统自动从产出表抽取并发放，DM 只负责
       const result = skillCheck(mod, dc)
       const checkLabel = hasWatcher ? '潜行检定(在他人注视下寻找物品)' : '察觉检定(搜索区域)'
 
-      // Discover hidden POIs on success
-      const hiddenPois = loc?.pointsOfInterest.filter(p => !p.discovered) ?? []
+      // Discover hidden POIs on success — 写入 session flag, 不 mutate module data
+      // (历史 bug: 直接改 module 对象会污染所有后续 session,新游戏地图也显示已发现 POI)
+      const hiddenPois = loc?.pointsOfInterest.filter(p => !isPoiDiscovered(session, p)) ?? []
       let discoveredPoi: { id: string; nameZh: string; description: string } | undefined
       if (result.success && hiddenPois.length > 0) {
-        hiddenPois[0].discovered = true
+        markPoiDiscovered(session, hiddenPois[0].id)
         facts.addEvent(`发现${hiddenPois[0].nameZh}`)
         discoveredPoi = { id: hiddenPois[0].id, nameZh: hiddenPois[0].nameZh, description: hiddenPois[0].description }
       }

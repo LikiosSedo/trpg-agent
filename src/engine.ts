@@ -35,7 +35,7 @@ import { validateParty } from './party-manager.js'
 import { pickNarrative } from './combat-narrative.js'
 import { UseItemTool } from './tools/use-item.js'
 import { renderPrologue, renderWorldGuide } from './world-guide.js'
-import { WORLD_OVERVIEW, locations, connections } from './data/maps.js'
+import { WORLD_OVERVIEW, locations, connections, isPoiDiscovered } from './data/maps.js'
 import { getDefaultSubLocation, getSubLocationName, getPlayerSubLocation, getNPCSubLocation } from './npc-mobility.js'
 import { resolveAudio, type AudioState } from './audio-config.js'
 import { consumeAmbianceOverride } from './tools/set-ambiance.js'
@@ -558,7 +558,7 @@ export function buildFallbackActions(session: GameSession): SceneActions {
     if (suggestions.length < 3) {
       const area = locations[loc]
       if (area) {
-        const otherPoi = area.pointsOfInterest.find((p: any) => p.discovered !== false && p.id !== subLoc)
+        const otherPoi = area.pointsOfInterest.find((p: any) => isPoiDiscovered(session, p) && p.id !== subLoc)
         if (otherPoi) suggestions.push(`前往${(otherPoi as any).nameZh}`)
       }
     }
@@ -642,7 +642,7 @@ export function buildFallbackActions(session: GameSession): SceneActions {
   if (area && suggestions.length < 3) {
     const otherPois = area.pointsOfInterest.filter((p: any) => {
       if (p.id === subLoc) return false
-      if (p.discovered === false) return false
+      if (!isPoiDiscovered(session, p)) return false
       // 深夜不推荐商店类地点
       if (isNight && (p.id === 'sturdy-anvil' || p.id === 'adventurer-guild' || p.id === 'silver-scale-guild')) return false
       return true
@@ -1214,20 +1214,23 @@ export class GameEngine {
           currentSubLocation: session.worldState.currentSubLocation,
           currentSubLocationName: currentLoc?.pointsOfInterest?.find((p: any) => p.id === session.worldState.currentSubLocation)?.nameZh ?? '',
           subLocations: currentLoc?.pointsOfInterest
-            ?.map((p: any) => ({
-              id: p.id,
-              nameZh: p.discovered !== false ? p.nameZh : '???',
-              description: p.discovered !== false ? p.description : '',
-              discovered: p.discovered !== false,
-              isCurrent: p.id === session.worldState.currentSubLocation,
-              npcs: (() => {
-                if (p.discovered === false) return []  // 未发现的地点不显示NPC
-                const here = session.npcs.filter(n =>
-                  n.location === session.worldState.currentLocation &&
-                  (n.subLocation ?? n.homeBase) === p.id)
-                return here.filter(n => this.dossier.isUnlocked(n.name)).map(n => n.name)
-              })(),
-            })) ?? [],
+            ?.map((p: any) => {
+              const disc = isPoiDiscovered(session, p)
+              return {
+                id: p.id,
+                nameZh: disc ? p.nameZh : '???',
+                description: disc ? p.description : '',
+                discovered: disc,
+                isCurrent: p.id === session.worldState.currentSubLocation,
+                npcs: (() => {
+                  if (!disc) return []  // 未发现的地点不显示NPC
+                  const here = session.npcs.filter(n =>
+                    n.location === session.worldState.currentLocation &&
+                    (n.subLocation ?? n.homeBase) === p.id)
+                  return here.filter(n => this.dossier.isUnlocked(n.name)).map(n => n.name)
+                })(),
+              }
+            }) ?? [],
           reachableAreas,
         },
       }
@@ -1941,13 +1944,13 @@ export class GameEngine {
       const inputText = input.trim()
       // 1) 严格 subLoc 匹配
       let lairPoi = allPois.find((p: any) =>
-        p.id === currentSubLoc && p.discovered && p.encounter &&
+        p.id === currentSubLoc && isPoiDiscovered(session, p) && p.encounter &&
         !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
       )
       // 2) 退化:input 文本含 POI 中文名 (玩家明示去某地战斗)
       if (!lairPoi) {
         lairPoi = allPois.find((p: any) =>
-          p.discovered && p.encounter &&
+          isPoiDiscovered(session, p) && p.encounter &&
           !session.worldState.flags[`poi_encounter_triggered_${p.id}`] &&
           (p as any).nameZh && inputText.includes((p as any).nameZh)
         )
@@ -1996,7 +1999,7 @@ export class GameEngine {
       } else if (action.type === 'ATTACK' && !(action as any).target && !session.combat?.active) {
         const currentLoc = locations[session.worldState.currentLocation]
         const encounterPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
-          p.discovered && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+          isPoiDiscovered(session, p) && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
         )
         if (encounterPoi) {
           session.worldState.flags[`poi_encounter_triggered_${encounterPoi.id}`] = true
@@ -2019,7 +2022,7 @@ export class GameEngine {
         const locName = currentLoc?.nameZh ?? session.worldState.currentLocation
         const target = (action as any).target ?? input
         const pois = (currentLoc?.pointsOfInterest ?? [])
-          .filter((p: any) => p.discovered)
+          .filter((p: any) => isPoiDiscovered(session, p))
           .map((p: any) => `${p.nameZh}(${p.description?.slice(0, 30) ?? ''})`)
           .join('、')
         parts.push(
@@ -2083,7 +2086,7 @@ export class GameEngine {
       if (!session.combat?.active && /突袭|偷袭|袭击|攻击|冲上去|杀|先下手|进攻|开打/.test(input)) {
         const currentLoc = locations[session.worldState.currentLocation]
         const encounterPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
-          p.discovered && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
+          isPoiDiscovered(session, p) && p.encounter && !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
         )
         if (encounterPoi) {
           session.worldState.flags[`poi_encounter_triggered_${encounterPoi.id}`] = true
@@ -2157,7 +2160,7 @@ export class GameEngine {
         const lairPoi = lairArea?.pointsOfInterest.find((p: any) => p.id === lairPoiId)
         if (
           lairPoi?.encounter &&
-          lairPoi.discovered &&
+          isPoiDiscovered(session, lairPoi) &&
           !session.worldState.flags[`poi_encounter_triggered_${lairPoi.id}`]
         ) {
           yield {

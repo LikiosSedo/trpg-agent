@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 import type { Tool } from '../agent/types.js'
-import { locations, connections } from '../data/maps.js'
+import { locations, connections, isPoiDiscovered } from '../data/maps.js'
 import { getSession, getFacts, advanceTime } from '../game-state.js'
 import { ChapterManager } from '../chapter-manager.js'
 import { findSubLocationArea, moveNPC } from '../npc-mobility.js'
@@ -106,7 +106,7 @@ export const MoveTool: Tool = {
         ? `${avoidingNpcs.join('、')}看到你后匆匆离开了。` : ''
 
       const subLocs = destArea.pointsOfInterest
-        .filter((p: any) => p.discovered && p.id !== session.worldState.currentSubLocation)
+        .filter((p: any) => isPoiDiscovered(session, p) && p.id !== session.worldState.currentSubLocation)
         .map((p: any) => p.nameZh)
 
       // 区域遭遇检测（有冷却机制防止连续战斗）
@@ -156,7 +156,7 @@ export const MoveTool: Tool = {
     )
 
     if (targetPoi) {
-      if (!targetPoi.discovered) {
+      if (!isPoiDiscovered(session, targetPoi)) {
         return { output: `你还没有发现这个地方。`, isError: true }
       }
 
@@ -236,7 +236,7 @@ export const MoveTool: Tool = {
 
     // ── Nothing matched — 目的地不在地图注册表中 ──
     const available = currentArea.pointsOfInterest
-      .filter((p: any) => p.discovered)
+      .filter((p: any) => isPoiDiscovered(session, p))
       .map((p: any) => `${p.nameZh}(${p.id})`)
     const areaConnections = connections
       .filter(c => c.from === current || c.to === current)
