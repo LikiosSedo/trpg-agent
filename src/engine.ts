@@ -1922,24 +1922,44 @@ export class GameEngine {
       }
     }
 
-    // ── 巢穴入口确认：玩家点击"踏入"按钮或输入相关关键词 ──
+    // ── 巢穴入口确认：玩家说"踏入/进入/...XXX"触发战斗预热 ──
+    // 两段匹配:
+    // 1) currentSubLoc 已经在 lair POI 上 → 严格命中(原逻辑)
+    // 2) 退化:用 input 文本里的 POI 名匹配当前区域的所有未触发 lair POI
+    //    这处理"DM 把 Move 走成 NARRATIVE 没更新 subLoc"的常见场景
     if (
       !session.combat?.active &&
       /^(踏入|进入|闯入|深入|走进|冲进)/.test(input.trim())
     ) {
       const currentLoc = locations[session.worldState.currentLocation]
       const currentSubLoc = session.worldState.currentSubLocation
-      const lairPoi = (currentLoc?.pointsOfInterest ?? []).find((p: any) =>
+      const allPois = (currentLoc?.pointsOfInterest ?? [])
+      const inputText = input.trim()
+      // 1) 严格 subLoc 匹配
+      let lairPoi = allPois.find((p: any) =>
         p.id === currentSubLoc && p.discovered && p.encounter &&
         !session.worldState.flags[`poi_encounter_triggered_${p.id}`]
       )
+      // 2) 退化:input 文本含 POI 中文名 (玩家明示去某地战斗)
+      if (!lairPoi) {
+        lairPoi = allPois.find((p: any) =>
+          p.discovered && p.encounter &&
+          !session.worldState.flags[`poi_encounter_triggered_${p.id}`] &&
+          (p as any).nameZh && inputText.includes((p as any).nameZh)
+        )
+        if (lairPoi) {
+          // 同步 subLoc 让其他系统(audio/quest hint/discovery)也认知到玩家在这
+          session.worldState.currentSubLocation = (lairPoi as any).id
+          console.log(`[lair] 玩家文本"${inputText}"匹配 POI ${(lairPoi as any).nameZh},自动同步 subLocation`)
+        }
+      }
       if (lairPoi) {
-        session.worldState.flags[`poi_encounter_triggered_${lairPoi.id}`] = true
-        session.worldState.flags['pending_encounter'] = lairPoi.encounter!.monsters.join(',')
-        console.log(`[lair] 玩家确认踏入 ${lairPoi.nameZh}，触发遭遇: ${lairPoi.encounter!.monsters.join(',')}`)
+        session.worldState.flags[`poi_encounter_triggered_${(lairPoi as any).id}`] = true
+        session.worldState.flags['pending_encounter'] = (lairPoi as any).encounter!.monsters.join(',')
+        console.log(`[lair] 玩家确认踏入 ${(lairPoi as any).nameZh}，触发遭遇: ${(lairPoi as any).encounter!.monsters.join(',')}`)
         parts.push(
-          `[叙事引导] 玩家深吸一口气，踏入了「${lairPoi.nameZh}」。` +
-          `${lairPoi.encounter!.description} ` +
+          `[叙事引导] 玩家深吸一口气，踏入了「${(lairPoi as any).nameZh}」。` +
+          `${(lairPoi as any).encounter!.description} ` +
           `用2-3句描写玩家踏入巢穴的瞬间——光线骤变、空气凝固、` +
           `敌人察觉到入侵者的那个紧张时刻。战斗即将开始。`
         )
