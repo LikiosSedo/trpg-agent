@@ -6578,11 +6578,12 @@
           }
           break
         case 'combat_grid_end':
-          // 2026-04-18: 不再立即 battleQueue.clear — 改为 enqueue cleanup 到队尾,
-          // 让之前入队的结束叙事 / 卡片退场先播完,再做清理。
+          // 2026-04-18: enqueue cleanup 到队尾, 让之前入队的结束叙事/卡片退场先播完
+          // ⚠️ 不要在这里 battleQueue.queue.length=0! 后续 combat_status ended:true
+          // 也会 enqueue doCleanup, 清队列会把它吞掉 → 卡在战斗 UI 退不出去 (修复于 2026-04-18)
           battleQueue.enqueue(async () => {
             hideActorCard()
-            // A4: 兜底清暴击 banner(若刚好暴击+战斗结束的边界态)
+            // 兜底清暴击 / 回合 banner / 屏幕震动
             {
               const banner = document.getElementById('battle-crit-banner')
               if (banner) { banner.style.display = 'none'; banner.style.animation = '' }
@@ -6593,9 +6594,6 @@
             highlightGridActor(null)
             hideBattleSubtitle()
             endCombatGrid(msg.result, msg.loot)
-            // 清除 grid_end 之后意外入队的残留 job(例如网络延迟的 narrative)
-            // 不影响当前执行的这个 job
-            battleQueue.queue.length = 0
           })
           break
 
@@ -8373,6 +8371,22 @@
       // 退出战斗 — 清字幕条 + 恢复 #messages
       hideBattleSubtitle()
       setCombatBodyMode(false)
+
+      // 兜底: combatMode + 战斗目标全清 (防 combat_status ended:true 因任何原因没到达,
+      // 玩家被卡在 legacy 战斗 UI 退不出去 — 用户实测过的根因之一,2026-04-18)
+      combatMode = false
+      combatTargets = []
+      combatSpells = []
+      combatItems = []
+      combatAllies = []
+      combatAllMonsters = []
+      combatMonsterPortraits = {}
+      combatSelectedTarget = null
+      combatPlayerHp = 0
+      combatPlayerMaxHp = 0
+      // 移除 legacy 战斗 UI 残留
+      document.getElementById('messages').querySelectorAll('.combat-portraits').forEach(el => el.remove())
+      try { updateCombatPanel() } catch (e) { }
 
       if (result === 'victory') {
         playSfx('victory', 0.5)
