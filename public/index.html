@@ -308,7 +308,7 @@
       display: none;
       background: linear-gradient(180deg, #16213e 0%, #0e1628 100%);
       border-bottom: 2px solid #ff8c42;
-      padding: 10px 12px;
+      padding: 6px 12px;  /* D 微调:padding 10→6,降低 hud 总高度 */
       flex-shrink: 0;
       z-index: 40;
     }
@@ -443,8 +443,8 @@
       display: flex; flex-direction: column; align-items: center;
       background: rgba(255, 140, 66, 0.06);
       border: 1px solid rgba(255, 140, 66, 0.3);
-      border-radius: 6px; padding: 4px 6px;
-      min-width: 56px; max-width: 72px;
+      border-radius: 4px; padding: 2px 4px;
+      min-width: 38px; max-width: 52px;  /* D 微调: 56→38 / 72→52 */
       cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, opacity 0.3s;
       -webkit-tap-highlight-color: transparent;
     }
@@ -457,22 +457,22 @@
     .chud-enemy.hit { animation: chudDamageFlash 0.4s ease-out; }
 
     .chud-enemy-portrait {
-      width: 32px; height: 32px; border-radius: 4px;
+      width: 22px; height: 22px; border-radius: 3px;  /* D 微调: 32→22 */
       background: #1a0a0a; display: flex; align-items: center; justify-content: center;
       overflow: hidden; position: relative;
     }
-    .chud-enemy-portrait img { width: 32px; height: 32px; image-rendering: pixelated; }
-    .chud-enemy-portrait .fallback-icon { font-size: 16px; color: #ff8c42; }
+    .chud-enemy-portrait img { width: 22px; height: 22px; image-rendering: pixelated; }
+    .chud-enemy-portrait .fallback-icon { font-size: 12px; color: #ff8c42; }
     .chud-enemy.dead .chud-enemy-portrait { filter: grayscale(1); }
 
     .chud-enemy-name {
-      font-size: 9px; color: #ff8c42; margin-top: 2px;
+      font-size: 8px; color: #ff8c42; margin-top: 1px;
       text-align: center; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; max-width: 64px;
+      overflow: hidden; text-overflow: ellipsis; max-width: 48px;
     }
     .chud-enemy-name.dead-name { text-decoration: line-through; color: #555; }
 
-    .chud-enemy .chud-hp-bar { width: 100%; height: 7px; margin-top: 3px; border-radius: 3px; }
+    .chud-enemy .chud-hp-bar { width: 100%; height: 5px; margin-top: 2px; border-radius: 2px; }
     .chud-enemy .chud-hp-fill { background: #f44336; border-radius: 0; transition: width 0.4s ease; }
     .chud-enemy .chud-hp-text { font-size: 10px; color: #cc7755; margin-top: 1px; }
 
@@ -3487,6 +3487,240 @@
       margin-bottom: 2px;
     }
 
+    /* ─── 战斗演出 · Actor Turn Cards (Wave 2 双立绘对决布局) ─── */
+    /* attacker 卡片在屏幕左侧,target 卡片在右侧,中央留出地图 + 操作按钮 */
+    #battle-actor-stage {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 950;
+      pointer-events: none;
+      display: none;
+    }
+    #battle-actor-stage.active { display: block; }
+    .battle-actor-card {
+      position: absolute;
+      width: 200px;
+      background: linear-gradient(180deg, #1a1a2e 0%, #111 100%);
+      border: 2px solid #555;
+      border-radius: 10px;
+      padding: 10px 10px 8px;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.6), 0 0 18px rgba(100,80,200,0.15);
+      transform-origin: center;
+    }
+    /* 左侧 slot:attacker(行动者) — 顶部对齐,避开操作按钮(中下)和输入框(底部) */
+    .battle-actor-card.slot-attacker {
+      left: 24px;
+      top: 60px;  /* 让出 HUD 顶部 */
+      animation: battleCardEnterLeft 0.4s cubic-bezier(0.2,0.9,0.3,1.1);
+    }
+    /* 右侧 slot:target(受击/被作用方) */
+    .battle-actor-card.slot-target {
+      right: 24px;
+      top: 60px;
+      animation: battleCardEnterRight 0.4s cubic-bezier(0.2,0.9,0.3,1.1);
+    }
+    .battle-actor-card.slot-attacker.leaving { animation: battleCardLeaveLeft 0.3s ease-in forwards; }
+    .battle-actor-card.slot-target.leaving { animation: battleCardLeaveRight 0.3s ease-in forwards; }
+    /* side 染色:边框颜色 */
+    .battle-actor-card.side-player { border-color: #5a9bd4; box-shadow: 0 6px 22px rgba(0,0,0,0.6), 0 0 22px rgba(90,155,212,0.4); }
+    .battle-actor-card.side-enemy { border-color: #c0504d; box-shadow: 0 6px 22px rgba(0,0,0,0.6), 0 0 22px rgba(192,80,77,0.4); }
+    .battle-actor-card.side-ally { border-color: #9bbb59; box-shadow: 0 6px 22px rgba(0,0,0,0.6), 0 0 18px rgba(155,187,89,0.35); }
+    /* intent 顶部色条 */
+    .battle-actor-card.intent-attack { border-top: 4px solid #e74c3c; }
+    .battle-actor-card.intent-spell { border-top: 4px solid #9b59b6; }
+    .battle-actor-card.intent-defend { border-top: 4px solid #3498db; }
+    .battle-actor-card.intent-move { border-top: 4px solid #95a5a6; }
+    .battle-actor-card.intent-item { border-top: 4px solid #f39c12; }
+    .battle-actor-card.intent-flee { border-top: 4px solid #7f8c8d; }
+    .battle-actor-card.intent-target { border-top: 4px solid #444; }  /* target 卡 */
+    .battle-actor-portrait {
+      width: 100%;
+      height: 160px;  /* B1: 缩短从 200 → 160,卡片整体更紧凑,避开下方按钮 */
+      background: #0a0a12 center/cover no-repeat;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      position: relative;
+      overflow: hidden;
+      image-rendering: pixelated;  /* 像素风立绘:禁用平滑插值 */
+    }
+    .battle-actor-portrait.fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      color: #444;
+    }
+    .battle-actor-name {
+      text-align: center;
+      color: #e8e8f0;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+    .battle-actor-intent {
+      text-align: center;
+      color: #aaa;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    /* 入场动画:左卡从屏幕外左边滑入,右卡从屏幕外右边滑入 — B1 调整后无 translateY */
+    @keyframes battleCardEnterLeft {
+      0%   { opacity: 0; transform: translateX(-40px) scale(0.92); }
+      100% { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes battleCardEnterRight {
+      0%   { opacity: 0; transform: translateX(40px) scale(0.92); }
+      100% { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes battleCardLeaveLeft {
+      0%   { opacity: 1; transform: translateX(0) scale(1); }
+      100% { opacity: 0; transform: translateX(-30px) scale(0.92); }
+    }
+    @keyframes battleCardLeaveRight {
+      0%   { opacity: 1; transform: translateX(0) scale(1); }
+      100% { opacity: 0; transform: translateX(30px) scale(0.92); }
+    }
+    /* battleShake 也要去掉 translate(-50%),避免 shake 时回到旧居中位 */
+    /* 移动端:卡片缩成顶部条状(立绘 + 名字)避开网格(390 宽下卡片必须很小) */
+    @media (max-width: 768px) {
+      .battle-actor-card {
+        width: 100px;
+        padding: 4px 6px 4px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-top-width: 3px;
+      }
+      .battle-actor-card.slot-attacker { left: 8px; top: 50px; }
+      .battle-actor-card.slot-target { right: 8px; top: 50px; }
+      .battle-actor-portrait { height: 80px; margin-bottom: 4px; }
+      .battle-actor-name { font-size: 11px; margin-bottom: 0; }
+      .battle-actor-intent { font-size: 9px; letter-spacing: 1px; }
+      /* 移动端暴击 banner 缩小避免撞 UI */
+      #battle-crit-banner { font-size: 38px; letter-spacing: 4px; top: 28%; }
+    }
+
+    /* ─── Wave 2 Tier 1 特效:命中震动 / 伤害数字 / 暴击震屏 / Miss ─── */
+    .battle-actor-card.shake { animation: battleShake 0.35s ease-in-out; }
+    .battle-actor-card.flash-red {
+      animation: battleFlashRed 0.4s ease-out;
+    }
+    @keyframes battleShake {
+      0%, 100% { transform: translateX(0); }
+      15% { transform: translateX(-6px) rotate(-1deg); }
+      30% { transform: translateX(7px) rotate(1deg); }
+      45% { transform: translateX(-4px); }
+      60% { transform: translateX(5px); }
+      75% { transform: translateX(-2px); }
+    }
+    @keyframes battleFlashRed {
+      0% { filter: none; }
+      30% { filter: brightness(1.4) hue-rotate(-15deg) saturate(1.6) drop-shadow(0 0 12px #c0392b); }
+      100% { filter: none; }
+    }
+    /* 伤害数字 / Miss 飘字:从 target 卡顶部飞出 */
+    .battle-floater {
+      position: absolute;
+      left: 50%;
+      top: -10px;
+      transform: translateX(-50%);
+      font-weight: bold;
+      font-size: 32px;
+      letter-spacing: 1px;
+      pointer-events: none;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 8px currentColor;
+      animation: battleFloatUp 1.0s ease-out forwards;
+      z-index: 10;
+    }
+    .battle-floater.dmg-normal { color: #ff6b6b; }
+    .battle-floater.dmg-crit { color: #ffd93d; font-size: 44px; text-shadow: 0 2px 4px #000, 0 0 16px #ff8c00; }
+    .battle-floater.dmg-heal { color: #6dd178; }
+    .battle-floater.miss { color: #95a5a6; font-size: 24px; }
+    @keyframes battleFloatUp {
+      0%   { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.6); }
+      15%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+      30%  { opacity: 1; transform: translateX(-50%) translateY(-12px) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-60px) scale(0.95); }
+    }
+    /* 暴击全屏震屏 */
+    body.battle-screen-shake { animation: battleScreenShake 0.3s ease-in-out; }
+    @keyframes battleScreenShake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-4px, -2px); }
+      40% { transform: translate(5px, 3px); }
+      60% { transform: translate(-3px, 2px); }
+      80% { transform: translate(3px, -1px); }
+    }
+    /* ─── 回合开始大字 banner(2026-04-18 新增) ─── */
+    /* actor_turn_start 触发时显示 0.9s,我方金色/敌方红色/盟友绿色 */
+    #battle-turn-banner {
+      position: fixed;
+      top: 18%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      pointer-events: none;
+      z-index: 999;
+      display: none;
+      white-space: nowrap;
+    }
+    #battle-turn-banner.player {
+      color: #ffd93d;
+      text-shadow: 0 0 14px rgba(255,217,61,0.85), 0 4px 12px rgba(0,0,0,0.9);
+    }
+    #battle-turn-banner.enemy {
+      color: #ff6b5a;
+      text-shadow: 0 0 14px rgba(255,107,90,0.85), 0 4px 12px rgba(0,0,0,0.9);
+    }
+    #battle-turn-banner.ally {
+      color: #b6e16a;
+      text-shadow: 0 0 14px rgba(155,187,89,0.85), 0 4px 12px rgba(0,0,0,0.9);
+    }
+    #battle-turn-banner.show { display: block; animation: battleTurnBanner 0.9s ease-out forwards; }
+    @keyframes battleTurnBanner {
+      0%   { opacity: 0; transform: translate(-50%, -90%) scale(0.55); letter-spacing: 28px; }
+      22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); letter-spacing: 8px; }
+      70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); letter-spacing: 8px; }
+      100% { opacity: 0; transform: translate(-50%, -38%) scale(1); letter-spacing: 8px; }
+    }
+    @media (max-width: 768px) {
+      #battle-turn-banner { font-size: 30px; letter-spacing: 5px; top: 24%; }
+    }
+
+    /* 暴击大字 — B2: 移到地图正上方(避开卡片顶 + 操作按钮) */
+    #battle-crit-banner {
+      position: fixed;
+      top: 25%; left: 50%;  /* B2: 视口 1/4 高,刚好压在地图上方,卡片之下 */
+      transform: translate(-50%, -50%);
+      font-size: 60px;  /* B2: 缩小避撞 */
+      font-weight: 900;
+      color: #ffd93d;
+      text-shadow: 0 0 8px #ff8c00, 0 0 24px #c0392b, 0 4px 8px rgba(0,0,0,0.9);
+      letter-spacing: 6px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      animation: battleCritBanner 0.7s ease-out;
+    }
+    @keyframes battleCritBanner {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+      30%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+      60%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+    }
+    /* 网格当前行动单位高亮 */
+    .grid-cell.actor-active {
+      box-shadow: inset 0 0 0 3px #ffd93d, 0 0 16px rgba(255,217,61,0.6);
+      animation: gridActorPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes gridActorPulse {
+      0%, 100% { box-shadow: inset 0 0 0 3px #ffd93d, 0 0 16px rgba(255,217,61,0.6); }
+      50% { box-shadow: inset 0 0 0 3px #ffe98a, 0 0 24px rgba(255,217,61,0.9); }
+    }
+
     /* ─── Bestiary Panel ─── */
     .bestiary-header { padding: 0 0 12px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px; }
     .bestiary-stats { font-size: 0.95em; color: #ccc; }
@@ -3689,6 +3923,7 @@
         <button class="grid-action-btn attack" id="grid-btn-attack" onclick="gridAttackMode()"><i class="ra ra-sword"></i> 攻击</button>
         <button class="grid-action-btn" id="grid-btn-move" onclick="gridMoveMode()"><i class="ra ra-footprint"></i> 移动</button>
         <button class="grid-action-btn" id="grid-btn-spell" onclick="gridSpellMode()"><i class="ra ra-fairy-wand"></i> 法术</button>
+        <button class="grid-action-btn" id="grid-btn-item" onclick="gridItemMode()"><i class="ra ra-potion"></i> 物品</button>
         <button class="grid-action-btn" id="grid-btn-defend" onclick="gridDefend()"><i class="ra ra-shield"></i> 防御</button>
         <button class="grid-action-btn" id="grid-btn-flee" onclick="gridFlee()"><i class="ra ra-lightning-bolt"></i> 逃跑</button>
       </div>
@@ -3720,6 +3955,11 @@
       <button id="send" onclick="sendInput()">发送</button>
     </div>
   </div>
+
+  <!-- 战斗演出 · 当前行动角色立绘卡片（Wave 1）+ 暴击大字（Wave 2）-->
+  <div id="battle-actor-stage"></div>
+  <div id="battle-turn-banner"></div>
+  <div id="battle-crit-banner">暴 击!</div>
 
   <!-- DM 思考日志面板 -->
   <div id="dm-thinking-panel" class="thinking-panel collapsed" style="display:none">
@@ -4158,6 +4398,9 @@
         const panel = document.getElementById('dm-thinking-panel')
         if (panel && localStorage.getItem('trpg_dev_thinking') === '1') {
           panel.style.display = 'block'
+          panel.classList.remove('collapsed')
+          const toggle = document.getElementById('thinking-toggle')
+          if (toggle) toggle.textContent = '▼'
         }
       })()
 
@@ -5272,7 +5515,18 @@
     function setThinkingVisible(enabled) {
       localStorage.setItem('trpg_dev_thinking', enabled ? '1' : '0')
       const panel = document.getElementById('dm-thinking-panel')
-      if (panel) panel.style.display = enabled ? 'block' : 'none'
+      if (!panel) return
+      panel.style.display = enabled ? 'block' : 'none'
+      if (enabled) {
+        // 勾上时顺便展开 + 给空 content 加 placeholder,避免看起来像 bug
+        panel.classList.remove('collapsed')
+        const toggle = document.getElementById('thinking-toggle')
+        if (toggle) toggle.textContent = '▼'
+        const content = document.getElementById('thinking-content')
+        if (content && !content.children.length) {
+          content.innerHTML = '<div style="color:#555;font-style:italic;padding:4px 0">等待 DM 响应... (reasoning 非 100% emit,有时这轮就是没有)</div>'
+        }
+      }
     }
 
     // ─── 下载/上传存档 ───
@@ -5688,6 +5942,22 @@
       const container = document.getElementById('messages')
       hideThinking()
 
+      // 防御性锁:本轮还没完全结束(sending=true)时,即使某条消息或外部代码
+      // 意外把 input.disabled 打开了,也强制关回去。只有终端事件(sync / 战斗
+      // action_req / 错误处理)才走 unlockInput(),在那里 sending 会被置 false,
+      // 本守卫自然不再介入。配合下面 dm_end 不再过早 unlock,可以保证:
+      //   "只要 DM 这一轮还没彻底跑完,玩家就不能发下一条输入"
+      if (sending) {
+        const inp = document.getElementById('input')
+        if (inp && !inp.disabled) {
+          inp.disabled = true
+          inp.placeholder = 'DM 正在回应...'
+          const sendBtn = document.getElementById('send')
+          if (sendBtn) sendBtn.disabled = true
+          document.querySelectorAll('.quick-btn').forEach(b => b.classList.add('disabled'))
+        }
+      }
+
       switch (msg.type) {
         case 'dm':
           if (!currentDmDiv) {
@@ -5736,8 +6006,12 @@
             combatMode = true
             updateCombatPanel()
           } else {
-            // 有交易卡片时不解锁输入——玩家必须先处理交易
-            if (!msg.hasPendingTrade) unlockInput()
+            // 不在 dm_end 解锁 —— 解锁推迟到终端 sync 事件。
+            // 原因: dm_end 之后引擎还可能发 actions_loading(补选项)、
+            // 追加的 dm_text_delta、audio、npc_memory_update 等,sync 是
+            // 保证"本轮所有副作用都 yield 完"之后才发的最后一个事件。
+            // 交易卡片的情况下 _pendingTradeLock 会阻止 sync 解锁。
+            window._pendingTradeLock = !!msg.hasPendingTrade
             combatMode = false
             updateCombatPanel()
             showSceneActions(msg.actions)
@@ -5835,33 +6109,42 @@
           if (msg.playerHp != null) combatPlayerHp = msg.playerHp
           if (msg.playerMaxHp != null) combatPlayerMaxHp = msg.playerMaxHp
           if (msg.allies) combatAllies = msg.allies
-          // 怪物回合延迟显示（让玩家先看到自己的结果）
-          setTimeout(() => {
-            appendMsg('── 敌方回合 ──', 'combat-divider')
+          // Sprint A2: 战棋模式下数值日志只写 gridLog,#messages 主区域不再插入分隔/文本
+          // (避免和卡片演出抢视觉焦点 + setTimeout 节奏与 queue 不同步)
+          if (gridState) {
+            gridLog(msg.text)
+            updateCombatHUD()
+          } else {
+            // legacy 非战棋模式,保留旧行为
             setTimeout(() => {
-              playSfx('enemy_hit', 0.45)
-              appendMsg(msg.text, 'combat-monster')
-              // Flash player side of HUD + 刷新 HP 条
-              updateCombatHUD()
-              const ps = document.querySelector('.chud-player')
-              if (ps) { ps.style.animation = 'chudDamageFlash 0.4s ease-out'; setTimeout(() => ps.style.animation = '', 500) }
-            }, 400)
-          }, 800)
+              appendMsg('── 敌方回合 ──', 'combat-divider')
+              setTimeout(() => {
+                playSfx('enemy_hit', 0.45)
+                appendMsg(msg.text, 'combat-monster')
+                updateCombatHUD()
+                const ps = document.querySelector('.chud-player')
+                if (ps) { ps.style.animation = 'chudDamageFlash 0.4s ease-out'; setTimeout(() => ps.style.animation = '', 500) }
+              }, 400)
+            }, 800)
+          }
           break
 
         case 'combat_status':
-          if (gridState) gridLog(msg.text)
-          // 玩家回合也延迟显示 + 分隔线
-          appendMsg('── 你的回合 ──', 'combat-divider')
-          setTimeout(() => {
-            playSfx('attack_hit', 0.35)
-            appendMsg(msg.text, 'combat-player-result')
-            // Flash targeted enemy in HUD
-            if (combatSelectedTarget) {
-              const ec = document.querySelector('[data-monster-id="' + combatSelectedTarget + '"]')
-              if (ec) { ec.classList.add('hit'); setTimeout(() => ec.classList.remove('hit'), 500) }
-            }
-          }, 300)
+          if (gridState) {
+            // Sprint A2: 战棋模式只写 gridLog,不再 appendMsg 到 #messages
+            gridLog(msg.text)
+          } else {
+            // legacy 非战棋模式
+            appendMsg('── 你的回合 ──', 'combat-divider')
+            setTimeout(() => {
+              playSfx('attack_hit', 0.35)
+              appendMsg(msg.text, 'combat-player-result')
+              if (combatSelectedTarget) {
+                const ec = document.querySelector('[data-monster-id="' + combatSelectedTarget + '"]')
+                if (ec) { ec.classList.add('hit'); setTimeout(() => ec.classList.remove('hit'), 500) }
+              }
+            }, 300)
+          }
           if (msg.ended) {
             // 战棋网格清理
             if (gridState) endCombatGrid(msg.result, null)
@@ -6025,10 +6308,17 @@
           initCombatGrid(msg.grid)
           break
         case 'combat_grid_move':
-          animateGridMove(msg.unitId, msg.path)
+          // Wave 2 Sprint A1: 入队 + 逐格滑动,等卡片弹完才走单位
+          battleQueue.enqueue(async () => {
+            await animateGridMoveAsync(msg.unitId, msg.path)
+          })
           break
         case 'combat_grid_death':
-          gridUnitDeath(msg.unitId)
+          // 入队保证死亡动画在攻击演出后才播
+          battleQueue.enqueue(async () => {
+            gridUnitDeath(msg.unitId)
+            await battleSleep(900)
+          })
           break
         case 'combat_grid_spawn':
           if (gridState && msg.unit && msg.unit.pos
@@ -6047,7 +6337,64 @@
           }
           break
         case 'combat_grid_end':
+          // 战斗结束时 queue 清空,清掉所有演出残留(卡片/banner/网格高亮)
+          battleQueue.clear()
+          hideActorCard()
+          // A4: 兜底清暴击 banner(若刚好暴击+战斗结束的边界态)
+          {
+            const banner = document.getElementById('battle-crit-banner')
+            if (banner) { banner.style.display = 'none'; banner.style.animation = '' }
+            // 兜底清回合 banner
+            const tb = document.getElementById('battle-turn-banner')
+            if (tb) { tb.className = ''; tb.textContent = '' }
+            document.body.classList.remove('battle-screen-shake')
+          }
+          highlightGridActor(null)  // 清网格高亮
           endCombatGrid(msg.result, msg.loot)
+          break
+
+        // ─── 战斗演出 · 角色回合开始/结束 (Wave 2 双立绘对决) ───
+        // 每条事件入队列,串行播放保证"逐个角色结算"节奏
+        case 'actor_turn_start':
+          battleQueue.enqueue(async () => {
+            const attacker = {
+              actorName: msg.actorName, side: msg.side, intent: msg.intent, portrait: msg.portrait,
+            }
+            const target = msg.targetId ? {
+              actorName: msg.targetName, side: msg.targetSide, portrait: msg.targetPortrait,
+            } : null
+            // 回合开始大字 banner(我方=金/敌方=红/盟友=绿) — 与卡片同帧入场
+            showTurnBanner(msg.side, msg.actorName, msg.intent)
+            showActorPair(attacker, target)
+            highlightGridActor(msg.actorId)
+            // 停留时间按 intent 区分(2026-04-18 +50%):attack/spell 长 defend/move 短
+            const intent = msg.intent || 'attack'
+            const baseHold = (intent === 'attack' || intent === 'spell') ? 1200
+              : (intent === 'item' ? 1050 : 750)
+            const hold = baseHold + (target ? 300 : 0)
+            await battleSleep(hold)
+          })
+          break
+        case 'actor_turn_end':
+          battleQueue.enqueue(async () => {
+            hideActorCard()
+            highlightGridActor(null)
+            await battleSleep(480)
+          })
+          break
+
+        // ─── Wave 2 Tier 1:命中演出(震动/红 flash/伤害数字/暴击 banner)
+        case 'combat_grid_attack':
+          battleQueue.enqueue(async () => {
+            playHitEffect({
+              hit: !!msg.hit,
+              isCritical: !!msg.isCritical,
+              damage: msg.damage ?? 0,
+            })
+            // 演出节奏(2026-04-18 +50%):Miss 0.6s / 命中 0.9s / 暴击 1.35s
+            const wait = !msg.hit ? 600 : (msg.isCritical ? 1350 : 900)
+            await battleSleep(wait)
+          })
           break
 
         // ─── 物品获取通知 ───
@@ -6102,6 +6449,11 @@
           if (!thinkingPanel || thinkingPanel.style.display === 'none') break
           const thinkingContent = document.getElementById('thinking-content')
           if (!currentThinkingEntry) {
+            // 清掉 "等待..." placeholder（只有当前仅有 placeholder 时）
+            const firstChild = thinkingContent.firstElementChild
+            if (firstChild && firstChild.style && firstChild.style.fontStyle === 'italic') {
+              thinkingContent.innerHTML = ''
+            }
             currentThinkingEntry = document.createElement('div')
             currentThinkingEntry.className = 'thinking-entry'
             const label = document.createElement('div')
@@ -6123,8 +6475,10 @@
           if (msg.session?.combat?.active) {
             combatRound = msg.session.combat.round || 1
           }
-          // 战斗结束后的 sync 是最后一个事件，兜底解锁输入
-          if (!combatMode && !msg.session?.combat?.active) {
+          // sync 是每轮的终端事件,在这里统一解锁输入。
+          // 排除场景:战斗进行中(combat_action_req 会自己解锁)、
+          // 有未处理的交易卡片(玩家必须先确认/取消/砍价)。
+          if (!combatMode && !msg.session?.combat?.active && !window._pendingTradeLock) {
             unlockInput()
           }
           break
@@ -6988,9 +7342,215 @@
       overlay.classList.add('open')
     }
 
+    // ─── 战斗演出 · Actor Turn Animation Queue (Wave 1) ─────────
+    // 收到 actor_turn_start / end 时推入队列,每个 job 返回 Promise
+    // 串行播放,保证"每回合一个角色,上一个播完才到下一个"
+    // 其他战斗事件(grid_move, narrative, monster log)暂不走队列,保留现有 setTimeout 延迟
+    const INTENT_LABEL = {
+      attack: '攻击', spell: '施法', defend: '防御', move: '移动', item: '物品', flee: '逃跑',
+    }
+    class BattleAnimationQueue {
+      constructor() { this.queue = []; this.running = false; this.skipMode = false }
+      enqueue(job) {
+        this.queue.push(job)
+        if (!this.running) this._run()
+      }
+      async _run() {
+        this.running = true
+        while (this.queue.length > 0) {
+          const job = this.queue.shift()
+          try { await job() } catch (err) { console.error('[battle-queue]', err) }
+        }
+        this.running = false
+        this.skipMode = false  // 队列空了自动重置
+      }
+      clear() { this.queue = []; this.running = false; this.skipMode = false }
+      // B3: 快进 — 标记 skipMode,正在 await 的 sleep 提前 resolve(下一个 jobSleep 走 0ms)
+      skip() { this.skipMode = true }
+    }
+    const battleQueue = new BattleAnimationQueue()
+    window.battleQueue = battleQueue  // 暴露给 e2e 测试访问
+    // B3: 演出节奏 sleep — 走这个 helper,快进模式下立即 resolve
+    function battleSleep(ms) {
+      if (battleQueue.skipMode) return Promise.resolve()
+      return new Promise(r => setTimeout(r, ms))
+    }
+    // B3: Space / Enter / Esc 快进当前所有演出
+    document.addEventListener('keydown', (e) => {
+      // 只在战棋模式下生效,且不打断玩家在输入框打字
+      if (!gridState) return
+      const tag = (e.target && e.target.tagName) || ''
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.code === 'Space' || e.code === 'Escape') {
+        e.preventDefault()
+        battleQueue.skip()
+      }
+    })
+
+    /**
+     * 渲染单张卡片到指定 slot(attacker/target)
+     * data: { actorName, side, intent, portrait }
+     */
+    function renderCardToSlot(slot, data) {
+      const card = document.createElement('div')
+      const intent = data.intent || 'attack'
+      const side = data.side || 'enemy'
+      card.className = `battle-actor-card slot-${slot} side-${side} intent-${intent}`
+      const portrait = document.createElement('div')
+      portrait.className = 'battle-actor-portrait'
+      const fallbackIcon = side === 'player' ? '⚔' : side === 'ally' ? '🛡' : '☠'
+      if (data.portrait) {
+        const probe = new Image()
+        probe.onload = () => { portrait.style.backgroundImage = `url('${data.portrait}')` }
+        probe.onerror = () => {
+          portrait.classList.add('fallback')
+          portrait.textContent = fallbackIcon
+        }
+        probe.src = data.portrait
+      } else {
+        portrait.classList.add('fallback')
+        portrait.textContent = fallbackIcon
+      }
+      card.appendChild(portrait)
+      const name = document.createElement('div')
+      name.className = 'battle-actor-name'
+      name.textContent = data.actorName || '未知'
+      card.appendChild(name)
+      const intentEl = document.createElement('div')
+      intentEl.className = 'battle-actor-intent'
+      // target 卡显示 "受击" 而不是攻击者的 intent
+      const intentLabel = slot === 'target' ? '受击' : (INTENT_LABEL[intent] || intent)
+      intentEl.textContent = intentLabel
+      card.appendChild(intentEl)
+      return card
+    }
+
+    /**
+     * 显示一对立绘:attacker 在左,target 在右
+     * target 可省略(防御/移动/buff 类无目标动作)
+     * attacker: { actorName, side, intent, portrait }
+     * target?:  { actorName, side, portrait }(target 卡顶部色条固定 intent-target)
+     */
+    function showActorPair(attacker, target) {
+      const stage = document.getElementById('battle-actor-stage')
+      if (!stage) return
+      stage.innerHTML = ''
+      stage.classList.add('active')
+      stage.appendChild(renderCardToSlot('attacker', attacker))
+      if (target) {
+        // target 卡顶部条固定灰色 (intent-target),side 仍按目标本身染色
+        stage.appendChild(renderCardToSlot('target', { ...target, intent: 'target' }))
+      }
+    }
+
+    /**
+     * 兼容老接口:showActorCard 等价于 showActorPair(data)(无 target)
+     * 旧 actor_turn_start handler 还在用这个名字,保留 alias
+     */
+    function showActorCard(data) {
+      showActorPair(data)
+    }
+
+    function hideActorCard() {
+      const stage = document.getElementById('battle-actor-stage')
+      if (!stage) return
+      const cards = stage.querySelectorAll('.battle-actor-card')
+      cards.forEach(c => c.classList.add('leaving'))
+      setTimeout(() => {
+        stage.innerHTML = ''
+        stage.classList.remove('active')
+      }, 320)
+    }
+
+    /**
+     * 回合开始大字 banner(2026-04-18 新增)
+     * - side='player' → 金色"你 的 回 合"
+     * - side='enemy'  → 红色"敌方 · {name}"(intent 不显示,避免文字过长)
+     * - side='ally'   → 绿色"{name} · 行动"
+     * 0.9s 自动消失,不阻塞演出队列(banner 只是叠加视觉)
+     */
+    function showTurnBanner(side, actorName, intent) {
+      const el = document.getElementById('battle-turn-banner')
+      if (!el) return
+      let label = ''
+      if (side === 'player') label = '你 的 回 合'
+      else if (side === 'enemy') label = `敌 方 · ${actorName || '?'}`
+      else if (side === 'ally') label = `${actorName || '盟友'} · 行 动`
+      else label = actorName || '?'
+      // 重置类与动画(连续触发也能重新播)
+      el.className = ''
+      el.textContent = label
+      el.classList.add(side === 'enemy' ? 'enemy' : (side === 'ally' ? 'ally' : 'player'))
+      void el.offsetWidth  // 强制 reflow,重启动画
+      el.classList.add('show')
+    }
+
+    /**
+     * 在 target 卡上播放受击演出:震动 + 红 flash + 伤害数字飘出
+     * 暴击额外:全屏震屏 + 大红"暴击!"banner
+     * 未命中:Miss 蓝灰飘字
+     */
+    function playHitEffect(opts) {
+      const targetCard = document.querySelector('#battle-actor-stage .battle-actor-card.slot-target')
+      if (!targetCard) return  // 没有 target 卡(单卡场景)就不演
+      // 飘字
+      const floater = document.createElement('div')
+      floater.className = 'battle-floater'
+      if (!opts.hit) {
+        floater.classList.add('miss')
+        floater.textContent = 'MISS'
+      } else if (opts.isCritical) {
+        floater.classList.add('dmg-crit')
+        floater.textContent = '-' + opts.damage
+      } else {
+        floater.classList.add('dmg-normal')
+        floater.textContent = '-' + opts.damage
+      }
+      targetCard.appendChild(floater)
+      setTimeout(() => floater.remove(), 1100)
+      // 震动 / 红 flash 只命中时
+      if (opts.hit) {
+        targetCard.classList.add('shake', 'flash-red')
+        setTimeout(() => targetCard.classList.remove('shake', 'flash-red'), 450)
+      }
+      // 暴击全屏震 + banner
+      if (opts.isCritical) {
+        document.body.classList.add('battle-screen-shake')
+        setTimeout(() => document.body.classList.remove('battle-screen-shake'), 320)
+        const banner = document.getElementById('battle-crit-banner')
+        if (banner) {
+          banner.style.display = 'block'
+          banner.style.animation = 'none'
+          // reflow → 重启 animation
+          void banner.offsetWidth
+          banner.style.animation = 'battleCritBanner 0.7s ease-out'
+          setTimeout(() => { banner.style.display = 'none' }, 720)
+        }
+      }
+    }
+
+    /**
+     * 网格当前行动单位高亮(A3):
+     * - 设置 currentActiveActorId,触发 renderCombatGrid 后由它自动应用 .actor-active class
+     * - 这样即使 grid_move 期间 renderCombatGrid 多次重渲,高亮也跟随 actor 当前位置
+     */
+    function highlightGridActor(actorId) {
+      currentActiveActorId = actorId || null
+      applyActorHighlight()
+    }
+    function applyActorHighlight() {
+      document.querySelectorAll('.grid-cell.actor-active').forEach(c => c.classList.remove('actor-active'))
+      if (!currentActiveActorId || !gridState) return
+      const unit = gridState.units.find(u => u.id === currentActiveActorId)
+      if (!unit) return
+      const cell = document.querySelector(`.grid-cell[data-x="${unit.pos.x}"][data-y="${unit.pos.y}"]`)
+      if (cell) cell.classList.add('actor-active')
+    }
+
     // ─── 战棋网格系统 ───
     let gridState = null  // { width, height, terrain[][], units[] }
     let gridMode = 'idle' // idle | move | attack
+    let currentActiveActorId = null  // Wave 2 A3: 当前行动 actor,renderCombatGrid 会自动加 .actor-active
 
     function initCombatGrid(gridData) {
       gridState = gridData
@@ -7062,6 +7622,8 @@
           el.appendChild(cell)
         }
       }
+      // A3: 重渲染后立即应用 actor 高亮(否则 grid_move 多次 render 会丢 .actor-active class)
+      applyActorHighlight()
     }
 
     let gridActionPending = false  // 防止重复点击发送
@@ -7265,10 +7827,74 @@
     }
 
     function gridSpellMode() {
-      // TODO: 法术选择 UI，暂时走旧的 processCombatAction
+      if (!gridState || gridActionPending) return
+      // 战棋模式下 #messages 隐藏,反馈必须走 gridLog 才能被看到
+      if (!combatSpells || combatSpells.length === 0) {
+        gridLog('⚠ 此职业没有可用法术')
+        return
+      }
+      const usable = combatSpells.filter(s => s.remaining > 0 || s.isCantrip)
+      if (usable.length === 0) {
+        gridLog('⚠ 法术已用尽,需要长休恢复')
+        return
+      }
+      showCombatSelector('选择法术', usable.map(s => ({
+        label: s.name,
+        info: s.isCantrip ? '戏法' : (s.remaining + '/' + s.max),
+        value: s.name,
+      })), (spell) => {
+        const spellData = combatSpells.find(s => s.name === spell.value)
+        // buff / 自施法术不选目标
+        if (spellData?.isBuff) {
+          sendGridSpell(spell.value, null)
+          return
+        }
+        const alive = gridState.units.filter(u => u.side === 'enemy' && u.hp > 0)
+        if (alive.length === 0) { appendMsg('场上没有可施法的目标。', 'system'); return }
+        if (alive.length === 1) { sendGridSpell(spell.value, alive[0].id); return }
+        showCombatSelector('选择目标', alive.map(t => ({
+          label: t.name, info: 'HP ' + t.hp + '/' + t.maxHp, value: t.id,
+        })), (target) => sendGridSpell(spell.value, target.value))
+      })
+    }
+
+    function sendGridSpell(spellName, targetId) {
+      if (!ws || gridActionPending) return
+      gridActionPending = true
+      startGridPendingTimeout()
+      appendMsg('✦ 法术（' + spellName + '）' + (targetId ? ' → 目标' : ''), 'player')
+      playSfx('spell_cast', 0.45)
+      const payload = { type: 'grid_action', action: 'grid_spell', spellName }
+      if (targetId) payload.targetId = targetId
+      ws.send(JSON.stringify(payload))
       gridMode = 'idle'
       clearGridHighlights()
       setActiveGridBtn(null)
+      disableGridButtons()
+    }
+
+    function gridItemMode() {
+      if (!gridState || gridActionPending) return
+      if (!combatItems || combatItems.length === 0) {
+        gridLog('⚠ 背包里没有战斗可用物品(药水/卷轴等)')
+        return
+      }
+      showCombatSelector('选择物品', combatItems.map(i => ({
+        label: i.name, info: i.desc || '', value: i.name,
+      })), (item) => sendGridItem(item.value))
+    }
+
+    function sendGridItem(itemName) {
+      if (!ws || gridActionPending) return
+      gridActionPending = true
+      startGridPendingTimeout()
+      appendMsg('◈ 物品（' + itemName + '）', 'player')
+      playSfx('item_acquire', 0.35)
+      ws.send(JSON.stringify({ type: 'grid_action', action: 'grid_item', itemName }))
+      gridMode = 'idle'
+      clearGridHighlights()
+      setActiveGridBtn(null)
+      disableGridButtons()
     }
 
     function gridDefend() {
@@ -7306,13 +7932,27 @@
 
     function enableGridButtons() {
       document.querySelectorAll('.grid-action-btn').forEach(b => b.disabled = false)
+      // 法术/物品根据可用性灰掉(战士无法术/未带药水时,按钮直接发灰 + tooltip)
+      const spellBtn = document.getElementById('grid-btn-spell')
+      if (spellBtn) {
+        const usable = (combatSpells || []).filter(s => s.remaining > 0 || s.isCantrip)
+        const empty = usable.length === 0
+        spellBtn.disabled = empty
+        spellBtn.title = empty ? (combatSpells.length === 0 ? '此职业没有可用法术' : '法术已用尽,需要长休') : ''
+      }
+      const itemBtn = document.getElementById('grid-btn-item')
+      if (itemBtn) {
+        const empty = !combatItems || combatItems.length === 0
+        itemBtn.disabled = empty
+        itemBtn.title = empty ? '没有可用的战斗物品(药水等)' : ''
+      }
     }
 
     // ── 动画 ──
 
     function animateGridMove(unitId, path) {
+      // 同步版本:旧调用点(非战斗演出场景)还可能用,保留瞬移行为
       if (!gridState || !path || path.length < 2) {
-        // 更新位置
         if (gridState && path && path.length > 0) {
           const u = gridState.units.find(u => u.id === unitId)
           if (u) u.pos = { ...path[path.length - 1] }
@@ -7322,9 +7962,32 @@
       }
       const unit = gridState.units.find(u => u.id === unitId)
       if (!unit) return
-      // 直接更新位置并重渲染（简化版动画，后续可加逐格滑动）
       unit.pos = { ...path[path.length - 1] }
       renderCombatGrid()
+    }
+
+    /**
+     * 异步版逐格滑动 — Wave 2 Sprint A1
+     * 每格 130ms 视觉延迟,营造"看到走过去"的过程感
+     * 用于 combat_grid_move 入队后的播放
+     */
+    async function animateGridMoveAsync(unitId, path) {
+      if (!gridState || !path || path.length < 2) {
+        if (gridState && path && path.length > 0) {
+          const u = gridState.units.find(u => u.id === unitId)
+          if (u) u.pos = { ...path[path.length - 1] }
+          renderCombatGrid()
+        }
+        return
+      }
+      const unit = gridState.units.find(u => u.id === unitId)
+      if (!unit) return
+      // 跳过 path[0](起点已经在那),从 path[1] 开始一步步走
+      for (let i = 1; i < path.length; i++) {
+        unit.pos = { ...path[i] }
+        renderCombatGrid()
+        await battleSleep(130)
+      }
     }
 
     function gridUnitDeath(unitId) {
@@ -7566,6 +8229,10 @@
       input.disabled = true
       input.placeholder = 'DM 正在回应...'
       document.getElementById('send').disabled = true
+      // 玩家已处理交易 → 解除 pendingTradeLock,让后续 sync 可以正常解锁,
+      // 并开启 sending 让 handleWsMessage 的防御锁生效
+      window._pendingTradeLock = false
+      sending = true
 
       ws.send(JSON.stringify({ type: 'trade_execute', npc, items, totalPrice }))
       card.remove()  // 移除交易卡片
@@ -7580,6 +8247,8 @@
       input.disabled = true
       input.placeholder = 'DM 正在回应...'
       document.getElementById('send').disabled = true
+      window._pendingTradeLock = false
+      sending = true
 
       ws.send(JSON.stringify({ type: 'trade_cancel', npc }))
       card.remove()  // 移除交易卡片
@@ -7590,6 +8259,9 @@
       // 卡片会在确认/取消/砍价结果返回时才移除
       window._bargainMode = true
       window._currentTradeCard = btn.closest('.trade-proposal-card')  // 保存引用，砍价后可能需要更新
+      // 进入砍价输入态:显式释放 turn lock,否则 handleWsMessage 的防御锁会把输入框关掉
+      window._pendingTradeLock = false
+      sending = false
       const input = document.getElementById('input')
       input.disabled = false
       input.value = ''
@@ -8069,6 +8741,7 @@
 
     function unlockInput() {
       sending = false
+      window._pendingTradeLock = false   // 清干净,避免遗留锁导致下一轮 sync 不解锁
       const inp = document.getElementById('input')
       if (inp) { inp.disabled = false; inp.placeholder = '说点什么 . . .' }
       document.getElementById('send').disabled = false
