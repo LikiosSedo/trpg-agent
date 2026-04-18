@@ -3537,7 +3537,8 @@
     .battle-actor-portrait {
       width: 100%;
       height: 160px;  /* B1: 缩短从 200 → 160,卡片整体更紧凑,避开下方按钮 */
-      background: #0a0a12 center/cover no-repeat;
+      /* 顶部对齐: portrait 立绘竖向超出时优先裁脚, 不裁头/脸 (用户反馈 2026-04-18) */
+      background: #0a0a12 center top / cover no-repeat;
       border-radius: 6px;
       margin-bottom: 8px;
       position: relative;
@@ -3698,6 +3699,34 @@
     }
     @media (max-width: 768px) {
       #battle-turn-banner { font-size: 18px; padding: 4px 12px; top: 10%; }
+    }
+
+    /* ─── 战斗中央 toast (2026-04-18) ─── */
+    /* 关键反馈不走 #messages(战棋模式隐藏) 也不走 gridLog(常折叠) — 直接屏幕中央 */
+    .combat-toast {
+      position: fixed;
+      top: 30%; left: 50%;
+      transform: translate(-50%, -10px);
+      padding: 12px 22px;
+      border-radius: 8px;
+      background: rgba(20, 14, 28, 0.94);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      z-index: 1200;
+      pointer-events: auto;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.6);
+    }
+    .combat-toast.warn { border: 2px solid #f0c060; color: #ffd680; }
+    .combat-toast.info { border: 2px solid #5a9bd4; color: #b8d8ff; }
+    .combat-toast .ct-icon { margin-right: 6px; font-size: 18px; }
+    .combat-toast.show { opacity: 1; transform: translate(-50%, 0); }
+    @media (max-width: 768px) {
+      .combat-toast { font-size: 14px; padding: 10px 16px; top: 28%; }
     }
 
     /* ─── 战斗胜利结算弹窗 (2026-04-18) ─── */
@@ -8169,13 +8198,15 @@
 
     function gridSpellMode() {
       if (!gridState || gridActionPending) return
-      // 战棋模式下 #messages 隐藏,反馈必须走 gridLog 才能被看到
+      // 战棋模式下 #messages 隐藏, gridLog 也常被折叠 → 反馈必须用屏幕中央 toast
       if (!combatSpells || combatSpells.length === 0) {
+        showCombatToast('此职业没有可用法术', 'warn')
         gridLog('⚠ 此职业没有可用法术')
         return
       }
       const usable = combatSpells.filter(s => s.remaining > 0 || s.isCantrip)
       if (usable.length === 0) {
+        showCombatToast('法术已用尽 — 需要长休恢复', 'warn')
         gridLog('⚠ 法术已用尽,需要长休恢复')
         return
       }
@@ -8217,6 +8248,7 @@
     function gridItemMode() {
       if (!gridState || gridActionPending) return
       if (!combatItems || combatItems.length === 0) {
+        showCombatToast('背包里没有战斗物品(药水/卷轴)', 'warn')
         gridLog('⚠ 背包里没有战斗可用物品(药水/卷轴等)')
         return
       }
@@ -8874,6 +8906,24 @@
       'mystery': '神秘',
       'danger': '危险逼近',
       'peaceful': '宁静',
+    }
+
+    /**
+     * 战斗中央 toast (2026-04-18)
+     * 战棋模式下 #messages 隐藏 + gridLog 常折叠 → 关键反馈要走屏幕中央 toast
+     * type: 'warn' (黄边)/ 'info' (蓝边); 1.5s 自动淡出, 点击立即关
+     */
+    function showCombatToast(text, type) {
+      // 移除旧 toast 防叠层
+      document.querySelectorAll('.combat-toast').forEach(t => t.remove())
+      const toast = document.createElement('div')
+      toast.className = 'combat-toast ' + (type === 'warn' ? 'warn' : 'info')
+      toast.innerHTML = `<span class="ct-icon">${type === 'warn' ? '⚠' : 'ℹ'}</span> ${esc(text)}`
+      document.body.appendChild(toast)
+      requestAnimationFrame(() => toast.classList.add('show'))
+      const close = () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 250) }
+      toast.onclick = close
+      setTimeout(close, 1500)
     }
 
     // ─── 图鉴暗示 toast ───
